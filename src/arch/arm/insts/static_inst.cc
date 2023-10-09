@@ -374,6 +374,13 @@ ArmStaticInst::printMiscReg(std::ostream &os, RegIndex reg_idx) const
 }
 
 void
+ArmStaticInst::printMetalReg(std::ostream &os, RegIndex reg_idx) const
+{
+    assert(reg_idx < metal_reg::NumRegs);
+    ccprintf(os, "%s", ArmISA::metal_reg::regNames[reg_idx]);
+}
+
+void
 ArmStaticInst::printMnemonic(std::ostream &os,
                              const std::string &suffix,
                              bool withPred,

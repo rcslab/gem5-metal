@@ -1072,6 +1072,18 @@ class DynInst : public ExecContext, public RefCounted
     }
 
     void
+    setMetalReg(int metal_reg, RegVal val) override
+    {
+        panic("unimplemented!");
+    }
+
+    RegVal
+    readMetalReg(int metal_reg) override
+    {
+        panic("unimplemented!");
+    }
+
+    void
     forwardOldRegs()
     {
 

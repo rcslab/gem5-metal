@@ -330,6 +330,15 @@ class CheckerCPU : public BaseCPU, public ExecContext
         return this->setMiscReg(reg.index(), val);
     }
 
+    RegVal readMetalReg(int metal_reg) override
+    {
+        return thread->readMetalReg(metal_reg);
+    }
+
+    void setMetalReg(int metal_reg, RegVal val) override
+    {
+        thread->setMetalReg(metal_reg, val);
+    }
     /////////////////////////////////////////
 
     void

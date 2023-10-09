@@ -595,8 +595,28 @@ namespace Aarch64
                 RegIndex rn = (RegIndex)(uint8_t)bits(machInst, 9, 5);
                 RegIndex rm = (RegIndex)(uint8_t)bits(machInst, 4, 0);
                 uint8_t op4 = bits(machInst, 4, 0);
-                if (op2 != 0x1f || op3 != 0x0)
+                uint8_t opm = bits(machInst, 11, 10);
+                if (op2 != 0x1f)
                     return new Unknown64(machInst);
+                if (op3 != 0x0) {
+                    if (op3 == 0b0001) {
+                        if (opm == 0b00) {
+                            uint8_t mroutine = (uint8_t)bits(machInst, 7, 0);
+                            return new Menter64(machInst, mroutine);
+                        } else if (opm == 0b01) {
+                            return new Mexit64(machInst);
+                        } else if (opm == 0b10) {
+                            RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                            RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                            return new Rmr64(machInst, mreg, greg);
+                        } else {
+                            RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                            RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                            return new Wmr64(machInst, mreg, greg);
+                        }
+                    }
+                    return new Unknown64(machInst);
+                }
                 switch (opc) {
                   case 0x0:
                     if (bits(machInst, 11) == 0)

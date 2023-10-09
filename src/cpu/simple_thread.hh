@@ -60,6 +60,7 @@
 #include "debug/MatRegs.hh"
 #include "debug/VecPredRegs.hh"
 #include "debug/VecRegs.hh"
+#include "debug/MetalRegs.hh"
 #include "mem/htm.hh"
 #include "mem/page_table.hh"
 #include "mem/request.hh"
@@ -287,6 +288,30 @@ class SimpleThread : public ThreadState, public ThreadContext
     setMiscReg(RegIndex misc_reg, RegVal val) override
     {
         return isa->setMiscReg(misc_reg, val);
+    }
+
+    RegVal
+    readMetalRegNoEffect(RegIndex metal_reg) const override
+    {
+        return isa->readMetalRegNoEffect(metal_reg);
+    }
+
+    RegVal
+    readMetalReg(RegIndex metal_reg) override
+    {
+        return isa->readMetalReg(metal_reg);
+    }
+
+    void
+    setMetalRegNoEffect(RegIndex metal_reg, RegVal val) override
+    {
+        return isa->setMetalRegNoEffect(metal_reg, val);
+    }
+
+    void
+    setMetalReg(RegIndex metal_reg, RegVal val) override
+    {
+        return isa->setMetalReg(metal_reg, val);
     }
 
     unsigned readStCondFailures() const override { return storeCondFailures; }

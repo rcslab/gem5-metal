@@ -758,6 +758,10 @@ class BaseCPU : public ClockedObject
         statistics::Scalar numMiscRegReads;
         statistics::Scalar numMiscRegWrites;
 
+        /* Number of Metal register file accesses */
+        statistics::Scalar numMetalRegReads;
+        statistics::Scalar numMetalRegWrites;
+
         /* Number of vector alu accesses */
         statistics::Scalar numVecAluAccesses;
 

@@ -2286,6 +2286,14 @@ resetCPSR(ArmSystem *system)
 }
 
 void
+ISA::resetMetalRegs()
+{
+    for (int i = 0; i < metal_reg::NumRegs; i++) {
+      this->setMetalReg(i, 0);
+    }
+}
+
+void
 ISA::initializeMiscRegMetadata()
 {
     // the MiscReg metadata tables are shared across all instances of the

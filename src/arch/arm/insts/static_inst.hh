@@ -177,6 +177,7 @@ class ArmStaticInst : public StaticInst
                        bool withPred = true,
                        bool withCond64 = false,
                        ConditionCode cond64 = COND_UC) const;
+    void printMetalReg(std::ostream &os, RegIndex reg_index) const;
     void printTarget(std::ostream &os, Addr target,
                      const loader::SymbolTable *symtab) const;
     void printCondition(std::ostream &os, unsigned code,

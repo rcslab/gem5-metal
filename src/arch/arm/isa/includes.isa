@@ -57,6 +57,7 @@ output header {{
 #include "arch/arm/insts/mem64.hh"
 #include "arch/arm/insts/misc.hh"
 #include "arch/arm/insts/misc64.hh"
+#include "arch/arm/insts/metal.hh"
 #include "arch/arm/insts/mult.hh"
 #include "arch/arm/insts/neon64_mem.hh"
 #include "arch/arm/insts/pred_inst.hh"

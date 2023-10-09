@@ -47,6 +47,7 @@
 #include "arch/arm/regs/int.hh"
 #include "arch/arm/regs/mat.hh"
 #include "arch/arm/regs/misc.hh"
+#include "arch/arm/regs/metal.hh"
 #include "arch/arm/regs/vec.hh"
 #include "arch/arm/self_debug.hh"
 #include "arch/arm/system.hh"
@@ -117,12 +118,14 @@ namespace ArmISA
         }
 
         void initializeMiscRegMetadata();
+        void resetMetalRegs();
 
         BaseISADevice &getGenericTimer();
         BaseISADevice &getGICv3CPUInterface();
         BaseISADevice *getGICv3CPUInterface(ThreadContext *tc);
 
         RegVal miscRegs[NUM_MISCREGS];
+        RegVal metalRegs[metal_reg::NumRegs];
         const RegId *intRegMap;
 
         void
@@ -195,6 +198,11 @@ namespace ArmISA
         RegVal readMiscReg(RegIndex idx) override;
         void setMiscRegNoEffect(RegIndex idx, RegVal val) override;
         void setMiscReg(RegIndex, RegVal val) override;
+
+        RegVal readMetalRegNoEffect(RegIndex idx) const override;
+        RegVal readMetalReg(RegIndex idx) override;
+        void setMetalRegNoEffect(RegIndex idx, RegVal val) override;
+        void setMetalReg(RegIndex, RegVal val) override;
 
         RegVal readMiscRegReset(RegIndex) const;
         void setMiscRegReset(RegIndex, RegVal val);

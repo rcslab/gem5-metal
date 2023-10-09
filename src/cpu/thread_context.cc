@@ -131,6 +131,14 @@ ThreadContext::compare(ThreadContext *one, ThreadContext *two)
                   i, t1, t2);
     }
 
+    for (int i = 0; i < regClasses.at(MetalRegClass)->numRegs(); ++i) {
+        RegVal t1 = one->readMetalRegNoEffect(i);
+        RegVal t2 = two->readMetalRegNoEffect(i);
+        if (t1 != t2)
+            panic("Metal reg idx %d doesn't match, one: %#x, two: %#x",
+                  i, t1, t2);
+    }
+
     // loop through the Condition Code registers.
     for (auto &id: *regClasses.at(CCRegClass)) {
         RegVal t1 = one->getReg(id);
