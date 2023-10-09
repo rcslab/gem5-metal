@@ -302,6 +302,32 @@ class CheckerThreadContext : public ThreadContext
         actualTC->setMiscReg(misc_reg, val);
     }
 
+    RegVal
+    readMetalReg(RegIndex metal_reg) override
+    {
+        return actualTC->readMetalReg(metal_reg);
+    }
+
+    RegVal
+    readMetalRegNoEffect(RegIndex metal_reg) const override
+    {
+        return actualTC->readMetalRegNoEffect(metal_reg);
+    }
+
+    void
+    setMetalRegNoEffect(RegIndex metal_reg, RegVal val) override
+    {
+        checkerTC->setMetalRegNoEffect(metal_reg, val);
+        actualTC->setMetalRegNoEffect(metal_reg, val);
+    }
+
+    void
+    setMetalReg(RegIndex metal_reg, RegVal val) override
+    {
+        checkerTC->setMetalReg(metal_reg, val);
+        actualTC->setMetalReg(metal_reg, val);
+    }
+
     unsigned
     readStCondFailures() const override
     {

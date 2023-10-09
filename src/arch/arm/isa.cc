@@ -44,6 +44,7 @@
 #include "arch/arm/mmu.hh"
 #include "arch/arm/pmu.hh"
 #include "arch/arm/regs/misc.hh"
+#include "arch/arm/regs/metal.hh"
 #include "arch/arm/self_debug.hh"
 #include "arch/arm/system.hh"
 #include "arch/arm/utility.hh"
@@ -58,6 +59,7 @@
 #include "debug/MatRegs.hh"
 #include "debug/VecPredRegs.hh"
 #include "debug/VecRegs.hh"
+#include "debug/MetalRegs.hh"
 #include "dev/arm/generic_timer.hh"
 #include "dev/arm/gic_v3.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
@@ -91,6 +93,7 @@ ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
     _regClasses.push_back(&matRegClass);
     _regClasses.push_back(&ccRegClass);
     _regClasses.push_back(&miscRegClass);
+    _regClasses.push_back(&metalRegClass);
 
     // Hook up a dummy device if we haven't been configured with a
     // real PMU. By using a dummy device, we don't need to check that
@@ -140,6 +143,8 @@ ISA::clear()
     for (auto idx = 0; idx < NUM_MISCREGS; idx++) {
         miscRegs[idx] = lookUpMiscReg[idx].reset();
     }
+
+    resetMetalRegs();
 
     updateRegMap(miscRegs[MISCREG_CPSR]);
 }
@@ -193,6 +198,9 @@ ISA::copyRegsFrom(ThreadContext *src)
 
     for (int i = 0; i < NUM_MISCREGS; i++)
         tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
+
+    for (int i = 0; i < metal_reg::NumRegs; i++)
+        tc->setMetalRegNoEffect(i, src->readMetalRegNoEffect(i));
 
     ArmISA::VecRegContainer vc;
     for (auto &id: vecRegClass) {
@@ -1357,6 +1365,30 @@ ISA::setMiscRegReset(RegIndex idx, RegVal val)
 {
     int flat_idx = flattenMiscIndex(idx);
     InitReg(flat_idx).reset(val);
+}
+
+RegVal
+ISA::readMetalReg(RegIndex idx)
+{
+  return readMetalRegNoEffect(idx);
+}
+
+RegVal
+ISA::readMetalRegNoEffect(RegIndex idx) const
+{
+  return this->metalRegs[idx];
+}
+
+void
+ISA::setMetalReg(RegIndex idx, RegVal val)
+{
+  setMetalRegNoEffect(idx, val);
+}
+
+void
+ISA::setMetalRegNoEffect(RegIndex idx, RegVal val)
+{
+  this->metalRegs[idx] = val;
 }
 
 BaseISADevice &

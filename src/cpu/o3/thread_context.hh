@@ -209,6 +209,29 @@ class ThreadContext : public gem5::ThreadContext
      * write might have as defined by the architecture. */
     void setMiscReg(RegIndex misc_reg, RegVal val) override;
 
+
+    RegVal
+    readMetalRegNoEffect(RegIndex metal_reg) const override
+    {
+        panic("unimplemented!");
+    }
+
+    RegVal
+    readMetalReg(RegIndex metal_reg) override
+    {
+        panic("unimplemented!");
+    }
+
+    void setMetalRegNoEffect(RegIndex misc_reg, RegVal val) override
+    {
+        panic("unimplemented!");
+    }
+
+    void setMetalReg(RegIndex misc_reg, RegVal val) override
+    {
+        panic("unimplemented!");
+    }
+
     /** Returns the number of consecutive store conditional failures. */
     // @todo: Figure out where these store cond failures should go.
     unsigned

@@ -231,8 +231,10 @@ DebugFlag('VecPredRegs')
 DebugFlag('MatRegs')
 DebugFlag('CCRegs')
 DebugFlag('MiscRegs')
+DebugFlag('MetalRegs')
+DebugFlag('Metal')
 CompoundFlag('Registers', [ 'IntRegs', 'FloatRegs', 'VecRegs', 'VecPredRegs',
-                            'MatRegs', 'CCRegs', 'MiscRegs' ])
+                            'MatRegs', 'CCRegs', 'MiscRegs', 'MetalRegs' ])
 
 DebugFlag('Decoder', "Decoder debug output")
 DebugFlag('Faults', "Information about faults, exceptions, interrupts, etc")

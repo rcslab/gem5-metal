@@ -92,6 +92,8 @@ class SimpleExecContext : public ExecContext
                        "Number of times a function call or return occured"),
               ADD_STAT(numMatInsts, statistics::units::Count::get(),
                        "Number of matrix instructions"),
+              ADD_STAT(numMetalInsts, statistics::units::Count::get(),
+                       "Number of Metal instructions"),
               ADD_STAT(numIdleCycles, statistics::units::Cycle::get(),
                        "Number of idle cycles"),
               ADD_STAT(numBusyCycles, statistics::units::Cycle::get(),
@@ -143,6 +145,9 @@ class SimpleExecContext : public ExecContext
 
         // Number of matrix instructions
         statistics::Scalar numMatInsts;
+
+        // Number of matrix instructions
+        statistics::Scalar numMetalInsts;
 
         // Number of matrix register file accesses
         mutable statistics::Scalar numMatRegReads;
@@ -261,6 +266,21 @@ class SimpleExecContext : public ExecContext
         cpu->executeStats[thread->threadId()]->numMiscRegWrites++;
         thread->setMiscReg(misc_reg, val);
     }
+
+    void
+    setMetalReg(int metal_reg, RegVal val) override
+    {
+        cpu->executeStats[thread->threadId()]->numMetalRegWrites++;
+        thread->setMetalReg(metal_reg, val);
+    }
+
+    RegVal
+    readMetalReg(int metal_reg) override
+    {
+        cpu->executeStats[thread->threadId()]->numMetalRegReads++;
+        return thread->readMetalReg(metal_reg);
+    }
+
 
     const PCStateBase &
     pcState() const override
