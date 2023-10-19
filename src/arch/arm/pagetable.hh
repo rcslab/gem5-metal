@@ -72,6 +72,15 @@ extern const GrainSize GrainMap_tg1[];
 // Max. physical address range in bits supported by the architecture
 const unsigned MaxPhysAddrRange = 52;
 
+struct AccessEntry {
+    uint8_t ap;             // Access permissions bits
+    uint8_t hap;            // Hyp access permissions bits
+
+    // Access permissions
+    bool xn;                // Execute Never
+    bool pxn;               // Privileged Execute Never (LPAE only)
+};
+
 // ITB/DTB page table entry
 struct PTE
 {
@@ -265,6 +274,8 @@ struct TlbEntry : public Serializable
     bool xn;                // Execute Never
     bool pxn;               // Privileged Execute Never (LPAE only)
 
+    int access;
+
     //Construct an entry that maps to physical address addr for SE mode
     TlbEntry(Addr _asn, Addr _vaddr, Addr _paddr,
              bool uncacheable, bool read_only) :
@@ -277,7 +288,7 @@ struct TlbEntry : public Serializable
          ns(true), nstid(true), el(EL0), type(TypeTLB::unified),
          partial(false),
          nonCacheable(uncacheable),
-         shareable(false), outerShareable(false), xn(0), pxn(0)
+         shareable(false), outerShareable(false), xn(0), pxn(0), access(-1)
     {
         // no restrictions by default, hap = 0x3
 
@@ -294,7 +305,7 @@ struct TlbEntry : public Serializable
          longDescFormat(false), isHyp(false), global(false), valid(false),
          ns(true), nstid(true), el(EL0), type(TypeTLB::unified),
          partial(false), nonCacheable(false),
-         shareable(false), outerShareable(false), xn(0), pxn(0)
+         shareable(false), outerShareable(false), xn(0), pxn(0), access(-1)
     {
         // no restrictions by default, hap = 0x3
 
@@ -489,6 +500,13 @@ struct TlbEntry : public Serializable
         uint8_t domain_;
         paramIn(cp, "domain", domain_);
         domain = static_cast<DomainType>(domain_);
+    }
+
+    void syncAP(const AccessEntry &ae) {
+        hap = ae.hap;
+        ap = ae.ap;
+        xn = ae.xn;
+        pxn = ae.pxn;
     }
 
 };
