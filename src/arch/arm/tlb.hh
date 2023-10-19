@@ -103,6 +103,7 @@ class TLB : public BaseTLB
 {
   protected:
     TlbEntry* table;
+    AccessEntry* accessTable;
 
     /** TLB Size */
     int size;
@@ -182,6 +183,8 @@ class TLB : public BaseTLB
     void takeOverFrom(BaseTLB *otlb) override;
 
     void setTableWalker(TableWalker *table_walker);
+
+    AccessEntry *getAccessEntry(int idx) { return (idx >= 0 && idx < size) ? &accessTable[idx] : nullptr; }
 
     TableWalker *getTableWalker() { return tableWalker; }
 

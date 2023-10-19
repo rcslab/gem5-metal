@@ -59,7 +59,8 @@ namespace gem5
 using namespace ArmISA;
 
 TLB::TLB(const ArmTLBParams &p)
-    : BaseTLB(p), table(new TlbEntry[p.size]), size(p.size),
+    : BaseTLB(p), table(new TlbEntry[p.size]),
+      accessTable(new AccessEntry[p.size]), size(p.size),
       isStage2(p.is_stage2),
       _walkCache(false),
       tableWalker(nullptr),
@@ -144,8 +145,15 @@ TLB::match(const Lookup &lookup_data)
             for (int i = idx; i > 0; i--)
                 table[i] = table[i - 1];
             table[0] = tmp_entry;
+
+            // sync access permissions
+            const AccessEntry& ae = accessTable[table[0].access];
+            table[0].syncAP(ae);
             return &table[0];
         } else {
+            // sync access permissions
+            const AccessEntry& ae = accessTable[table[idx].access];
+            table[idx].syncAP(ae);
             return &table[idx];
         }
     }
@@ -253,14 +261,19 @@ TLB::insert(TlbEntry &entry)
                 "size: %#x ap:%d ns:%d nstid:%d g:%d isHyp:%d el: %d\n",
                 table[size-1].vpn << table[size-1].N, table[size-1].asid,
                 table[size-1].vmid, table[size-1].pfn << table[size-1].N,
-                table[size-1].size, table[size-1].ap, table[size-1].ns,
+                table[size-1].size, accessTable[table[size-1].access].ap, table[size-1].ns,
                 table[size-1].nstid, table[size-1].global, table[size-1].isHyp,
                 table[size-1].el);
 
     // inserting to MRU position and evicting the LRU one
-    for (int i = size - 1; i > 0; --i)
+    for (int i = size - 1; i > 0; --i) {
         table[i] = table[i-1];
+        accessTable[i] = accessTable[i-1];
+        table[i].access++;
+    }
     table[0] = entry;
+    accessTable[0] = AccessEntry{entry.ap, entry.hap, entry.xn, entry.pxn};
+    table[0].access = 0;
 
     stats.inserts++;
     ppRefills->notify(1);
