@@ -84,6 +84,17 @@ getMem(PacketPtr pkt, MemT &mem, trace::InstRecord *traceData)
 
 template <class MemT>
 void
+getMemRaw(PacketPtr pkt, MemT &mem, [[maybe_unused]] trace::InstRecord *traceData)
+{
+    static_assert(std::is_standard_layout_v<MemT>);
+    const MemT * src = pkt->getConstPtr<MemT>();
+    memcpy(reinterpret_cast<char *>(&mem), reinterpret_cast<const char *>(src), sizeof(MemT));
+    // if (traceData)
+    //      traceData->setData(mem);
+}
+
+template <class MemT>
+void
 getMemLE(PacketPtr pkt, MemT &mem, trace::InstRecord *traceData)
 {
     getMem<ByteOrder::little>(pkt, mem, traceData);

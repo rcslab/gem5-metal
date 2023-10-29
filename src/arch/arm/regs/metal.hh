@@ -19,8 +19,10 @@ namespace metal_reg
 {
     BitUnion64(MSR_t)
         Bitfield<63> init; // Metal initialization flag
-        Bitfield<62> ic; // instruction intercept enable
-        Bitfield<61,0> lv; // Metal nesting level
+        Bitfield<62> ii; // instruction intercept enable
+        Bitfield<61> is; // instruction skip
+        Bitfield<60> im; // instruction intercept mask
+        Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
     enum : RegIndex
@@ -75,51 +77,69 @@ namespace metal_reg
         "mib"
     };
 
-    static inline unsigned long getMetalLevel(ThreadContext * tc)
+    static inline unsigned long getMetalLevel(MSR_t msr)
     {
-        MSR_t msr = tc->readMetalRegNoEffect(metal_reg::MSR);
         return msr.lv;
     }
 
-    static inline bool isInMetalMode(ThreadContext * tc)
+    static inline bool isInMetalMode(MSR_t msr)
     {
-        return getMetalLevel(tc) > 0;
+        return getMetalLevel(msr) > 0;
     }
 
-    static inline bool isMetalInitialized(ThreadContext *tc)
+    static inline bool isMetalInitialized(MSR_t msr)
     {
-        MSR_t msr = tc->readMetalRegNoEffect(metal_reg::MSR);
         return (bool)msr.init;
     }
 
-    static inline bool canWriteMetalReg(ThreadContext *tc, RegIndex mreg)
+    static inline bool isInstInterceptEnabled(MSR_t msr)
+    {
+        return (bool)msr.ii;
+    }
+
+    static inline bool isInstSkipEnabled(MSR_t msr)
+    {
+        return (bool)msr.is;
+    }
+
+    static inline bool isInstInterceptMasked(MSR_t msr)
+    {
+        return (bool)msr.im;
+    }
+
+    static inline bool canWriteMetalReg(MSR_t msr, RegIndex mreg)
     {
         if (mreg >= NumRegs) {
             // access beyond the number of parameters
             return false;
         }
 
-        if (isInMetalMode(tc)) {
+        if (isInMetalMode(msr)) {
             // allow access in full metal mode
             return true;
         }
 
-        if (mreg == MBR && !isMetalInitialized(tc)) {
+        if (mreg == MBR && !isMetalInitialized(msr)) {
             // allow writing to Metal Base Register outside of Metal mode to initialize Metal
-            return true;    
+            return true;
         }
 
         return false;
     }
 
-    static inline bool canReadMetalReg(ThreadContext *tc, RegIndex mreg)
+    static inline bool canReadMetalReg(MSR_t msr, RegIndex mreg)
     {
         if (mreg >= NumRegs) {
             // access beyond the number of parameters
             return false;
         }
 
-        return isInMetalMode(tc);
+        return isInMetalMode(msr);
+    }
+
+    static inline bool isMetalRegWriteMemAccess(RegIndex mreg)
+    {
+        return mreg == MIB || mreg == MBR;
     }
 
 } // namespace metal_reg

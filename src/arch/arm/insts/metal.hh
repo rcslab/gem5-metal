@@ -11,13 +11,13 @@ namespace gem5
 
         static constexpr std::string_view MetalDisasmPrefix = "Metal: ";
         // Metal instructions with an immediate (menter)
-        class MetalImmOp : public ArmStaticInst
+        class MetalImmOp8 : public ArmStaticInst
         {
         protected:
             uint8_t imm;
 
         public:
-            MetalImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass,
+            MetalImmOp8(const char *mnem, ExtMachInst _machInst, OpClass __opClass,
                        uint8_t _imm) : ArmStaticInst(mnem, _machInst, __opClass), imm(_imm)
             {
                 this->flags[IsMetal] = true;
@@ -43,10 +43,9 @@ namespace gem5
         // Metal instructions with args (rmr, wmr)
         class MetalRegOp : public ArmStaticInst
         {
-        private:
+        protected:
             RegId srcRegIdxArr[1];
             RegId destRegIdxArr[1];
-        protected:
             RegIndex mReg;
             RegIndex gReg;
 
@@ -58,10 +57,6 @@ namespace gem5
                     &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
                 reinterpret_cast<RegIdArrayPtr>(
                     &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
-        
-                setSrcRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
-                setDestRegIdx(_numDestRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
-                _numTypedDestRegs[intRegClass.type()]++;
 
                 this->flags[IsMetal] = true;
             }
@@ -71,21 +66,19 @@ namespace gem5
         };
 
         // menter
-        class Menter64 : public MetalImmOp
+        class Menter64 : public MetalImmOp8
         {
         public:
             Menter64(ExtMachInst _machInst, uint8_t _imm);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
-            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
-            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
         // mexit
-        class Mexit64 : public MetalNakedOp
+        class Mexit64 : public MetalImmOp8
         {
         public:
-            Mexit64(ExtMachInst _machInst);
+            Mexit64(ExtMachInst _machInst, uint8_t _imm);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
@@ -93,9 +86,6 @@ namespace gem5
         // rmr
         class Rmr64 : public MetalRegOp
         {
-        private:
-            RegId srcRegIdxArr[1];
-            RegId destRegIdxArr[1]; 
         public:
             Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
 
@@ -105,13 +95,12 @@ namespace gem5
         // wmr
         class Wmr64 : public MetalRegOp
         {
-        private:
-            RegId srcRegIdxArr[1];
-            RegId destRegIdxArr[1];
         public:
             Wmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
     } // namespace ArmISA

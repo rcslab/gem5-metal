@@ -241,6 +241,20 @@ class ThreadContext : public PCEventScope
                                      HtmFailureFaultCause cause) = 0;
     virtual BaseHTMCheckpointPtr& getHtmCheckpointPtr() = 0;
     virtual void setHtmCheckpointPtr(BaseHTMCheckpointPtr cpt) = 0;
+
+    // instruction interception
+    // check* functions only checks if an instruction should be intercepted
+    // do*/done* functions actually perform the intercept by changing architectural states, including PC
+    virtual bool checkInstPreIntercept(const StaticInstPtr &inst) const = 0;
+    virtual void doInstPreIntercept(const StaticInstPtr &inst) = 0;
+    virtual bool checkInstPostIntercept(const StaticInstPtr &inst) const = 0;
+    virtual void doInstPostIntercept(const StaticInstPtr &inst) = 0;
+    virtual bool checkInstInterceptMasked(void) const = 0;
+    virtual void doneInstInterceptMasked(void) = 0;
+    // METAL_XXX: these should probably be architecture-specific and not "generically" supported by the base ThreadContext class
+    // as they can be implemented by just setting the PC to the correct value
+    virtual bool checkNextInstSkipped(void) const = 0;
+    virtual void doneNextInstSkipped(void) = 0;
 };
 
 /** @{ */

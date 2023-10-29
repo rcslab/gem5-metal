@@ -126,7 +126,60 @@ namespace ArmISA
 
         RegVal miscRegs[NUM_MISCREGS];
         RegVal metalRegs[metal_reg::NumRegs];
+        char * metalCtx;
         const RegId *intRegMap;
+
+public:
+        // mroutine
+        BitUnion64(MroutineCtrl)
+            Bitfield<63> valid;
+            Bitfield<7,0> mroutine;
+        EndBitUnion(MroutineCtrl)
+
+        struct MroutineTableEntry {
+            MroutineCtrl ctrl;
+            uint64_t addr;
+        };
+        static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) * 2);
+
+        static constexpr size_t MroutineTableMaxEntryNum = 1 << 8;
+        struct MroutineTable {
+          MroutineTableEntry entries[MroutineTableMaxEntryNum];
+        };
+        static_assert(sizeof(MroutineTable) == sizeof(MroutineTableEntry) * MroutineTableMaxEntryNum);
+
+        // Instruction intercept
+        BitUnion32(InstInterceptCtrl)
+            Bitfield<31> valid;
+            Bitfield<30> post;
+            Bitfield<29> pre;
+            Bitfield<7,0> mroutine;
+        EndBitUnion(InstInterceptCtrl)
+
+        struct InstInterceptTableEntry {
+            InstInterceptCtrl ctrl;
+            uint32_t inst;
+        };
+        static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 2);
+
+        static constexpr size_t InstInterceptTableMaxEntryNum = 1 << 8;
+        struct InstInterceptTable {
+            InstInterceptTableEntry entries[InstInterceptTableMaxEntryNum];
+        };
+        static_assert(sizeof(InstInterceptTable) == sizeof(InstInterceptTableEntry) * InstInterceptTableMaxEntryNum);
+private:
+        std::unordered_map<std::string, unsigned int> instPreInterceptMap;
+        std::unordered_map<std::string, unsigned int> instPostInterceptMap;
+        void registerInstPreIntercept(std::string mnemonic, unsigned int mroutine);
+        void registerInstPostIntercept(std::string mnemonic, unsigned int mroutine);
+        bool checkInstIntercept(const StaticInstPtr &inst, bool post, Addr &addr) const;
+        void doInstIntercept(const StaticInstPtr &inst, bool post);
+        void flushInstInterceptTable(void);
+        void loadInstInterceptTable(void);
+
+        MroutineTable mroutineTable;
+        void flushMroutineTable(void);
+        void loadMroutineTable(void);
 
         void
         updateRegMap(CPSR cpsr)
@@ -198,14 +251,27 @@ namespace ArmISA
         RegVal readMiscReg(RegIndex idx) override;
         void setMiscRegNoEffect(RegIndex idx, RegVal val) override;
         void setMiscReg(RegIndex, RegVal val) override;
+        RegVal readMiscRegReset(RegIndex) const;
+        void setMiscRegReset(RegIndex, RegVal val);
 
         RegVal readMetalRegNoEffect(RegIndex idx) const override;
         RegVal readMetalReg(RegIndex idx) override;
         void setMetalRegNoEffect(RegIndex idx, RegVal val) override;
         void setMetalReg(RegIndex, RegVal val) override;
 
-        RegVal readMiscRegReset(RegIndex) const;
-        void setMiscRegReset(RegIndex, RegVal val);
+        void * allocMetalContext(size_t sz);
+
+        void freeMetalContext(void);
+public:
+        bool checkInstPreIntercept(const StaticInstPtr &inst) const override;
+        void doInstPreIntercept(const StaticInstPtr &inst) override;
+        bool checkInstPostIntercept(const StaticInstPtr &inst) const override;
+        void doInstPostIntercept(const StaticInstPtr &inst) override;
+        bool checkInstInterceptMasked(void) const override;
+        void doneInstInterceptMasked(void) override;
+        bool checkNextInstSkipped(void) const override;
+        void doneNextInstSkipped(void) override;
+        bool lookupMroutineAddr(unsigned int mroutine, Addr &npc) const;
 
         int
         flattenMiscIndex(int reg) const

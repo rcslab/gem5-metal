@@ -85,7 +85,9 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
       curThread(0),
       branchPred(p.branchPred),
       traceData(NULL),
-      _status(Idle)
+      _status(Idle),
+      isCurInstSkipped(false),
+      isInstPreIntercepted(false)
 {
     SimpleThread *thread;
 
@@ -366,6 +368,22 @@ BaseSimpleCPU::preExecute()
             t_info.fetchOffset += decoder->moreBytesSize();
         }
 
+        if (instPtr) {
+            if (thread->checkNextInstSkipped()) {
+                thread->doneNextInstSkipped();
+                this->isCurInstSkipped = true;
+                goto end;
+            }
+            else if (thread->checkInstInterceptMasked()) {
+                thread->doneInstInterceptMasked();
+                this->isInstPreIntercepted = false;
+            } else if  (thread->checkInstPreIntercept(curStaticInst)) {
+                thread->doInstPreIntercept(curStaticInst);
+                this->isInstPreIntercepted = true;
+                goto end;
+            }
+        }
+
         //If we decoded an instruction and it's microcoded, start pulling
         //out micro ops
         if (instPtr && instPtr->isMacroop()) {
@@ -401,7 +419,7 @@ BaseSimpleCPU::preExecute()
         if (predict_taken)
             ++t_info.execContextStats.numPredictedBranches;
     }
-
+end:
     // increment the fetch instruction stat counters
     if (curStaticInst) {
         countFetchInst();
@@ -412,6 +430,7 @@ void
 BaseSimpleCPU::postExecute()
 {
     SimpleExecContext &t_info = *threadInfo[curThread];
+    SimpleThread * thread = t_info.thread;
 
     assert(curStaticInst);
 
@@ -492,6 +511,14 @@ BaseSimpleCPU::postExecute()
 
     // Call CPU instruction commit probes
     probeInstCommit(curStaticInst, instAddr);
+
+    if (!isRomMicroPC(thread->pcState().microPC()) && !curMacroStaticInst &&
+         thread->checkInstPostIntercept(curStaticInst)) {
+            // don't post intercept macro ops
+            thread->doInstPostIntercept(curStaticInst);
+            // this flag is currently unused in TimingCPU, but might be useful for other CPUs
+            this->isInstPostIntercepted = true;
+    }
 }
 
 void

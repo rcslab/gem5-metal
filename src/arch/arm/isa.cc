@@ -60,6 +60,7 @@
 #include "debug/VecPredRegs.hh"
 #include "debug/VecRegs.hh"
 #include "debug/MetalRegs.hh"
+#include "debug/Metal.hh"
 #include "dev/arm/generic_timer.hh"
 #include "dev/arm/gic_v3.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
@@ -129,6 +130,7 @@ ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
     initializeMiscRegMetadata();
     preUnflattenMiscReg();
 
+    this->metalCtx = nullptr;
     clear();
 }
 
@@ -145,6 +147,9 @@ ISA::clear()
     }
 
     resetMetalRegs();
+    flushInstInterceptTable();
+    flushMroutineTable();
+    freeMetalContext();
 
     updateRegMap(miscRegs[MISCREG_CPSR]);
 }
@@ -1351,6 +1356,236 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
     }
 }
 
+void
+ISA::registerInstPreIntercept(std::string mnemonic, unsigned int mroutine)
+{
+    this->instPreInterceptMap[mnemonic] = mroutine;
+}
+
+void 
+ISA::registerInstPostIntercept(std::string mnemonic, unsigned int mroutine)
+{
+    this->instPostInterceptMap[mnemonic] = mroutine;
+}
+
+void 
+ISA::flushInstInterceptTable(void)
+{
+    DPRINTF(Metal, "Flushing instruction intercept table...\n");
+    this->instPreInterceptMap.clear();
+    this->instPostInterceptMap.clear();
+}
+
+void
+ISA::loadInstInterceptTable(void)
+{
+    assert(this->metalCtx != nullptr);
+    auto ents = reinterpret_cast<InstInterceptTableEntry *>(this->metalCtx);
+    
+    // we need to decode from the emulated PC but obtain flags from the read memory
+    Addr mib = this->readMetalRegNoEffect(metal_reg::MIB);
+    InstDecoder * decoder = this->tc->getDecoderPtr();
+    // reset decoder state and start fresh
+    decoder->reset();
+
+    for (int i = 0; i < InstInterceptTableMaxEntryNum; i++) {
+        auto ent = ents[i];
+        if (!ent.ctrl.valid) {
+            continue;
+        }
+
+        if (!ent.ctrl.pre && !ent.ctrl.post) {
+            continue;
+        }
+
+
+        Addr inst_addr = mib + i * sizeof(InstInterceptTableEntry);
+        inst_addr = purifyTaggedAddr(inst_addr, this->tc, currEL(), true);
+        PCState pc(inst_addr);
+        // copy current thread's PCState info
+        // set(pc, this->tc->pcState());
+        // pc.pc(inst_addr);
+
+        decoder->moreBytes(pc, inst_addr);
+        if (!decoder->instReady()) {
+            
+        }
+        assert(decoder->instReady());
+        StaticInstPtr inst = decoder->decode(pc);
+        // XXX: properly handle wrong encodings
+        if (!inst) {
+            panic("Cannot decode inst intercept table instruction at pc=%d, encoding=0x%x\n", inst_addr, ent.inst);
+        }
+
+        // check flags
+        if (ent.ctrl.pre) {
+            DPRINTF(Metal, "Registered inst intercept for %s.PRE.\n", inst->getName());
+            registerInstPreIntercept(inst->getName(), ent.ctrl.mroutine);
+        }
+        if (ent.ctrl.post) {
+            DPRINTF(Metal, "Registered inst intercept for %s.POST.\n", inst->getName());
+            registerInstPostIntercept(inst->getName(), ent.ctrl.mroutine);
+        }
+    }
+}
+
+void
+ISA::flushMroutineTable(void)
+{
+    DPRINTF(Metal, "Flushing mroutine table...\n");
+    for (int i = 0; i < MroutineTableMaxEntryNum; i++) {
+        this->mroutineTable.entries[i].ctrl = 0;
+        this->mroutineTable.entries[i].addr = 0;
+    }
+}
+
+void
+ISA::loadMroutineTable(void)
+{
+    assert(this->metalCtx != nullptr);
+    auto ents = reinterpret_cast<MroutineTableEntry *>(this->metalCtx);
+
+    for (int i = 0; i < MroutineTableMaxEntryNum; i++) {
+        if (!ents[i].ctrl.valid) {
+            continue;
+        }
+
+        unsigned int idx = ents[i].ctrl.mroutine;
+        if (idx >= MroutineTableMaxEntryNum) {
+            continue;
+        }
+
+        this->mroutineTable.entries[idx].ctrl = ents[i].ctrl;
+        // table format is little endian
+        this->mroutineTable.entries[idx].addr = letoh(ents[i].addr);
+
+        if (this->mroutineTable.entries[i].ctrl.valid) {
+            DPRINTF(Metal, "Loaded valid mroutine entry %d -> 0x%x", i, this->mroutineTable.entries[i].addr);
+        }
+    }
+}
+
+bool
+ISA::lookupMroutineAddr(unsigned int mroutine, Addr &npc) const
+{
+    if (mroutine >= MroutineTableMaxEntryNum) {
+        return false;
+    }
+
+    MroutineTableEntry ent = this->mroutineTable.entries[mroutine];
+
+    if (!ent.ctrl.valid) {
+        return false;
+    }
+
+    npc = ent.addr;
+    return true;
+}
+
+bool
+ISA::checkNextInstSkipped(void) const
+{
+    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    return metal_reg::isInstSkipEnabled(msr);
+}
+
+void
+ISA::doneNextInstSkipped(void)
+{
+    metal_reg::MSR_t msr = this->readMetalReg(metal_reg::MSR);
+    msr.is = 0;
+    this->setMetalReg(metal_reg::MSR, msr);
+}
+
+bool
+ISA::checkInstInterceptMasked(void) const
+{
+    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    return metal_reg::isInstInterceptMasked(msr);
+}
+
+void
+ISA::doneInstInterceptMasked(void)
+{
+    metal_reg::MSR_t msr = this->readMetalReg(metal_reg::MSR);
+    msr.im = 0;
+    this->setMetalReg(metal_reg::MSR, msr);
+}
+
+bool
+ISA::checkInstPreIntercept(const StaticInstPtr &inst) const
+{
+    Addr addr;
+    return checkInstIntercept(inst, false, addr);
+}
+
+void 
+ISA::doInstPreIntercept(const StaticInstPtr &inst)
+{
+    return doInstIntercept(inst, false);
+}
+
+bool
+ISA::checkInstPostIntercept(const StaticInstPtr &inst) const
+{
+    Addr addr;
+    return checkInstIntercept(inst, true, addr);
+}
+
+void 
+ISA::doInstPostIntercept(const StaticInstPtr &inst)
+{
+    return doInstIntercept(inst, true);
+}
+
+void
+ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
+{
+    Addr addr;
+    if (!checkInstIntercept(inst, post, addr)) {
+        panic("doInstIntercept called on a non-intercepted inst.");
+    }
+    
+    // set Metal mode
+    metal_reg::MSR_t msr = this->readMetalReg(metal_reg::MSR);
+    msr.lv = msr.lv + 1;
+
+    // set new PC
+    PCState pc;
+    set(pc, tc->pcState());
+    Addr naddr = purifyTaggedAddr(addr, tc, currEL(), true);
+    pc.instNPC(naddr);
+    tc->pcState(pc);
+}
+
+bool 
+ISA::checkInstIntercept(const StaticInstPtr &inst, bool post, Addr &addr) const
+{
+    metal_reg::MSR_t msr = readMetalRegNoEffect(metal_reg::MSR);
+
+    if (!metal_reg::isInstInterceptEnabled(msr) || !metal_reg::isMetalInitialized(msr)) {
+        // ic flag is currently disabled or metal mode is disabled
+        return false;
+    }
+
+    auto &map = post ? this->instPostInterceptMap : this->instPreInterceptMap;
+    auto it = map.find(inst->getName());
+    if (it == map.end()) {
+        return false;
+    } else {
+        // look up mroutine table to find the address
+        unsigned int mroutine = it->second;
+        assert(mroutine < MroutineTableMaxEntryNum);
+        MroutineTableEntry ment = this->mroutineTable.entries[mroutine];
+        if (!ment.ctrl.valid) {
+            // XXX: return fault instead
+            return false;
+        }
+        addr = ment.addr;
+        return true;
+    }
+}
+
 RegVal
 ISA::readMiscRegReset(RegIndex idx) const
 {
@@ -1368,25 +1603,83 @@ ISA::setMiscRegReset(RegIndex idx, RegVal val)
 RegVal
 ISA::readMetalReg(RegIndex idx)
 {
-  return readMetalRegNoEffect(idx);
+    return readMetalRegNoEffect(idx);
 }
 
 RegVal
 ISA::readMetalRegNoEffect(RegIndex idx) const
 {
-  return this->metalRegs[idx];
-}
-
-void
-ISA::setMetalReg(RegIndex idx, RegVal val)
-{
-  setMetalRegNoEffect(idx, val);
+    assert(idx < metal_reg::NumRegs);
+    return this->metalRegs[idx];
 }
 
 void
 ISA::setMetalRegNoEffect(RegIndex idx, RegVal val)
 {
-  this->metalRegs[idx] = val;
+    assert(idx < metal_reg::NumRegs);
+    this->metalRegs[idx] = val;
+}
+
+void
+ISA::setMetalReg(RegIndex idx, RegVal val)
+{
+    DPRINTF(Metal, "Setting Metal reg %d to 0x%x.\n", idx, val);
+
+    switch (idx) {
+        case metal_reg::MIB : {
+            flushInstInterceptTable();
+            loadInstInterceptTable();
+            freeMetalContext();
+            break;
+        }
+        case metal_reg::MBR : {
+            flushMroutineTable();
+            loadMroutineTable();
+            freeMetalContext();
+            break;
+        }
+        case metal_reg::MSR : {
+            metal_reg::MSR_t new_val = val;
+            metal_reg::MSR_t msr = readMetalRegNoEffect(idx);
+            // msr.init is readonly
+            new_val.init = msr.init;
+            // msr.lv is readonly
+            new_val.lv = msr.lv;
+
+            if (msr.ii != new_val.ii) {
+                DPRINTF(Metal, "Toggling instruction intercept: %d\n", new_val.ii);
+            }
+            if (msr.im != new_val.im) {
+                DPRINTF(Metal, "Toggling instruction intercept masking: %d\n", new_val.im);
+            }
+            if (msr.is != new_val.is) {
+                DPRINTF(Metal, "Toggling instruction skip: %d\n", new_val.is);
+            }
+            break;
+        }
+        default: {
+            panic("Setting unknown Metal reg %d.", idx);
+        }
+    }
+
+    setMetalRegNoEffect(idx, val);
+}
+
+void
+ISA::freeMetalContext(void)
+{
+    if (this->metalCtx != nullptr) {
+        delete[] this->metalCtx;
+        this->metalCtx = nullptr;
+    }
+}
+
+void *
+ISA::allocMetalContext(size_t sz)
+{
+    assert(this->metalCtx == nullptr);
+    this->metalCtx = new char[sz];
+    return this->metalCtx;
 }
 
 BaseISADevice &
