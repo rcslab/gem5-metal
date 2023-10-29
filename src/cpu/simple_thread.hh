@@ -416,6 +416,15 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
+
+    bool checkInstPreIntercept(const StaticInstPtr &inst) const override;
+    void doInstPreIntercept(const StaticInstPtr &inst) override;
+    bool checkInstPostIntercept(const StaticInstPtr &inst) const override;
+    void doInstPostIntercept(const StaticInstPtr &inst) override;
+    bool checkInstInterceptMasked(void) const override;
+    void doneInstInterceptMasked(void) override;
+    bool checkNextInstSkipped(void) const override;
+    void doneNextInstSkipped(void) override;
 };
 
 } // namespace gem5

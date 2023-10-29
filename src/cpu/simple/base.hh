@@ -122,6 +122,11 @@ class BaseSimpleCPU : public BaseCPU
 
     Status _status;
 
+    /** flags for skipping the current inst **/
+    bool isCurInstSkipped;
+    bool isInstPreIntercepted;
+    bool isInstPostIntercepted;
+
     /**
      * Handler used when encountering a fault; its purpose is to
      * tear down the InstRecord. If a fault is meant to be traced,

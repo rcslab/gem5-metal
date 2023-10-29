@@ -840,6 +840,18 @@ TimingSimpleCPU::completeIfetch(PacketPtr pkt)
 
     preExecute();
 
+    if (this->isCurInstSkipped) {
+        this->isCurInstSkipped = false;
+        advanceInst(NoFault);
+        goto cleanup;
+    }
+
+    if (this->isInstPreIntercepted) {
+        this->isInstPreIntercepted = false;
+        advanceInst(NoFault);
+        goto cleanup;
+    }
+
     // hardware transactional memory
     if (curStaticInst && curStaticInst->isHtmStart()) {
         // if this HtmStart is not within a transaction,
@@ -892,6 +904,7 @@ TimingSimpleCPU::completeIfetch(PacketPtr pkt)
         advanceInst(NoFault);
     }
 
+cleanup:
     if (pkt) {
         delete pkt;
     }

@@ -153,6 +153,54 @@ SimpleThread::suspend()
 }
 
 
+bool 
+SimpleThread::checkNextInstSkipped(void) const
+{
+    return getIsaPtr()->checkNextInstSkipped();
+}
+
+void
+SimpleThread::doneNextInstSkipped(void)
+{
+    return getIsaPtr()->doneNextInstSkipped();
+}
+
+bool 
+SimpleThread::checkInstInterceptMasked(void) const
+{
+    return getIsaPtr()->checkInstInterceptMasked();
+}
+
+void 
+SimpleThread::doneInstInterceptMasked(void)
+{
+    return getIsaPtr()->doneInstInterceptMasked();
+}
+
+bool 
+SimpleThread::checkInstPreIntercept(const StaticInstPtr &inst) const
+{
+    return getIsaPtr()->checkInstPreIntercept(inst);
+}
+
+void 
+SimpleThread::doInstPreIntercept(const StaticInstPtr &inst)
+{
+    return getIsaPtr()->doInstPreIntercept(inst);
+}
+
+bool 
+SimpleThread::checkInstPostIntercept(const StaticInstPtr &inst) const
+{
+    return getIsaPtr()->checkInstPostIntercept(inst);
+}
+
+void 
+SimpleThread::doInstPostIntercept(const StaticInstPtr &inst)
+{
+    return getIsaPtr()->doInstPostIntercept(inst);
+}
+
 void
 SimpleThread::halt()
 {

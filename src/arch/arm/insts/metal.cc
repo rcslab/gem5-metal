@@ -16,7 +16,7 @@ namespace gem5
     {
 
         std::string
-        MetalImmOp::generateDisassembly(
+        MetalImmOp8::generateDisassembly(
             Addr pc, const loader::SymbolTable *symtab) const
         {
             std::stringstream ss;
@@ -50,76 +50,33 @@ namespace gem5
         }
 
         // menter
-        Menter64::Menter64(ExtMachInst _machInst, uint8_t _imm) : MetalImmOp("menter", _machInst, IntAluOp, _imm)
+        Menter64::Menter64(ExtMachInst _machInst, uint8_t _imm) : MetalImmOp8("menter", _machInst, IntAluOp, _imm)
         {
             this->flags[IsCall] = true;
             this->flags[IsControl] = true;
             this->flags[IsDirectControl] = true;
             this->flags[IsInteger] = true;
             this->flags[IsUncondControl] = true;
-            this->flags[IsLoad] = true;
         }
 
         Fault Menter64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            // get mroutine table's base address
-            const RegVal base = xc->readMetalReg(metal_reg::MBR);
+            ISA * isa = static_cast<ISA *>(xc->tcBase()->getIsaPtr());
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            const Addr mroutine_ea = base + sizeof(uintptr_t) * this->imm;
+            DPRINTF(Metal, "MENTER: MBR = 0x%x, idx = %d\n", xc->readMetalReg(metal_reg::MBR), this->imm);
 
-            DPRINTF(Metal, "MENTER: MBR = 0x%x, idx = %d\n", base, this->imm);
-
-            uintptr_t target;
-
-            Fault fault = readMemAtomicLE(xc, traceData, mroutine_ea, target, ArmISA::MMU::AllowUnaligned);
-            target = cSwap(target, isBigEndian64(xc->tcBase()));
-
-            if (fault != NoFault)
-            {
-                return fault;
+            Addr npc;
+            if (!isa->lookupMroutineAddr(this->imm, npc) || metal_reg::isMetalInitialized(msr)) {
+                // mroutine does not exist or is invalid
+                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
+            npc = purifyTaggedAddr(npc, xc->tcBase(), currEL(xc->tcBase()), true);
 
             // set new PC
-            const Addr target_addr = purifyTaggedAddr(target, xc->tcBase(), currEL(xc->tcBase()), true);
             PCState pcState;
             set(pcState, xc->pcState());
-            pcState.instNPC(target_addr);
-            xc->pcState(pcState);
-
-            // save link address
-            xc->setMetalReg(metal_reg::MLR, pcState.pc() + 4);
-            // increase metal level
-            xc->setMetalReg(metal_reg::MSR, xc->readMetalReg(metal_reg::MSR) + 1);
-
-            return fault;
-        }
-
-        Fault Menter64::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
-        {
-            // get mroutine table's base address
-            const RegVal base = xc->readMetalReg(metal_reg::MBR);
-            const Addr mroutine_ea = base + sizeof(uintptr_t) * this->imm;
-
-            uintptr_t target;
-
-            DPRINTF(Metal, "MENTER: MBR = 0x%x, idx = %d\n", base, this->imm);
-
-            Fault fault = initiateMemRead(xc, traceData, mroutine_ea, target, ArmISA::MMU::AllowUnaligned);
-
-            return fault;
-        }
-
-        Fault Menter64::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
-        {
-            uintptr_t target;
-            getMemLE(pkt, target, traceData);
-            target = cSwap(target, isBigEndian64(xc->tcBase()));
-
-            // set new PC
-            const Addr target_addr = purifyTaggedAddr(target, xc->tcBase(), currEL(xc->tcBase()), true);
-            PCState pcState;
-            set(pcState, xc->pcState());
-            pcState.instNPC(target_addr);
+            pcState.instNPC(npc);
             xc->pcState(pcState);
 
             // save link address
@@ -131,7 +88,7 @@ namespace gem5
         }
 
         // mexit
-        Mexit64::Mexit64(ExtMachInst _machInst) : MetalNakedOp("mexit", _machInst, IntAluOp)
+        Mexit64::Mexit64(ExtMachInst _machInst, uint8_t _imm) : MetalImmOp8("mexit", _machInst, IntAluOp, _imm)
         {
             this->flags[IsControl] = true;
             this->flags[IsIndirectControl] = true;
@@ -144,6 +101,13 @@ namespace gem5
         {
             // get mroutine table's base address
             const RegVal ret = xc->readMetalReg(metal_reg::MLR);
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            
+            // must be in Metal mode to mexit
+            if (!metal_reg::isInMetalMode(msr)) {
+                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+            }
+
             DPRINTF(Metal, "MEXIT: MLR = 0x%x\n", ret);
 
             // set new PC
@@ -153,28 +117,133 @@ namespace gem5
             pcState.instNPC(target_addr);
             xc->pcState(pcState);
 
+            // handle instruction skip and intercept mask flags
+            if (this->imm & 0b1) {
+                msr.im = 1;
+            }
+            if ((this->imm >> 1) & 0b1) {
+                msr.is = 1;
+            }
+            if (this->imm != 0) {
+                xc->setMetalReg(metal_reg::MSR, msr);
+            }
+            
+            msr.lv = msr.lv - 1;
+
             return NoFault;
         }
 
         // wmr
         Wmr64::Wmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp("wmr", _machInst, IntAluOp, _mreg, _greg)
         {
+            setSrcRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
+            setDestRegIdx(_numDestRegs++, metalRegClass[mReg]);
+            _numTypedDestRegs[metalRegClass.type()]++;
+
             this->flags[IsInteger] = true;
+            this->flags[IsLoad] = metal_reg::isMetalRegWriteMemAccess(_mreg);
         }
 
         Fault Wmr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             ThreadContext *tc = xc->tcBase();
+            ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
             DPRINTF(Metal, "WMR: mReg = %d, gReg = %d\n", mReg, gReg);
 
-            if (!metal_reg::canWriteMetalReg(tc, mReg))
-            {
+            if (!metal_reg::canWriteMetalReg(msr, mReg)) {
                 return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
 
-            RegVal v = xc->getRegOperand(this, 1);
-            xc->setMetalReg(mReg, v);
+            Fault fault = NoFault;
+            RegVal v = xc->getRegOperand(this, 0);
+            switch(this->mReg) {
+                case metal_reg::MBR: {
+                    ISA::MroutineTable * p = reinterpret_cast<ISA::MroutineTable*>(isa->allocMetalContext(sizeof(ISA::MroutineTable)));
+                    static const std::vector<bool> byte_enable(sizeof(ISA::MroutineTable), true);
+                    fault = readMemAtomic(xc, static_cast<Addr>(v), reinterpret_cast<uint8_t*>(p), 
+                                            sizeof(ISA::MroutineTable), 
+                                            ArmISA::MMU::AllowUnaligned,
+                                            byte_enable);
+                    break;
+                }
+                case metal_reg::MIB: {
+                    ISA::InstInterceptTable * p = reinterpret_cast<ISA::InstInterceptTable*>(isa->allocMetalContext(sizeof(ISA::InstInterceptTable)));
+                    static const std::vector<bool> byte_enable(sizeof(ISA::InstInterceptTable), true);
+                    fault = readMemAtomic(xc, static_cast<Addr>(v), reinterpret_cast<uint8_t*>(p), 
+                                            sizeof(ISA::InstInterceptTable), 
+                                            ArmISA::MMU::AllowUnaligned,
+                                            byte_enable);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+
+            if (fault == NoFault) {
+                xc->setMetalReg(mReg, v);
+            } else {
+                isa->freeMetalContext();
+            }
+
+            return fault;
+        }
+
+        Fault Wmr64::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+
+            DPRINTF(Metal, "WMR: mReg = %d, gReg = %d\n", mReg, gReg);
+
+            if (!metal_reg::canWriteMetalReg(msr, mReg)) {
+                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+            }
+
+            Fault fault = NoFault;
+            RegVal v = xc->getRegOperand(this, 0);
+            switch(this->mReg) {
+                case metal_reg::MBR: {
+                    static ISA::MroutineTable p;
+                    fault = initiateMemRead(xc, traceData, v, p, ArmISA::MMU::AllowUnaligned);
+                    break;
+                }
+                case metal_reg::MIB: {
+                    static ISA::InstInterceptTable p;
+                    fault = initiateMemRead(xc, traceData, v, p, ArmISA::MMU::AllowUnaligned);
+                    break;
+                }
+                default: {
+                    panic("Setting Metal reg %d does not require memory access.\n", mReg);
+                }
+            }
+
+            return fault;
+        }
+
+        Fault Wmr64::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            ThreadContext *tc = xc->tcBase();
+            ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
+
+            switch(this->mReg) {
+                case metal_reg::MBR: {
+                    ISA::MroutineTable * p = reinterpret_cast<ISA::MroutineTable*>(isa->allocMetalContext(sizeof(ISA::MroutineTable)));
+                    getMemRaw(pkt, *p, traceData);
+                    break;
+                }
+                case metal_reg::MIB: {
+                    ISA::InstInterceptTable * p = reinterpret_cast<ISA::InstInterceptTable*>(isa->allocMetalContext(sizeof(ISA::InstInterceptTable)));
+                    getMemRaw(pkt, *p, traceData);
+                    break;
+                }
+                default: {
+                    panic("Setting Metal reg %d does not require memory access.\n", mReg);
+                }
+            }
+
+            xc->setMetalReg(mReg, xc->getRegOperand(this, 0));
 
             return NoFault;
         }
@@ -182,22 +251,27 @@ namespace gem5
         // rmr
         Rmr64::Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp("rmr", _machInst, IntAluOp, _mreg, _greg)
         {
+            setDestRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
+            setSrcRegIdx(_numDestRegs++, metalRegClass[mReg]);
+            _numTypedDestRegs[intRegClass.type()]++;
+
             this->flags[IsInteger] = true;
         }
 
         Fault Rmr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext *tc = xc->tcBase();
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+
 
             DPRINTF(Metal, "RMR: mReg = %d, gReg = %d\n", mReg, gReg);
 
-            if (!metal_reg::canReadMetalReg(tc, mReg))
+            if (!metal_reg::canReadMetalReg(msr, mReg))
             {
                 return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
 
             RegVal v = xc->readMetalReg(mReg);
-            xc->setRegOperand(this, 1, v);
+            xc->setRegOperand(this, 0, v);
 
             return NoFault;
         }

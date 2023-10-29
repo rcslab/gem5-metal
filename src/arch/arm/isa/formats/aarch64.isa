@@ -634,7 +634,8 @@ namespace Aarch64
                             uint8_t mroutine = (uint8_t)bits(machInst, 7, 0);
                             return new Menter64(machInst, mroutine);
                         } else if (opm == 0b01) {
-                            return new Mexit64(machInst);
+                            uint8_t flags = (uint8_t)bits(machInst, 1, 0);
+                            return new Mexit64(machInst, flags);
                         } else if (opm == 0b10) {
                             RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
                             RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);

@@ -42,6 +42,7 @@
 
 #include <vector>
 
+#include "cpu/static_inst.hh"
 #include "arch/generic/pcstate.hh"
 #include "base/logging.hh"
 #include "cpu/reg_class.hh"
@@ -82,6 +83,18 @@ class BaseISA : public SimObject
 
     virtual void setMetalRegNoEffect(RegIndex idx, RegVal val) = 0;
     virtual void setMetalReg(RegIndex idx, RegVal val) = 0;
+
+    // instruction interception
+    // check* functions only checks if an instruction should be intercepted
+    // do*/done* functions actually perform the intercept by changing architectural states, including PC
+    virtual bool checkInstPreIntercept(const StaticInstPtr &inst) const = 0;
+    virtual void doInstPreIntercept(const StaticInstPtr &inst) = 0;
+    virtual bool checkInstPostIntercept(const StaticInstPtr &inst) const = 0;
+    virtual void doInstPostIntercept(const StaticInstPtr &inst) = 0;
+    virtual bool checkInstInterceptMasked(void) const = 0;
+    virtual void doneInstInterceptMasked(void) = 0;
+    virtual bool checkNextInstSkipped(void) const = 0;
+    virtual void doneNextInstSkipped(void) = 0;
 
     virtual void takeOverFrom(ThreadContext *new_tc, ThreadContext *old_tc) {}
     virtual void setThreadContext(ThreadContext *_tc) { tc = _tc; }
