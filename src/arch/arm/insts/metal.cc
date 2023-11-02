@@ -43,9 +43,9 @@ namespace gem5
             std::stringstream ss;
             ss << MetalDisasmPrefix;
             printMnemonic(ss, "", false);
-            printMetalReg(ss, gReg);
-            ccprintf(ss, ", ");
             printMetalReg(ss, mReg);
+            ccprintf(ss, ", ");
+            printIntReg(ss, gReg);
             return ss.str();
         }
 
@@ -64,12 +64,12 @@ namespace gem5
             ISA * isa = static_cast<ISA *>(xc->tcBase()->getIsaPtr());
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            DPRINTF(Metal, "MENTER: MBR = 0x%x, idx = %d\n", xc->readMetalReg(metal_reg::MBR), this->imm);
+            DPRINTF(Metal, "MENTER: MBR = 0x%lx, mroutine = %d\n", xc->readMetalReg(metal_reg::MBR), this->imm);
 
             Addr npc;
-            if (!isa->lookupMroutineAddr(this->imm, npc) || metal_reg::isMetalInitialized(msr)) {
+            if (!isa->lookupMroutineAddr(this->imm, npc) || !metal_reg::isMetalInitialized(msr)) {
                 // mroutine does not exist or is invalid
-                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
             npc = purifyTaggedAddr(npc, xc->tcBase(), currEL(xc->tcBase()), true);
 
@@ -82,7 +82,9 @@ namespace gem5
             // save link address
             xc->setMetalReg(metal_reg::MLR, pcState.pc() + 4);
             // increase metal level
-            xc->setMetalReg(metal_reg::MSR, xc->readMetalReg(metal_reg::MSR) + 1);
+            msr = xc->readMetalReg(metal_reg::MSR);
+            msr.lv = msr.lv + 1;
+            xc->setMetalReg(metal_reg::MSR, msr);
 
             return NoFault;
         }
@@ -105,10 +107,10 @@ namespace gem5
             
             // must be in Metal mode to mexit
             if (!metal_reg::isInMetalMode(msr)) {
-                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            DPRINTF(Metal, "MEXIT: MLR = 0x%x\n", ret);
+            DPRINTF(Metal, "MEXIT: MLR = 0x%x.\n", ret);
 
             // set new PC
             const Addr target_addr = purifyTaggedAddr(ret, xc->tcBase(), currEL(xc->tcBase()), true);
@@ -127,9 +129,12 @@ namespace gem5
             if (this->imm != 0) {
                 xc->setMetalReg(metal_reg::MSR, msr);
             }
-            
-            msr.lv = msr.lv - 1;
 
+            // decrease Metal level
+            msr = xc->readMetalReg(metal_reg::MSR);
+            msr.lv = msr.lv - 1;
+            xc->setMetalReg(metal_reg::MSR, msr);
+            
             return NoFault;
         }
 
@@ -152,8 +157,21 @@ namespace gem5
 
             DPRINTF(Metal, "WMR: mReg = %d, gReg = %d\n", mReg, gReg);
 
-            if (!metal_reg::canWriteMetalReg(msr, mReg)) {
-                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+            bool allowWriting = false;
+            // allow writing to Metal Base Register outside of Metal mode to initialize Metal
+            if (!isMetalInitialized(msr)) {
+                if (this->mReg == metal_reg::MBR) {
+                    // set init bit
+                    msr.init = 1;
+                    xc->setMetalReg(metal_reg::MSR, msr);
+                    allowWriting = true;
+                }
+            } else {
+                allowWriting = metal_reg::canWriteMetalReg(msr, mReg);
+            }
+
+            if (!allowWriting) {
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
             Fault fault = NoFault;
@@ -177,6 +195,15 @@ namespace gem5
                                             byte_enable);
                     break;
                 }
+                case metal_reg::MSR: {
+                    metal_reg::MSR_t new_val = v;
+                    // msr.init is readonly
+                    new_val.init = msr.init;
+                    // msr.lv is readonly
+                    new_val.lv = msr.lv;
+                    v = new_val;
+                    break;
+                }
                 default: {
                     break;
                 }
@@ -197,8 +224,21 @@ namespace gem5
 
             DPRINTF(Metal, "WMR: mReg = %d, gReg = %d\n", mReg, gReg);
 
-            if (!metal_reg::canWriteMetalReg(msr, mReg)) {
-                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+            bool allowWriting = false;
+            // allow writing to Metal Base Register outside of Metal mode to initialize Metal
+            if (!isMetalInitialized(msr)) {
+                if (this->mReg == metal_reg::MBR) {
+                    // set init bit
+                    msr.init = 1;
+                    xc->setMetalReg(metal_reg::MSR, msr);
+                    allowWriting = true;
+                }
+            } else {
+                allowWriting = metal_reg::canWriteMetalReg(msr, mReg);
+            }
+
+            if (!allowWriting) {
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
             Fault fault = NoFault;
@@ -214,8 +254,14 @@ namespace gem5
                     fault = initiateMemRead(xc, traceData, v, p, ArmISA::MMU::AllowUnaligned);
                     break;
                 }
-                default: {
-                    panic("Setting Metal reg %d does not require memory access.\n", mReg);
+                case metal_reg::MSR: {
+                    metal_reg::MSR_t new_val = v;
+                    // msr.init is readonly
+                    new_val.init = msr.init;
+                    // msr.lv is readonly
+                    new_val.lv = msr.lv;
+                    v = new_val;
+                    break;
                 }
             }
 
@@ -267,7 +313,7 @@ namespace gem5
 
             if (!metal_reg::canReadMetalReg(msr, mReg))
             {
-                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
             RegVal v = xc->readMetalReg(mReg);

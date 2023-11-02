@@ -591,35 +591,40 @@ namespace Aarch64
             } else if (bits(machInst, 25) == 0x1) {
                 uint8_t opc = bits(machInst, 24, 21);
                 uint8_t op2 = bits(machInst, 20, 16);
-                uint8_t op3 = bits(machInst, 15, 12);
+                uint8_t op3 = bits(machInst, 15, 10);
                 RegIndex rn = (RegIndex)(uint8_t)bits(machInst, 9, 5);
                 RegIndex rm = (RegIndex)(uint8_t)bits(machInst, 4, 0);
                 uint8_t op4 = bits(machInst, 4, 0);
-                uint8_t opm = bits(machInst, 11, 10);
                 if (op2 != 0x1f)
                     return new Unknown64(machInst);
-                if (op3 != 0x0) {
-                    if (op3 == 0b0001) {
-                        if (opm == 0b00) {
-                            uint8_t mroutine = (uint8_t)bits(machInst, 7, 0);
-                            return new Menter64(machInst, mroutine);
-                        } else if (opm == 0b01) {
-                            uint8_t flags = (uint8_t)bits(machInst, 1, 0);
-                            return new Mexit64(machInst, flags);
-                        } else if (opm == 0b10) {
-                            RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
-                            RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
-                            return new Rmr64(machInst, mreg, greg);
-                        } else {
-                            RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
-                            RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
-                            return new Wmr64(machInst, mreg, greg);
-                        }
-                    }
-                    return new Unknown64(machInst);
-                }
                 switch (opc) {
                   case 0x0:
+                    if ((op3 >> 3) == 0b001) {
+                      uint8_t opm = bits(machInst, 12, 10);
+                      switch (opm) {
+                        case 0b000: {
+                          uint8_t mroutine = (uint8_t)bits(machInst, 7, 0);
+                          return new Menter64(machInst, mroutine);
+                        }
+                        case 0b001: {
+                          uint8_t flags = (uint8_t)bits(machInst, 6, 5);
+                          return new Mexit64(machInst, flags);
+                        }
+                        case 0b010: {
+                          RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                          RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                          return new Rmr64(machInst, mreg, greg);
+                        }
+                        case 0b011: {
+                          RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                          RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                          return new Wmr64(machInst, mreg, greg);
+                        }
+                        default:
+                          return new Unknown64(machInst);
+                      }
+                      return new Unknown64(machInst);
+                    }
                     if (bits(machInst, 11) == 0)
                         return new Br64(machInst, rn);
                     else if (op4 != 0x1f)
