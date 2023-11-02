@@ -2677,7 +2677,7 @@ void
 ISA::resetMetalRegs()
 {
     for (int i = 0; i < metal_reg::NumRegs; i++) {
-      this->setMetalReg(i, 0);
+      this->setMetalRegNoEffect(i, 0);
     }
 }
 

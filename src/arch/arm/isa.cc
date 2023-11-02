@@ -1388,10 +1388,12 @@ ISA::loadInstInterceptTable(void)
     Addr mib = this->readMetalRegNoEffect(metal_reg::MIB);
     InstDecoder * decoder = this->tc->getDecoderPtr();
     // reset decoder state and start fresh
-    decoder->reset();
+    // decoder->reset();
 
     for (int i = 0; i < InstInterceptTableMaxEntryNum; i++) {
         auto ent = ents[i];
+        ent.ctrl = letoh<uint32_t>(ent.ctrl);
+
         if (!ent.ctrl.valid) {
             continue;
         }
@@ -1400,19 +1402,19 @@ ISA::loadInstInterceptTable(void)
             continue;
         }
 
-
         Addr inst_addr = mib + i * sizeof(InstInterceptTableEntry);
         inst_addr = purifyTaggedAddr(inst_addr, this->tc, currEL(), true);
-        PCState pc(inst_addr);
+
         // copy current thread's PCState info
-        // set(pc, this->tc->pcState());
-        // pc.pc(inst_addr);
+        PCState pc;
+        set(pc, this->tc->pcState());
+        pc.uReset();
+        pc.pc(inst_addr);
 
         decoder->moreBytes(pc, inst_addr);
         if (!decoder->instReady()) {
-            
+            panic("Instruction decoder isn't ready after reading 32 bits.\n");
         }
-        assert(decoder->instReady());
         StaticInstPtr inst = decoder->decode(pc);
         // XXX: properly handle wrong encodings
         if (!inst) {
@@ -1445,24 +1447,29 @@ void
 ISA::loadMroutineTable(void)
 {
     assert(this->metalCtx != nullptr);
-    auto ents = reinterpret_cast<MroutineTableEntry *>(this->metalCtx);
+    auto ents = reinterpret_cast<MroutineTable *>(this->metalCtx);
 
     for (int i = 0; i < MroutineTableMaxEntryNum; i++) {
-        if (!ents[i].ctrl.valid) {
-            continue;
-        }
-
-        unsigned int idx = ents[i].ctrl.mroutine;
-        if (idx >= MroutineTableMaxEntryNum) {
-            continue;
-        }
-
-        this->mroutineTable.entries[idx].ctrl = ents[i].ctrl;
+        MroutineTableEntry ent = ents->entries[i];
         // table format is little endian
-        this->mroutineTable.entries[idx].addr = letoh(ents[i].addr);
+        ent.ctrl = letoh<uint64_t>(ent.ctrl);
+        ent.addr = letoh<uint64_t>(ent.addr);
+
+        if (!ent.ctrl.valid) {
+            continue;
+        }
+
+        unsigned int idx = ent.ctrl.mroutine;
+        if (idx >= MroutineTableMaxEntryNum) {
+            // XXX: properly handle OOB case
+            panic("mroutine index out of bound: %d.", idx);
+        }
+
+        this->mroutineTable.entries[idx].ctrl = ent.ctrl;
+        this->mroutineTable.entries[idx].addr = ent.addr;
 
         if (this->mroutineTable.entries[i].ctrl.valid) {
-            DPRINTF(Metal, "Loaded valid mroutine entry %d -> 0x%x", i, this->mroutineTable.entries[i].addr);
+            DPRINTF(Metal, "Loaded valid mroutine entry %d -> 0x%x.\n", i, ent.addr);
         }
     }
 }
@@ -1625,7 +1632,11 @@ ISA::setMetalRegNoEffect(RegIndex idx, RegVal val)
 void
 ISA::setMetalReg(RegIndex idx, RegVal val)
 {
-    DPRINTF(Metal, "Setting Metal reg %d to 0x%x.\n", idx, val);
+    DPRINTF(Metal, "Setting Metal reg %d to 0x%lx.\n", idx, val);
+
+    if (idx >= metal_reg::NumRegs) {
+      panic("Setting unknown Metal reg %d.", idx);
+    }
 
     switch (idx) {
         case metal_reg::MIB : {
@@ -1643,24 +1654,22 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
         case metal_reg::MSR : {
             metal_reg::MSR_t new_val = val;
             metal_reg::MSR_t msr = readMetalRegNoEffect(idx);
-            // msr.init is readonly
-            new_val.init = msr.init;
-            // msr.lv is readonly
-            new_val.lv = msr.lv;
-
+            if (msr.init != new_val.init) {
+                DPRINTF(Metal, "Setting MSR.init: %d -> %d.\n", msr.init, new_val.init);
+            }
+            if (msr.lv != new_val.lv) {
+                DPRINTF(Metal, "Setting MSR.level: %d -> %d.\n", msr.lv, new_val.lv);
+            }
             if (msr.ii != new_val.ii) {
-                DPRINTF(Metal, "Toggling instruction intercept: %d\n", new_val.ii);
+                DPRINTF(Metal, "Setting MSR.instruction intercept:  %d -> %d.\n", msr.ii, new_val.ii);
             }
             if (msr.im != new_val.im) {
-                DPRINTF(Metal, "Toggling instruction intercept masking: %d\n", new_val.im);
+                DPRINTF(Metal, "Setting MSR.instruction intercept masking:  %d -> %d.\n", msr.im, new_val.im);
             }
             if (msr.is != new_val.is) {
-                DPRINTF(Metal, "Toggling instruction skip: %d\n", new_val.is);
+                DPRINTF(Metal, "Setting MSR.instruction skip:  %d -> %d.\n", msr.is, new_val.is);
             }
             break;
-        }
-        default: {
-            panic("Setting unknown Metal reg %d.", idx);
         }
     }
 

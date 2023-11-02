@@ -128,7 +128,7 @@ namespace ArmISA
         RegVal metalRegs[metal_reg::NumRegs];
         char * metalCtx;
         const RegId *intRegMap;
-
+        static constexpr size_t MetalMemReadSz = 64;
 public:
         // mroutine
         BitUnion64(MroutineCtrl)
@@ -137,12 +137,12 @@ public:
         EndBitUnion(MroutineCtrl)
 
         struct MroutineTableEntry {
-            MroutineCtrl ctrl;
             uint64_t addr;
+            MroutineCtrl ctrl;
         };
         static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) * 2);
 
-        static constexpr size_t MroutineTableMaxEntryNum = 1 << 8;
+        static constexpr size_t MroutineTableMaxEntryNum = MetalMemReadSz / sizeof(MroutineTableEntry);
         struct MroutineTable {
           MroutineTableEntry entries[MroutineTableMaxEntryNum];
         };
@@ -157,12 +157,12 @@ public:
         EndBitUnion(InstInterceptCtrl)
 
         struct InstInterceptTableEntry {
-            InstInterceptCtrl ctrl;
             uint32_t inst;
+            InstInterceptCtrl ctrl;
         };
         static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 2);
 
-        static constexpr size_t InstInterceptTableMaxEntryNum = 1 << 8;
+        static constexpr size_t InstInterceptTableMaxEntryNum = MetalMemReadSz / sizeof(MroutineTableEntry);
         struct InstInterceptTable {
             InstInterceptTableEntry entries[InstInterceptTableMaxEntryNum];
         };
