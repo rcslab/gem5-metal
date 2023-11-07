@@ -84,7 +84,7 @@ RegClass floatRegClass(FloatRegClass, FloatRegClassName, 0, debug::FloatRegs);
 } // anonymous namespace
 
 ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
-    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop)
+    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), mrlb(MroutineTableMaxEntryNum)
 {
     _regClasses.push_back(&flatIntRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -130,7 +130,6 @@ ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
     initializeMiscRegMetadata();
     preUnflattenMiscReg();
 
-    this->metalCtx = nullptr;
     clear();
 }
 
@@ -148,7 +147,7 @@ ISA::clear()
 
     resetMetalRegs();
     flushInstInterceptTable();
-    flushMroutineTable();
+    this->mrlb.flushAll();
     freeMetalContext();
 
     updateRegMap(miscRegs[MISCREG_CPSR]);
@@ -1396,10 +1395,6 @@ ISA::loadInstInterceptTable(void)
             continue;
         }
 
-        if (!ent.ctrl.pre && !ent.ctrl.post) {
-            continue;
-        }
-
         Addr inst_addr = mib + i * sizeof(InstInterceptTableEntry);
         inst_addr = purifyTaggedAddr(inst_addr, this->tc, currEL(), true);
 
@@ -1420,73 +1415,32 @@ ISA::loadInstInterceptTable(void)
         }
 
         // check flags
-        if (ent.ctrl.pre) {
+        if (ent.ctrl.post) {
             DPRINTF(Metal, "Registered inst intercept for %s.PRE.\n", inst->getName());
+            registerInstPostIntercept(inst->getName(), ent.ctrl.mroutine);
+        } else {
+            DPRINTF(Metal, "Registered inst intercept for %s.POST.\n", inst->getName());
             registerInstPreIntercept(inst->getName(), ent.ctrl.mroutine);
         }
-        if (ent.ctrl.post) {
-            DPRINTF(Metal, "Registered inst intercept for %s.POST.\n", inst->getName());
-            registerInstPostIntercept(inst->getName(), ent.ctrl.mroutine);
-        }
     }
 }
 
-void
-ISA::flushMroutineTable(void)
+MRLB &
+ISA::getMrlbPtr(void)
 {
-    DPRINTF(Metal, "Flushing mroutine table...\n");
-    for (int i = 0; i < MroutineTableMaxEntryNum; i++) {
-        this->mroutineTable.entries[i].ctrl = 0;
-        this->mroutineTable.entries[i].addr = 0;
-    }
+    return this->mrlb;
 }
 
-void
-ISA::loadMroutineTable(void)
+void 
+ISA::loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx)
 {
-    assert(this->metalCtx != nullptr);
-    auto ents = reinterpret_cast<MroutineTable *>(this->metalCtx);
-
-    for (int i = 0; i < MroutineTableMaxEntryNum; i++) {
-        MroutineTableEntry ent = ents->entries[i];
+    for (int i = 0; i < count; i++) {
+        MroutineTableEntry ent = rawEnts[i];
         // table format is little endian
-        ent.ctrl = letoh<uint64_t>(ent.ctrl);
-        ent.addr = letoh<uint64_t>(ent.addr);
-
-        if (!ent.ctrl.valid) {
-            continue;
-        }
-
-        unsigned int idx = ent.ctrl.mroutine;
-        if (idx >= MroutineTableMaxEntryNum) {
-            // XXX: properly handle OOB case
-            panic("mroutine index out of bound: %d.", idx);
-        }
-
-        this->mroutineTable.entries[idx].ctrl = ent.ctrl;
-        this->mroutineTable.entries[idx].addr = ent.addr;
-
-        if (this->mroutineTable.entries[i].ctrl.valid) {
-            DPRINTF(Metal, "Loaded valid mroutine entry %d -> 0x%x.\n", i, ent.addr);
-        }
+        ent = isBigEndian64(this->tc) ? betoh<ISA::MroutineTableEntry>(ent) : letoh<ISA::MroutineTableEntry>(ent);
+        const MRLBEntry entry(startIdx + i, ent.unshiftedAddr << ISA::MroutineTableEntryAddrShift, ent.valid);
+        mrlb.add(entry);
     }
-}
-
-bool
-ISA::lookupMroutineAddr(unsigned int mroutine, Addr &npc) const
-{
-    if (mroutine >= MroutineTableMaxEntryNum) {
-        return false;
-    }
-
-    MroutineTableEntry ent = this->mroutineTable.entries[mroutine];
-
-    if (!ent.ctrl.valid) {
-        return false;
-    }
-
-    npc = ent.addr;
-    return true;
 }
 
 bool
@@ -1583,12 +1537,16 @@ ISA::checkInstIntercept(const StaticInstPtr &inst, bool post, Addr &addr) const
         // look up mroutine table to find the address
         unsigned int mroutine = it->second;
         assert(mroutine < MroutineTableMaxEntryNum);
-        MroutineTableEntry ment = this->mroutineTable.entries[mroutine];
-        if (!ment.ctrl.valid) {
-            // XXX: return fault instead
+        const MRLBEntry & ent = this->mrlb.get(mroutine);
+        if (&ent == &MRLB::NullMRLBEntry) {
+            panic("MRLB miss during inst intercept.\n");
+        }
+
+        if (!ent.isValid()) {
             return false;
         }
-        addr = ment.addr;
+
+        addr = ent.getAddr();
         return true;
     }
 }
@@ -1644,9 +1602,7 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             break;
         }
         case metal_reg::MBR : {
-            flushMroutineTable();
-            loadMroutineTable();
-            freeMetalContext();
+            this->mrlb.flushAll();
             break;
         }
         case metal_reg::MSR : {

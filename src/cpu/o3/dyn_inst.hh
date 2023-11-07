@@ -1146,6 +1146,25 @@ class DynInst : public ExecContext, public RefCounted
         return cpu->getWritableReg(renamedDestIdx(idx), threadNumber);
     }
 
+    void setReg(const RegId& reg, RegVal val) override
+    {
+        panic("unimplemented");
+    }
+
+    void setReg(const RegId& reg, const void * val) override
+    {
+        panic("unimplemented");
+    }
+
+    RegVal getReg(const RegId &reg) override
+    {
+        panic("unimplemented");
+    }
+
+    RegVal getReg(const RegId &reg, void *val) override
+    {
+        panic("unimplemented");
+    }
     /** @todo: Make results into arrays so they can handle multiple dest
      *  registers.
      */

@@ -71,7 +71,10 @@ namespace gem5
 class ExecContext
 {
   public:
-
+    virtual void setReg(const RegId& reg, RegVal val)  = 0;
+    virtual void setReg(const RegId& reg, const void * val) = 0;
+    virtual RegVal getReg(const RegId &reg) = 0;
+    virtual RegVal getReg(const RegId &reg, void *val) = 0;
     virtual RegVal getRegOperand(const StaticInst *si, int idx) = 0;
     virtual void getRegOperand(const StaticInst *si, int idx, void *val) = 0;
     virtual void *getWritableRegOperand(const StaticInst *si, int idx) = 0;

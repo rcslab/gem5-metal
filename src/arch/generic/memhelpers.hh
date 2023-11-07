@@ -59,6 +59,14 @@ initiateMemRead(XC *xc, Addr addr, std::size_t size,
     return xc->initiateMemRead(addr, size, flags, byte_enable);
 }
 
+template <class XC>
+Fault
+initiateMemRead(XC *xc, Addr addr, std::size_t size, Request::Flags flags)
+{
+    const std::vector<bool> byte_enable(size, true);
+    return initiateMemRead(xc, addr, size, flags, byte_enable);
+}
+
 /// Initiate a read from memory in timing mode.  Note that the 'mem'
 /// parameter is unused; only the type of that parameter is used
 /// to determine the size of the access.
@@ -67,9 +75,7 @@ Fault
 initiateMemRead(XC *xc, trace::InstRecord *traceData, Addr addr,
                 MemT &mem, Request::Flags flags)
 {
-    static const std::vector<bool> byte_enable(sizeof(MemT), true);
-    return initiateMemRead(xc, addr, sizeof(MemT),
-                           flags, byte_enable);
+    return initiateMemRead(xc, addr, sizeof(MemT), flags);
 }
 
 /// Extract the data returned from a timing mode read.
@@ -82,15 +88,21 @@ getMem(PacketPtr pkt, MemT &mem, trace::InstRecord *traceData)
         traceData->setData(mem);
 }
 
+static inline void
+getMemRawPtr(PacketPtr pkt, void * dst, size_t sz, [[maybe_unused]] trace::InstRecord *traceData)
+{
+    const char * src = pkt->getConstPtr<char>();
+    memcpy(reinterpret_cast<char *>(dst), src, sz);
+    // if (traceData)
+    //      traceData->setData(mem);
+}
+
 template <class MemT>
 void
 getMemRaw(PacketPtr pkt, MemT &mem, [[maybe_unused]] trace::InstRecord *traceData)
 {
     static_assert(std::is_standard_layout_v<MemT>);
-    const MemT * src = pkt->getConstPtr<MemT>();
-    memcpy(reinterpret_cast<char *>(&mem), reinterpret_cast<const char *>(src), sizeof(MemT));
-    // if (traceData)
-    //      traceData->setData(mem);
+    getMemRawPtr(pkt, reinterpret_cast<void *>(&mem), sizeof(MemT), traceData);
 }
 
 template <class MemT>

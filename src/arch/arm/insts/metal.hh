@@ -8,8 +8,7 @@ namespace gem5
 
     namespace ArmISA
     {
-
-        static constexpr std::string_view MetalDisasmPrefix = "Metal: ";
+        static constexpr std::string_view MetalDisasmPrefix = "";
         // Metal instructions with an immediate (menter)
         class MetalImmOp8 : public ArmStaticInst
         {
@@ -72,6 +71,11 @@ namespace gem5
             Menter64(ExtMachInst _machInst, uint8_t _imm);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+        private:
+            static void doMenter(ExecContext *xc, Addr addr);
+            static void calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count);
         };
 
         // mexit
@@ -101,6 +105,24 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+
+        // Read Architectural Register 
+        class Rar64 : public MetalRegOp
+        {
+        public:
+            Rar64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+
+        // Write Architectural Register 
+        class War64 : public MetalRegOp
+        {
+        public:
+            War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
     } // namespace ArmISA
