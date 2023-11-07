@@ -184,21 +184,49 @@ class SimpleExecContext : public ExecContext
     { }
 
     RegVal
+    getReg(const RegId &reg) override
+    {
+        if (reg.is(InvalidRegClass))
+            return 0;
+        (*this->execContextStats.numRegReads[reg.classValue()])++;
+        return this->thread->getReg(reg);
+    }
+
+    RegVal
+    getReg(const RegId &reg, void *val) override
+    {
+        (*this->execContextStats.numRegReads[reg.classValue()])++;
+        this->thread->getReg(reg, val);
+    }
+    
+    void
+    setReg(const RegId& reg, RegVal val) override
+    {
+        if (reg.is(InvalidRegClass))
+            return;
+        (*this->execContextStats.numRegWrites[reg.classValue()])++;
+        this->thread->setReg(reg, val);
+    }
+
+    void
+    setReg(const RegId& reg, const void * val) override
+    {
+        (*this->execContextStats.numRegWrites[reg.classValue()])++;
+        this->thread->setReg(reg, val);
+    }
+
+    RegVal
     getRegOperand(const StaticInst *si, int idx) override
     {
         const RegId &reg = si->srcRegIdx(idx);
-        if (reg.is(InvalidRegClass))
-            return 0;
-        (*execContextStats.numRegReads[reg.classValue()])++;
-        return thread->getReg(reg);
+        return this->getReg(reg);
     }
 
     void
     getRegOperand(const StaticInst *si, int idx, void *val) override
     {
         const RegId &reg = si->srcRegIdx(idx);
-        (*execContextStats.numRegReads[reg.classValue()])++;
-        thread->getReg(reg, val);
+        this->getReg(reg, val);
     }
 
     void *
@@ -213,18 +241,14 @@ class SimpleExecContext : public ExecContext
     setRegOperand(const StaticInst *si, int idx, RegVal val) override
     {
         const RegId &reg = si->destRegIdx(idx);
-        if (reg.is(InvalidRegClass))
-            return;
-        (*execContextStats.numRegWrites[reg.classValue()])++;
-        thread->setReg(reg, val);
+        this->setReg(reg, val);
     }
 
     void
     setRegOperand(const StaticInst *si, int idx, const void *val) override
     {
         const RegId &reg = si->destRegIdx(idx);
-        (*execContextStats.numRegWrites[reg.classValue()])++;
-        thread->setReg(reg, val);
+        this->setReg(reg, val);
     }
 
     RegVal

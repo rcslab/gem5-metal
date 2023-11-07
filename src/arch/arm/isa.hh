@@ -57,6 +57,7 @@
 #include "debug/Checkpoint.hh"
 #include "enums/DecoderFlavor.hh"
 #include "sim/sim_object.hh"
+#include "arch/arm/mlb.hh"
 
 namespace gem5
 {
@@ -128,41 +129,35 @@ namespace ArmISA
         RegVal metalRegs[metal_reg::NumRegs];
         char * metalCtx;
         const RegId *intRegMap;
-        static constexpr size_t MetalMemReadSz = 64;
+
+        MRLB mrlb;
 public:
-        // mroutine
-        BitUnion64(MroutineCtrl)
-            Bitfield<63> valid;
-            Bitfield<7,0> mroutine;
-        EndBitUnion(MroutineCtrl)
+        // mroutine stuff
+        static constexpr size_t MroutineTableMaxEntryNum = 1 << 7;
+        static constexpr uint64_t MroutineTableEntryAddrShift = 4;
+        BitUnion64(MroutineTableEntry)
+            Bitfield<63, MroutineTableEntryAddrShift> unshiftedAddr;
+            Bitfield<MroutineTableEntryAddrShift - 1, 1> _unused;
+            Bitfield<0> valid;
+        EndBitUnion(MroutineTableEntry)
+        static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) && isPowerOf2(sizeof(MroutineTableEntry)));
 
-        struct MroutineTableEntry {
-            uint64_t addr;
-            MroutineCtrl ctrl;
-        };
-        static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) * 2);
-
-        static constexpr size_t MroutineTableMaxEntryNum = MetalMemReadSz / sizeof(MroutineTableEntry);
-        struct MroutineTable {
-          MroutineTableEntry entries[MroutineTableMaxEntryNum];
-        };
-        static_assert(sizeof(MroutineTable) == sizeof(MroutineTableEntry) * MroutineTableMaxEntryNum);
+        MRLB & getMrlbPtr();
+        void loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx);
 
         // Instruction intercept
         BitUnion32(InstInterceptCtrl)
-            Bitfield<31> valid;
-            Bitfield<30> post;
-            Bitfield<29> pre;
-            Bitfield<7,0> mroutine;
+            Bitfield<9, 2> mroutine;
+            Bitfield<1> post;
+            Bitfield<0> valid;
         EndBitUnion(InstInterceptCtrl)
-
         struct InstInterceptTableEntry {
             uint32_t inst;
             InstInterceptCtrl ctrl;
         };
         static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 2);
 
-        static constexpr size_t InstInterceptTableMaxEntryNum = MetalMemReadSz / sizeof(MroutineTableEntry);
+        static constexpr size_t InstInterceptTableMaxEntryNum = 64 / sizeof(MroutineTableEntry);
         struct InstInterceptTable {
             InstInterceptTableEntry entries[InstInterceptTableMaxEntryNum];
         };
@@ -176,10 +171,6 @@ private:
         void doInstIntercept(const StaticInstPtr &inst, bool post);
         void flushInstInterceptTable(void);
         void loadInstInterceptTable(void);
-
-        MroutineTable mroutineTable;
-        void flushMroutineTable(void);
-        void loadMroutineTable(void);
 
         void
         updateRegMap(CPSR cpsr)
@@ -271,7 +262,6 @@ public:
         void doneInstInterceptMasked(void) override;
         bool checkNextInstSkipped(void) const override;
         void doneNextInstSkipped(void) override;
-        bool lookupMroutineAddr(unsigned int mroutine, Addr &npc) const;
 
         int
         flattenMiscIndex(int reg) const

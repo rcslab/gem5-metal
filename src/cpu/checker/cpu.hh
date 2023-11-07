@@ -172,6 +172,25 @@ class CheckerCPU : public BaseCPU, public ExecContext
     // long as these methods don't copy the pointer into any long-term
     // storage (which is pretty hard to imagine they would have reason
     // to do).
+    void setReg(const RegId& reg, RegVal val) override
+    {
+        panic("unimplemented");
+    }
+
+    void setReg(const RegId& reg, const void * val) override
+    {
+        panic("unimplemented");
+    }
+
+    RegVal getReg(const RegId &reg) override
+    {
+        panic("unimplemented");
+    }
+
+    RegVal getReg(const RegId &reg, void *val) override
+    {
+        panic("unimplemented");
+    }
 
     RegVal
     getRegOperand(const StaticInst *si, int idx) override

@@ -650,6 +650,16 @@ namespace Aarch64
                           RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
                           return new Wmr64(machInst, mreg, greg);
                         }
+                        case 0b100: {
+                          RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                          RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                          return new Rar64(machInst, mreg, greg);
+                        }
+                        case 0b101: {
+                          RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                          RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                          return new War64(machInst, mreg, greg);
+                        }
                         default:
                           return new Unknown64(machInst);
                       }

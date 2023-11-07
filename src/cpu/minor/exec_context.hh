@@ -164,6 +164,26 @@ class ExecContext : public gem5::ExecContext
         return thread.getWritableReg(si->destRegIdx(idx));
     }
 
+    void setReg(const RegId& reg, RegVal val) override
+    {
+        panic("unimplemented");
+    }
+
+    void setReg(const RegId& reg, const void * val) override
+    {
+        panic("unimplemented");
+    }
+
+    RegVal getReg(const RegId &reg) override
+    {
+        panic("unimplemented");
+    }
+
+    RegVal getReg(const RegId &reg, void *val) override
+    {
+        panic("unimplemented");
+    }
+
     void
     setRegOperand(const StaticInst *si, int idx, RegVal val) override
     {

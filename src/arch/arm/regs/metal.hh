@@ -139,7 +139,7 @@ namespace metal_reg
 
     static inline bool isMetalRegWriteMemAccess(RegIndex mreg)
     {
-        return mreg == MIB || mreg == MBR;
+        return mreg == MIB;
     }
 
 } // namespace metal_reg

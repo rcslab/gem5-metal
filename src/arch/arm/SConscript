@@ -110,6 +110,7 @@ Source('stage2_lookup.cc', tags='arm isa')
 Source('tlb.cc', tags='arm isa')
 Source('tlbi_op.cc', tags='arm isa')
 Source('utility.cc', tags='arm isa')
+Source('mlb.cc', tags='arm isa')
 
 SimObject('ArmDecoder.py', sim_objects=['ArmDecoder'], tags='arm isa')
 SimObject('ArmFsWorkload.py', sim_objects=[
