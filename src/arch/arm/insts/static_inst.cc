@@ -377,7 +377,14 @@ void
 ArmStaticInst::printMetalReg(std::ostream &os, RegIndex reg_idx) const
 {
     assert(reg_idx < metal_reg::NumRegs);
-    ccprintf(os, "%s", ArmISA::metal_reg::regNames[reg_idx]);
+    ccprintf(os, "%s", printMetalReg(reg_idx));
+}
+
+const char *
+ArmStaticInst::printMetalReg(RegIndex reg_idx)
+{
+    assert(reg_idx < metal_reg::NumRegs);
+    return ArmISA::metal_reg::regNames[reg_idx];
 }
 
 void

@@ -1,5 +1,5 @@
 #include "arch/arm/mlb.hh"
-#include "debug/Metal.hh"
+#include "arch/arm/insts/metal.hh"
 
 namespace gem5
 {
@@ -85,7 +85,7 @@ void MRLB::add(const MRLBEntry & e)
 
     ent.set(e);
     ent.setLoaded(true);
-    DPRINTF(Metal, "MRLB: added mroutine %d, addr = 0x%lx, valid = %d...\n", ent.getIdx(), ent.getAddr(), ent.isValid());
+    METAL_DBGPRINT(MRLB, ADD, "MRLB: added mroutine %d, addr = 0x%lx, valid = %d...\n", ent.getIdx(), ent.getAddr(), ent.isValid());
 }
 
 const MRLBEntry & 
@@ -97,14 +97,14 @@ MRLB::get(unsigned int idx) const
 
     const MRLBEntry & ent = entries.at(idx);
 
-    assert(ent.getIdx() == idx);
-
     if (!ent.isLoaded()) {
-        DPRINTF(Metal, "MRLB: *miss* for mroutine %d.\n", idx);
+        METAL_DBGPRINT(MRLB, GET, "MRLB: *miss* for mroutine %d.\n", idx);
         return NullMRLBEntry;
     }
+    
+    assert(ent.getIdx() == idx);
 
-    DPRINTF(Metal, "MRLB: *hit* for mroutine %d. Addr = 0x%lx, valid = %d...\n", ent.getIdx(), ent.getAddr(), ent.isValid());
+    METAL_DBGPRINT(MRLB, GET, "MRLB: *hit* for mroutine %d. Addr = 0x%lx, valid = %d...\n", ent.getIdx(), ent.getAddr(), ent.isValid());
     return ent;
 }
 
@@ -117,7 +117,7 @@ MRLB::getSize(void) const
 void 
 MRLB::flushAll(void)
 {
-    DPRINTF(Metal, "MRLB: flushing...\n");
+    METAL_DBGPRINT(MRLB, FLUSH, "MRLB: flushing...\n");
     for (unsigned int i = 0; i < this->size; i++) {
         this->flush(i);
     }

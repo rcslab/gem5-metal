@@ -119,21 +119,22 @@ namespace ArmISA
         }
 
         void initializeMiscRegMetadata();
-        void resetMetalRegs();
 
         BaseISADevice &getGenericTimer();
         BaseISADevice &getGICv3CPUInterface();
         BaseISADevice *getGICv3CPUInterface(ThreadContext *tc);
 
         RegVal miscRegs[NUM_MISCREGS];
-        RegVal metalRegs[metal_reg::NumRegs];
+
+        std::array<RegVal, metal_reg::TotalGRegs> metalRegs;
+        std::array<RegVal, metal_reg::NumMiscRegs> metalMiscRegs;
         char * metalCtx;
         const RegId *intRegMap;
 
         MRLB mrlb;
 public:
         // mroutine stuff
-        static constexpr size_t MroutineTableMaxEntryNum = 1 << 7;
+        static constexpr size_t MroutineTableMaxEntryNum = 1 << 8;
         static constexpr uint64_t MroutineTableEntryAddrShift = 4;
         BitUnion64(MroutineTableEntry)
             Bitfield<63, MroutineTableEntryAddrShift> unshiftedAddr;
@@ -147,30 +148,47 @@ public:
 
         // Instruction intercept
         BitUnion32(InstInterceptCtrl)
-            Bitfield<9, 2> mroutine;
-            Bitfield<1> post;
-            Bitfield<0> valid;
+            Bitfield<7, 0> mroutine;
+            Bitfield<30> post;
+            Bitfield<31> valid;
         EndBitUnion(InstInterceptCtrl)
         struct InstInterceptTableEntry {
             uint32_t inst;
             InstInterceptCtrl ctrl;
+            uint32_t mask0;
+            uint32_t mask1;
         };
-        static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 2);
+        static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 4 && isPowerOf2(sizeof(InstInterceptTableEntry)));
 
-        static constexpr size_t InstInterceptTableMaxEntryNum = 64 / sizeof(MroutineTableEntry);
+        static constexpr size_t InstInterceptTableMaxEntryNum = 64 / sizeof(InstInterceptTableEntry);
         struct InstInterceptTable {
             InstInterceptTableEntry entries[InstInterceptTableMaxEntryNum];
         };
         static_assert(sizeof(InstInterceptTable) == sizeof(InstInterceptTableEntry) * InstInterceptTableMaxEntryNum);
 private:
-        std::unordered_map<std::string, unsigned int> instPreInterceptMap;
-        std::unordered_map<std::string, unsigned int> instPostInterceptMap;
-        void registerInstPreIntercept(std::string mnemonic, unsigned int mroutine);
-        void registerInstPostIntercept(std::string mnemonic, unsigned int mroutine);
-        bool checkInstIntercept(const StaticInstPtr &inst, bool post, Addr &addr) const;
+        struct InstInterceptMapEntry {
+            std::string mnemonic;
+            bool post;
+            bool pre;
+            uint32_t mask0;
+            uint32_t mask1;
+            unsigned int mroutine;
+        };
+        std::unordered_map<std::string, InstInterceptMapEntry *> instPreInterceptMap;
+        std::unordered_map<std::string, InstInterceptMapEntry *> instPostInterceptMap;
+        void registerInstPreIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1);
+        void registerInstPostIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1);
+        const InstInterceptMapEntry * checkInstIntercept(const StaticInstPtr &inst, bool post) const;
         void doInstIntercept(const StaticInstPtr &inst, bool post);
         void flushInstInterceptTable(void);
         void loadInstInterceptTable(void);
+        static inline uint32_t shiftInstMask(uint32_t encoding, uint32_t mask)
+        {
+              if (!mask)
+                  return 0;
+              int firstBit = ffs(mask);
+              return (encoding & mask) >> (firstBit - 1);
+        }
 
         void
         updateRegMap(CPSR cpsr)
@@ -249,9 +267,12 @@ private:
         RegVal readMetalReg(RegIndex idx) override;
         void setMetalRegNoEffect(RegIndex idx, RegVal val) override;
         void setMetalReg(RegIndex, RegVal val) override;
-
+private:
+        void resetMetalRegs(void);
+        RegIndex flattenMetalGReg(RegIndex idx) const;
+        RegIndex flattenMetalMReg(RegIndex idx) const;
+public:
         void * allocMetalContext(size_t sz);
-
         void freeMetalContext(void);
 public:
         bool checkInstPreIntercept(const StaticInstPtr &inst) const override;
