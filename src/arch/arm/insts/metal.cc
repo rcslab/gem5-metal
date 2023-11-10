@@ -46,6 +46,17 @@ namespace gem5
             ss << MetalDisasmPrefix;
             printMnemonic(ss, "", false);
             printMetalReg(ss, mReg);
+            return ss.str();
+        }
+
+        std::string
+        MetalRegOp2::generateDisassembly(
+            Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printMetalReg(ss, mReg);
             ccprintf(ss, ", ");
             printIntReg(ss, gReg);
             return ss.str();
@@ -62,22 +73,26 @@ namespace gem5
             this->flags[IsLoad] = true;
         }
 
-        void Menter64::doMenter(ExecContext *xc, Addr addr)
+        void Menter64::doMenter(ThreadContext *tc, Addr npc, Addr lpc)
         {
             PCState pcState;
-            set(pcState, xc->pcState());
-    
-            // save link address
-            xc->setMetalReg(metal_reg::MLR, pcState.pc() + 4);
-
+            set(pcState, tc->pcState());
             // set new PC
-            pcState.instNPC(addr);
-            xc->pcState(pcState);
+            pcState.instNPC(npc);
+            tc->pcState(pcState);
 
             // increase metal level
-            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            metal_reg::MSR_t msr = tc->readMetalReg(metal_reg::MSR);
             msr.lv = msr.lv + 1;
-            xc->setMetalReg(metal_reg::MSR, msr);
+            tc->setMetalReg(metal_reg::MSR, msr);
+    
+            // save link address
+            tc->setMetalReg(metal_reg::MLR, lpc);
+        }
+
+        void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst)
+        {
+            doMenter(tc, npc, tc->pcState().instAddr() + inst.instSize());
         }
 
         void Menter64::calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count)
@@ -114,7 +129,7 @@ namespace gem5
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
             MRLB & mrlb = isa->getMrlbPtr();
 
-            DPRINTF(Metal, "MENTER: MBR = 0x%lx, mroutine = %d\n", xc->readMetalReg(metal_reg::MBR), this->imm);
+            METAL_DBGPRINT(INSTS, MENTER, "MBR = 0x%lx, mroutine = %d.\n", xc->readMetalReg(metal_reg::MBR), this->imm);
 
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
@@ -131,15 +146,15 @@ namespace gem5
 
                 this->calcLoadAddr(mbr, tc->getSystemPtr()->cacheLineSize(), this->imm, loadAddr, count);
 
-                DPRINTF(Metal, "MENTER: MRLB *miss* for mrouine %d. Mem load addr = 0x%lx, count = %d.\n", this->imm, loadAddr, count);
+                METAL_DBGPRINT(INSTS, MENTER, "MRLB *miss* for mrouine %d. Mem load addr = 0x%lx, count = %d.\n", this->imm, loadAddr, count);
 
                 fault = initiateMemRead(xc, loadAddr, tc->getSystemPtr()->cacheLineSize(), ArmISA::MMU::AllowUnaligned);
             } else {
-                //DPRINTF(Metal, "MENTER: MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
+                METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
                 if (!mrlbEnt.isValid()) {
                     return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
                 } else {
-                    this->doMenter(xc, purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true));
+                    doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
                 }
             }
     
@@ -150,6 +165,7 @@ namespace gem5
         {
             ThreadContext * tc = xc->tcBase();
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
+            MRLB & mrlb = isa->getMrlbPtr();
             const size_t cacheLineSz = tc->getSystemPtr()->cacheLineSize();
 
             static ISA::MroutineTableEntry buf[ISA::MroutineTableMaxEntryNum];
@@ -167,7 +183,19 @@ namespace gem5
             unsigned int count;
             this->calcLoadAddr(mbr, tc->getSystemPtr()->cacheLineSize(), this->imm, loadAddr, count);
 
-            isa->loadMroutineTable(buf, count, this->imm + (loadAddr - mbr) / (sizeof(ISA::MroutineTableEntry)));
+            isa->loadMroutineTable(buf, count, (loadAddr - mbr) / (sizeof(ISA::MroutineTableEntry)));
+
+            // lookup MRLB again
+            const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
+            
+            assert(&mrlbEnt != &MRLB::NullMRLBEntry);
+
+            METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
+            if (!mrlbEnt.isValid()) {
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            } else {
+                doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
+            }
 
             return NoFault;
         }
@@ -179,8 +207,6 @@ namespace gem5
 
             // ISA * isa = static_cast<ISA *>(xc->tcBase()->getIsaPtr());
             // metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-
-            // DPRINTF(Metal, "MENTER: MBR = 0x%lx, mroutine = %d\n", xc->readMetalReg(metal_reg::MBR), this->imm);
 
             // Addr npc;
             // if (!isa->lookupMroutineAddr(this->imm, npc) || !metal_reg::isMetalInitialized(msr)) {
@@ -226,7 +252,7 @@ namespace gem5
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            DPRINTF(Metal, "MEXIT: MLR = 0x%x, flags = 0x%x\n", ret, this->imm);
+            METAL_DBGPRINT(INSTS, MEXIT, "MLR = 0x%x, flags = 0x%x\n", ret, this->imm);
 
             // set new PC
             const Addr target_addr = purifyTaggedAddr(ret, xc->tcBase(), currEL(xc->tcBase()), true);
@@ -255,7 +281,7 @@ namespace gem5
         }
 
         // wmr
-        Wmr64::Wmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp("wmr", _machInst, IntAluOp, _mreg, _greg)
+        Wmr64::Wmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("wmr", _machInst, IntAluOp, _mreg, _greg)
         {
             setSrcRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
             setDestRegIdx(_numDestRegs++, metalRegClass[mReg]);
@@ -271,7 +297,7 @@ namespace gem5
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            DPRINTF(Metal, "WMR: mReg = %d, gReg = %d\n", mReg, gReg);
+            METAL_DBGPRINT(INSTS, WMR, "mReg = %s, gReg = %d.\n", printMetalReg(mReg), gReg);
 
             bool allowWriting = false;
             // allow writing to Metal Base Register outside of Metal mode to initialize Metal
@@ -330,7 +356,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            DPRINTF(Metal, "WMR: mReg = %d, gReg = %d\n", mReg, gReg);
+            METAL_DBGPRINT(INSTS, WMR, "mReg = %s, gReg = %d.\n", printMetalReg(mReg), gReg);
 
             bool allowWriting = false;
             // allow writing to Metal Base Register outside of Metal mode to initialize Metal
@@ -387,7 +413,7 @@ namespace gem5
         }
 
         // rmr
-        Rmr64::Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp("rmr", _machInst, IntAluOp, _mreg, _greg)
+        Rmr64::Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("rmr", _machInst, IntAluOp, _mreg, _greg)
         {
             setDestRegIdx(_numDestRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
             setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
@@ -400,7 +426,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            DPRINTF(Metal, "RMR: mReg = %d, gReg = %d\n", mReg, gReg);
+            METAL_DBGPRINT(INSTS, RMR, "mReg = %s, gReg = %d.\n", printMetalReg(mReg), gReg, this->encoding());
 
             if (!metal_reg::canReadMetalReg(msr, mReg))
             {
@@ -414,10 +440,10 @@ namespace gem5
         }
 
         // rar64
-        Rar64::Rar64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp("rar", _machInst, IntAluOp, _mreg, _greg)
+        Rar64::Rar64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("rar", _machInst, IntAluOp, _mreg, _greg)
         {
-            setSrcRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
-            setDestRegIdx(_numDestRegs++, metalRegClass[mReg]);
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
+            setDestRegIdx(_numDestRegs++, metalRegClass[gReg]);
             _numTypedDestRegs[metalRegClass.type()]++;
 
             this->flags[IsInteger] = true;
@@ -426,28 +452,28 @@ namespace gem5
         Fault Rar64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-            RegVal idx = xc->getRegOperand(this, 0);
+            RegVal idx = xc->readMetalReg(this->mReg);
 
-            DPRINTF(Metal, "RAR: mReg = %d, gReg = %d(0x%lx)\n", mReg, idx);
+            METAL_DBGPRINT(INSTS, RAR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, mReg))
-            {
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg)
+                || idx >= int_reg::NumArchRegs) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
             const RegId &id = intRegClass[idx];
             RegVal v = xc->getReg(id);
-            xc->setMetalReg(mReg, v);
+            xc->setMetalReg(this->gReg, v);
 
             return NoFault;
         }
 
         // war64
-        War64::War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp("war", _machInst, IntAluOp, _mreg, _greg)
+        War64::War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("war", _machInst, IntAluOp, _mreg, _greg)
         {
             setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
-            setSrcRegIdx(_numDestRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
-            setDestRegIdx(_numDestRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
+            setSrcRegIdx(_numDestRegs++, metalRegClass[gReg]);\
+            // writing to int class
             _numTypedDestRegs[intRegClass.type()]++;
 
             this->flags[IsInteger] = true;
@@ -456,15 +482,16 @@ namespace gem5
         Fault War64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-            RegVal idx = xc->getRegOperand(this, 1);
-            DPRINTF(Metal, "WAR: mReg = %d, gReg = %d(0x%lx)\n", mReg, gReg, idx);
+            RegVal idx = xc->readMetalReg(this->mReg);
 
-            if (!metal_reg::canReadMetalReg(msr, mReg))
-            {
+            METAL_DBGPRINT(INSTS, WAR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
+
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg) 
+                || idx >= int_reg::NumArchRegs) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            RegVal v = xc->readMetalReg(mReg);
+            RegVal v = xc->readMetalReg(this->gReg);
             const RegId & reg = intRegClass[idx];
             xc->setReg(reg, v);
 

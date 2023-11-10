@@ -2,12 +2,18 @@
 #define __ARCH_ARM_INSTS_METAL_HH__
 
 #include "arch/arm/insts/static_inst.hh"
+#include "debug/Metal.hh"
 
 namespace gem5
 {
 
     namespace ArmISA
     {
+        #define METAL_STR(x) #x
+        #define METAL_STR2(x) METAL_STR(x)
+        #define METAL_DBGPRINT(subsys, subsys2, format, ...) DPRINTF(Metal, "Metal." METAL_STR2(subsys) "." METAL_STR2(subsys2) ": " format, ##__VA_ARGS__)
+
+        static constexpr size_t MAX_METAL_OPERANDS = 4;
         static constexpr std::string_view MetalDisasmPrefix = "";
 
         class TLBEntryInfo {
@@ -110,17 +116,41 @@ namespace gem5
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
-        // Metal instructions with args (rmr, wmr)
+        // Metal instructions with 1 reg arg (rar, war)
         class MetalRegOp : public ArmStaticInst
         {
         protected:
-            RegId srcRegIdxArr[1];
-            RegId destRegIdxArr[1];
+            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
+            RegId destRegIdxArr[MAX_METAL_OPERANDS];
+            RegIndex mReg;
+
+        public:
+            MetalRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg) : ArmStaticInst(mnem, _machInst, __opClass), mReg(_mReg)
+            {
+                setRegIdxArrays(
+                reinterpret_cast<RegIdArrayPtr>(
+                    &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+                reinterpret_cast<RegIdArrayPtr>(
+                    &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
+
+                this->flags[IsMetal] = true;
+            }
+
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        // Metal instructions with 2 reg args (rmr, wmr)
+        class MetalRegOp2 : public ArmStaticInst
+        {
+        protected:
+            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
+            RegId destRegIdxArr[MAX_METAL_OPERANDS];
             RegIndex mReg;
             RegIndex gReg;
 
         public:
-            MetalRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : ArmStaticInst(mnem, _machInst, __opClass), mReg(_mReg), gReg(_gReg)
+            MetalRegOp2(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : ArmStaticInst(mnem, _machInst, __opClass), mReg(_mReg), gReg(_gReg)
             {
                 setRegIdxArrays(
                 reinterpret_cast<RegIdArrayPtr>(
@@ -165,8 +195,9 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+            static void doMenter(ThreadContext *xc, Addr npc, Addr lpc);
+            static void doMenter(ThreadContext *xc, Addr npc, const ArmStaticInst &inst);
         private:
-            static void doMenter(ExecContext *xc, Addr addr);
             static void calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count);
         };
 
@@ -180,7 +211,7 @@ namespace gem5
         };
 
         // rmr
-        class Rmr64 : public MetalRegOp
+        class Rmr64 : public MetalRegOp2
         {
         public:
             Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
@@ -189,7 +220,7 @@ namespace gem5
         };
 
         // wmr
-        class Wmr64 : public MetalRegOp
+        class Wmr64 : public MetalRegOp2
         {
         public:
             Wmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
@@ -200,7 +231,7 @@ namespace gem5
         };
 
         // Read Architectural Register 
-        class Rar64 : public MetalRegOp
+        class Rar64 : public MetalRegOp2
         {
         public:
             Rar64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
@@ -219,7 +250,7 @@ namespace gem5
         };
 
         // Write Architectural Register 
-        class War64 : public MetalRegOp
+        class War64 : public MetalRegOp2
         {
         public:
             War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);

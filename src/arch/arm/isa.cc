@@ -49,6 +49,8 @@
 #include "arch/arm/system.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/decoder.hh"
+#include "arch/arm/insts/static_inst.hh"
+#include "arch/arm/insts/metal.hh"
 #include "base/cprintf.hh"
 #include "base/random.hh"
 #include "cpu/base.hh"
@@ -59,8 +61,6 @@
 #include "debug/MatRegs.hh"
 #include "debug/VecPredRegs.hh"
 #include "debug/VecRegs.hh"
-#include "debug/MetalRegs.hh"
-#include "debug/Metal.hh"
 #include "dev/arm/generic_timer.hh"
 #include "dev/arm/gic_v3.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
@@ -84,7 +84,7 @@ RegClass floatRegClass(FloatRegClass, FloatRegClassName, 0, debug::FloatRegs);
 } // anonymous namespace
 
 ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
-    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), mrlb(MroutineTableMaxEntryNum)
+    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), metalCtx(nullptr), mrlb(MroutineTableMaxEntryNum)
 {
     _regClasses.push_back(&flatIntRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -1356,21 +1356,37 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
 }
 
 void
-ISA::registerInstPreIntercept(std::string mnemonic, unsigned int mroutine)
+ISA::registerInstPreIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1)
 {
-    this->instPreInterceptMap[mnemonic] = mroutine;
+    InstInterceptMapEntry * ent = new InstInterceptMapEntry;
+    ent->mnemonic = mnemonic;
+    ent->mask0 = mask0;
+    ent->mask1 = mask1;
+    ent->mroutine = mroutine;
+    this->instPreInterceptMap[mnemonic] = ent;
 }
 
 void 
-ISA::registerInstPostIntercept(std::string mnemonic, unsigned int mroutine)
+ISA::registerInstPostIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1)
 {
-    this->instPostInterceptMap[mnemonic] = mroutine;
+    InstInterceptMapEntry * ent = new InstInterceptMapEntry;
+    ent->mnemonic = mnemonic;
+    ent->mask0 = mask0;
+    ent->mask1 = mask1;
+    ent->mroutine = mroutine;
+    this->instPostInterceptMap[mnemonic] = ent;
 }
 
 void 
 ISA::flushInstInterceptTable(void)
 {
-    DPRINTF(Metal, "Flushing instruction intercept table...\n");
+    METAL_DBGPRINT(ISA, INSTINTR, "Flushing instruction intercept table...\n");
+    for (auto it = this->instPreInterceptMap.begin(); it != this->instPreInterceptMap.end(); it++) {
+        delete it->second;
+    }
+    for (auto it = this->instPostInterceptMap.begin(); it != this->instPostInterceptMap.end(); it++) {
+        delete it->second;
+    }
     this->instPreInterceptMap.clear();
     this->instPostInterceptMap.clear();
 }
@@ -1389,7 +1405,9 @@ ISA::loadInstInterceptTable(void)
 
     for (int i = 0; i < InstInterceptTableMaxEntryNum; i++) {
         auto ent = ents[i];
-        ent.ctrl = letoh<uint32_t>(ent.ctrl);
+        ent.ctrl = isBigEndian64(this->tc) ? betoh(ent.ctrl) : letoh(ent.ctrl);
+        ent.mask0 = isBigEndian64(this->tc) ? betoh(ent.mask0) : letoh(ent.mask0);
+        ent.mask1 = isBigEndian64(this->tc) ? betoh(ent.mask1) : letoh(ent.mask1);
 
         if (!ent.ctrl.valid) {
             continue;
@@ -1416,11 +1434,11 @@ ISA::loadInstInterceptTable(void)
 
         // check flags
         if (ent.ctrl.post) {
-            DPRINTF(Metal, "Registered inst intercept for %s.PRE.\n", inst->getName());
-            registerInstPostIntercept(inst->getName(), ent.ctrl.mroutine);
+            METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for %s.PRE mask0=0x%x mask1=0x%x.\n", inst->getName(), ent.mask0, ent.mask1);
+            registerInstPostIntercept(inst->getName(), ent.ctrl.mroutine, ent.mask0, ent.mask1);
         } else {
-            DPRINTF(Metal, "Registered inst intercept for %s.POST.\n", inst->getName());
-            registerInstPreIntercept(inst->getName(), ent.ctrl.mroutine);
+            METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for %s.POST mask0=0x%x mask1=0x%x.\n", inst->getName(), ent.mask0, ent.mask1);
+            registerInstPreIntercept(inst->getName(), ent.ctrl.mroutine, ent.mask0, ent.mask1);
         }
     }
 }
@@ -1476,8 +1494,7 @@ ISA::doneInstInterceptMasked(void)
 bool
 ISA::checkInstPreIntercept(const StaticInstPtr &inst) const
 {
-    Addr addr;
-    return checkInstIntercept(inst, false, addr);
+    return checkInstIntercept(inst, false) != nullptr;
 }
 
 void 
@@ -1489,8 +1506,7 @@ ISA::doInstPreIntercept(const StaticInstPtr &inst)
 bool
 ISA::checkInstPostIntercept(const StaticInstPtr &inst) const
 {
-    Addr addr;
-    return checkInstIntercept(inst, true, addr);
+    return checkInstIntercept(inst, true) != nullptr;
 }
 
 void 
@@ -1502,52 +1518,48 @@ ISA::doInstPostIntercept(const StaticInstPtr &inst)
 void
 ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
 {
-    Addr addr;
-    if (!checkInstIntercept(inst, post, addr)) {
+    const InstInterceptMapEntry * ent = checkInstIntercept(inst, post);
+    if (ent == nullptr) {
         panic("doInstIntercept called on a non-intercepted inst.");
     }
-    
-    // set Metal mode
-    metal_reg::MSR_t msr = this->readMetalReg(metal_reg::MSR);
-    msr.lv = msr.lv + 1;
 
-    // set new PC
-    PCState pc;
-    set(pc, tc->pcState());
-    Addr naddr = purifyTaggedAddr(addr, tc, currEL(), true);
-    pc.instNPC(naddr);
-    tc->pcState(pc);
+    // lookup mroutine
+    unsigned int mroutine = ent->mroutine;
+    assert(mroutine < MroutineTableMaxEntryNum);
+
+    const MRLBEntry & ment = this->mrlb.get(mroutine);
+    if (&ment == &MRLB::NullMRLBEntry) {
+        panic("MRLB miss during inst intercept.\n");
+    }
+
+    Menter64::doMenter(this->tc, purifyTaggedAddr(ment.getAddr(), tc, currEL(), true), reinterpret_cast<const ArmStaticInst &>(inst));
+
+    // set MIRs
+    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
+    uint32_t instBits = armInst->encoding();
+
+    this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent->mask0));
+    this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent->mask1));
 }
 
-bool 
-ISA::checkInstIntercept(const StaticInstPtr &inst, bool post, Addr &addr) const
+const ISA::InstInterceptMapEntry * 
+ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
 {
     metal_reg::MSR_t msr = readMetalRegNoEffect(metal_reg::MSR);
 
     if (!metal_reg::isInstInterceptEnabled(msr) || !metal_reg::isMetalInitialized(msr)) {
         // ic flag is currently disabled or metal mode is disabled
-        return false;
+        return nullptr;
     }
 
     auto &map = post ? this->instPostInterceptMap : this->instPreInterceptMap;
     auto it = map.find(inst->getName());
     if (it == map.end()) {
-        return false;
+        return nullptr;
     } else {
         // look up mroutine table to find the address
-        unsigned int mroutine = it->second;
-        assert(mroutine < MroutineTableMaxEntryNum);
-        const MRLBEntry & ent = this->mrlb.get(mroutine);
-        if (&ent == &MRLB::NullMRLBEntry) {
-            panic("MRLB miss during inst intercept.\n");
-        }
-
-        if (!ent.isValid()) {
-            return false;
-        }
-
-        addr = ent.getAddr();
-        return true;
+        const InstInterceptMapEntry * ent = it->second;
+        return ent;
     }
 }
 
@@ -1575,33 +1587,81 @@ RegVal
 ISA::readMetalRegNoEffect(RegIndex idx) const
 {
     assert(idx < metal_reg::NumRegs);
-    return this->metalRegs[idx];
+    if (metal_reg::isGeneralReg(idx)) {
+        return this->metalRegs.at(flattenMetalGReg(idx));
+    } else {
+        return this->metalMiscRegs.at(flattenMetalMReg(idx));
+    }
+}
+
+RegIndex 
+ISA::flattenMetalMReg(RegIndex idx) const
+{
+    assert(!metal_reg::isGeneralReg(idx) && idx < metal_reg::NumRegs);
+    return idx - metal_reg::NumGenRegs;
+}
+
+RegIndex
+ISA::flattenMetalGReg(RegIndex idx) const
+{
+    assert(metal_reg::isGeneralReg(idx));
+    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    unsigned int level = msr.lv;
+    if (level >= metal_reg::NumWindow) {
+        panic("Metal GReg window overflow.");
+    }
+    const size_t window = metal_reg::TotalGRegs - metal_reg::WindowOverlap - (level + 1) * (metal_reg::WindowSize - metal_reg::WindowOverlap);
+    const RegIndex fidx = window + idx;
+    METAL_DBGPRINT(ISA, REGS, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
+    return fidx;
+}
+
+void 
+ISA::resetMetalRegs(void)
+{
+    for(int i = 0; i < this->metalRegs.size(); i++) {
+        this->metalRegs.at(i) = 0;
+    }
+    for(int i = 0; i < this->metalMiscRegs.size(); i++) {
+        this->metalMiscRegs.at(i) = 0;
+    }
 }
 
 void
 ISA::setMetalRegNoEffect(RegIndex idx, RegVal val)
 {
     assert(idx < metal_reg::NumRegs);
-    this->metalRegs[idx] = val;
+    if (metal_reg::isGeneralReg(idx)) {
+        this->metalRegs.at(flattenMetalGReg(idx)) = val;
+    } else {
+        this->metalMiscRegs.at(flattenMetalMReg(idx)) = val;
+    }
 }
 
 void
 ISA::setMetalReg(RegIndex idx, RegVal val)
 {
-    DPRINTF(Metal, "Setting Metal reg %d to 0x%lx.\n", idx, val);
-
     if (idx >= metal_reg::NumRegs) {
-      panic("Setting unknown Metal reg %d.", idx);
+        panic("Setting unknown Metal reg %d.", idx);
     }
 
     switch (idx) {
         case metal_reg::MIB : {
+            if ((val & (sizeof(InstInterceptTableEntry) - 1)) != 0) {
+                METAL_DBGPRINT(ISA, REGS, "MIB is not %d byte aligned: 0x%lx.\n", sizeof(InstInterceptTableEntry), val);
+                val = val & (~((sizeof(InstInterceptTableEntry) - 1)));
+            }
             flushInstInterceptTable();
             loadInstInterceptTable();
             freeMetalContext();
             break;
         }
         case metal_reg::MBR : {
+            if ((val & (sizeof(MroutineTableEntry) - 1)) != 0) {
+                METAL_DBGPRINT(ISA, REGS, "MBR is not %d byte aligned: 0x%lx.\n", sizeof(MroutineTableEntry), val);
+                val = val & (~((sizeof(MroutineTableEntry) - 1)));
+            }
+        
             this->mrlb.flushAll();
             break;
         }
@@ -1609,24 +1669,25 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             metal_reg::MSR_t new_val = val;
             metal_reg::MSR_t msr = readMetalRegNoEffect(idx);
             if (msr.init != new_val.init) {
-                DPRINTF(Metal, "Setting MSR.init: %d -> %d.\n", msr.init, new_val.init);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.init: %d -> %d.\n", msr.init, new_val.init);
             }
             if (msr.lv != new_val.lv) {
-                DPRINTF(Metal, "Setting MSR.level: %d -> %d.\n", msr.lv, new_val.lv);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.level: %d -> %d.\n", msr.lv, new_val.lv);
             }
             if (msr.ii != new_val.ii) {
-                DPRINTF(Metal, "Setting MSR.instruction intercept:  %d -> %d.\n", msr.ii, new_val.ii);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction intercept:  %d -> %d.\n", msr.ii, new_val.ii);
             }
             if (msr.im != new_val.im) {
-                DPRINTF(Metal, "Setting MSR.instruction intercept masking:  %d -> %d.\n", msr.im, new_val.im);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction intercept masking:  %d -> %d.\n", msr.im, new_val.im);
             }
             if (msr.is != new_val.is) {
-                DPRINTF(Metal, "Setting MSR.instruction skip:  %d -> %d.\n", msr.is, new_val.is);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction skip:  %d -> %d.\n", msr.is, new_val.is);
             }
             break;
         }
     }
 
+    METAL_DBGPRINT(ISA, REGS, "Setting %s to 0x%lx.\n", ArmStaticInst::printMetalReg(idx), val);
     setMetalRegNoEffect(idx, val);
 }
 

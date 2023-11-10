@@ -25,34 +25,49 @@ namespace metal_reg
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
-    enum : RegIndex
+    enum : RegIndex 
     {
         /* All the unique register indices. */
         MR0 = 0,
-        MR1 = 1,
-        MR2 = 2,
-        MR3 = 3,
-        MR4 = 4,
-        MR5 = 5,
-        MR6 = 6,
-        MR7 = 7,
-        MR8 = 8,
-        MR9 = 9,
-        MR10 = 10,
-        MR11 = 11,
-        MR12 = 12,
-        MR13 = 13,
-        MR14 = 14,
-        MR15 = 15,
-        MLR = 16, // Metal Link Register (MR16)
-        NumGenRegs = MLR + 1,
+        MR1,
+        MR2,
+        MR3,
+        MR4,
+        MR5,
+        MR6,
+        MR7,
+        MR8,
+        MR9,
+        MR10,
+        MR11,
+        MR12,
+        MR13,
+        MR14,
+        MR15,
+        MR16,
+        MR17,
+        MR18,
+        MR19,
+        MR20,
+        MR21,
+        MR22,
+        MR23,
+        MIR0 = MR21,
+        MIR1 = MR22,
+        MLR = MR23,
+        NumGenRegs,
 
-        MSR = 17, // Metal Status Register
-        MBR = 18, // Metal Base Register
-        MIB = 19, // Metal Instruction Base Register
-
-        NumRegs = MIB + 1
+        MSR = NumGenRegs, // Metal Status Register
+        MBR, // Metal Base Register
+        MIB, // Metal Instruction Base Register
+        NumRegs,
+        NumMiscRegs = NumRegs - NumGenRegs,
     };
+    static_assert(NumRegs < (1 << 5));
+    static constexpr size_t NumWindow = 64;
+    static constexpr size_t WindowSize = NumGenRegs;
+    static constexpr size_t WindowOverlap = 8;
+    static constexpr size_t TotalGRegs = WindowOverlap + NumWindow * (WindowSize - WindowOverlap);
 
     const char * const regNames[] = {
         "mr0",
@@ -71,11 +86,23 @@ namespace metal_reg
         "mr13",
         "mr14",
         "mr15",
+        "mr16",
+        "mr17",
+        "mr18",
+        "mr19",
+        "mr20",
+        "mr21",
+        "mr22",
+        "mlr",
         "msr",
         "mbr",
-        "mlr",
         "mib"
     };
+
+    static inline bool isGeneralReg(RegIndex idx)
+    {
+        return idx < NumGenRegs;
+    }
 
     static inline unsigned long getMetalLevel(MSR_t msr)
     {
