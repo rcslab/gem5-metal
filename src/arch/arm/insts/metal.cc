@@ -62,6 +62,21 @@ namespace gem5
             return ss.str();
         }
 
+        std::string
+        MetalRegOp3::generateDisassembly(
+            Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printMetalReg(ss, rl);
+            ccprintf(ss, ", ");
+            printIntReg(ss, rm);
+            ccprintf(ss, ", ");
+            printIntReg(ss, rn);
+            return ss.str();
+        }
+
         // menter
         Menter64::Menter64(ExtMachInst _machInst, uint8_t _imm) : MetalImmOp8("menter", _machInst, IntAluOp, _imm)
         {
@@ -501,7 +516,7 @@ namespace gem5
         // rtlb
         Rtlb64::Rtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
                        RegIndex _rn)
-                       : MetalThreeRegOp("rtlb", _machInst, IntAluOp, _rl, _rm,
+                       : MetalRegOp3("rtlb", _machInst, IntAluOp, _rl, _rm,
                                          _rn)
         {
             this->flags[IsInteger] = true;
@@ -512,7 +527,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            DPRINTF(Metal, "RTLB: rl = %d, rm = %d, rn = %d\n", rl, rm, rn);
+            METAL_DBGPRINT(INSTS, RTLB, "RTLB: rl = %s, rm = %s, rn = %s\n", printMetalReg(rl), printMetalReg(rm), printMetalReg(rn));
 
             if (!metal_reg::canWriteMetalReg(msr, rl)
                 || !metal_reg::canWriteMetalReg(msr, rm)
@@ -610,7 +625,7 @@ namespace gem5
 
         // wtlb
         Wtlb64::Wtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
-                       RegIndex _rn) : MetalThreeRegOp("wtlb", _machInst,
+                       RegIndex _rn) : MetalRegOp3("wtlb", _machInst,
                                                        IntAluOp, _rl, _rm, _rn)
         {
             this->flags[IsInteger] = true;
@@ -621,7 +636,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            DPRINTF(Metal, "WTLB: rl = %d, rm = %d, rn = %d\n", rl, rm, rn);
+            METAL_DBGPRINT(INSTS, WTLB, "WTLB: rl = %s, rm = %s, rn = %s\n", printMetalReg(rl), printMetalReg(rm), printMetalReg(rn));
 
             if (!metal_reg::canReadMetalReg(msr, rl)
                 || !metal_reg::canReadMetalReg(msr, rm)
