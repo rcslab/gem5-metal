@@ -318,6 +318,13 @@ struct TlbEntry : public Serializable
     }
 
     bool
+    vaddrMatch(Addr vaddr) const
+    {
+        Addr v = vpn << N;
+        return (valid && vaddr >= v && vaddr <= v + size);
+    }
+
+    bool
     match(const Lookup &lookup) const
     {
         bool match = false;
