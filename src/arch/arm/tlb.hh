@@ -178,6 +178,8 @@ class TLB : public BaseTLB
      */
     TlbEntry *multiLookup(const Lookup &lookup_data);
 
+    TlbEntry *getEntry(Addr vaddr);
+
     virtual ~TLB();
 
     void takeOverFrom(BaseTLB *otlb) override;

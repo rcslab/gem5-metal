@@ -622,6 +622,7 @@ namespace Aarch64
                 uint8_t opc = bits(machInst, 24, 21);
                 uint8_t op2 = bits(machInst, 20, 16);
                 uint8_t op3 = bits(machInst, 15, 10);
+                RegIndex rl = (RegIndex)(uint8_t)bits(machInst, 14, 10);
                 RegIndex rn = (RegIndex)(uint8_t)bits(machInst, 9, 5);
                 RegIndex rm = (RegIndex)(uint8_t)bits(machInst, 4, 0);
                 uint8_t op4 = bits(machInst, 4, 0);
@@ -629,6 +630,9 @@ namespace Aarch64
                     return new Unknown64(machInst);
                 switch (opc) {
                   case 0x0:
+                    if ((op3 >> 5) == 1) {
+                      return new Rtlb64(machInst, rl, rn, rm);
+                    }
                     if ((op3 >> 3) == 0b001) {
                       uint8_t opm = bits(machInst, 12, 10);
                       switch (opm) {
@@ -675,6 +679,9 @@ namespace Aarch64
                     else
                         return new Brabz(machInst, rn);
                   case 0x1:
+                    if ((op3 >> 5) == 1) {
+                      return new Wtlb64(machInst, rl, rn, rm);
+                    }
                     if (bits(machInst, 11) == 0)
                         return new Blr64(machInst, rn);
                     else if (op4 != 0x1f)

@@ -9,6 +9,77 @@ namespace gem5
     namespace ArmISA
     {
         static constexpr std::string_view MetalDisasmPrefix = "";
+
+        class TLBEntryInfo {
+            public:
+                uint64_t data;
+
+                TLBEntryInfo() : data(0) {}
+
+                uint16_t asid() {
+                    return bits(data, 63, 48);
+                }
+                void set_asid(uint16_t asid) {
+                    insertBits(data, 63, 48, asid);
+                }
+
+                uint16_t vmid() {
+                    return bits(data, 47, 32);
+                }
+                void set_vmid(uint16_t vmid) {
+                    insertBits(data, 47, 32, vmid);
+                }
+
+                uint8_t attr() {
+                    return bits(data, 31, 24);
+                }
+                void set_attr(uint8_t attr) {
+                    insertBits(data, 31, 24, attr);
+                }
+
+                ExceptionLevel el() {
+                    return (ExceptionLevel)bits(data, 23, 22);
+                }
+                void set_el(ExceptionLevel el) {
+                    insertBits(data, 23, 22, el);
+                }
+
+                TlbEntry::MemoryType mtype() {
+                    return (TlbEntry::MemoryType)bits(data, 21, 20);
+                }
+                void set_mtype(TlbEntry::MemoryType mtype) {
+                    insertBits(data, 21, 20, mtype);
+                }
+
+                bool isHyp() {
+                    return bits(data, 19);
+                }
+                void set_isHyp(bool isHyp) {
+                    insertBits(data, 19, isHyp);
+                }
+
+                bool isSecure() {
+                    return bits(data, 18);
+                }
+                void set_isSecure(bool isSecure) {
+                    insertBits(data, 18, isSecure);
+                }
+
+                bool type() {
+                    return bits(data, 17);
+                }
+                void set_type(bool type) {
+                    insertBits(data, 17, type);
+                }
+
+                bool nc() {
+                    return bits(data, 16);
+                }
+                void set_nc(bool nc) {
+                    insertBits(data, 16, nc);
+                }
+        };
+
         // Metal instructions with an immediate (menter)
         class MetalImmOp8 : public ArmStaticInst
         {
@@ -57,6 +128,27 @@ namespace gem5
                 reinterpret_cast<RegIdArrayPtr>(
                     &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
 
+                this->flags[IsMetal] = true;
+            }
+
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        // Metal instructions with 3 args (rtlb64, wtlb64)
+        class MetalThreeRegOp : public ArmStaticInst
+        {
+        protected:
+            RegIndex rl;
+            RegIndex rm;
+            RegIndex rn;
+
+        public:
+            MetalThreeRegOp(const char *mnem, ExtMachInst _machInst,
+                OpClass __opClass, RegIndex _rl, RegIndex _rm, RegIndex _rn)
+                : ArmStaticInst(mnem, _machInst, __opClass), rl(_rl),
+                rm(_rm), rn(_rn)
+            {
                 this->flags[IsMetal] = true;
             }
 
@@ -116,11 +208,31 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
+        // rtlb
+        class Rtlb64 : public MetalThreeRegOp
+        {
+        public:
+            Rtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
+                   RegIndex _rn);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+
         // Write Architectural Register 
         class War64 : public MetalRegOp
         {
         public:
             War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+
+        // wrtlb
+        class Wtlb64 : public MetalThreeRegOp
+        {
+        public:
+            Wtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
+                   RegIndex _rn);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };

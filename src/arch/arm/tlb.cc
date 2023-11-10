@@ -104,6 +104,49 @@ TLB::setTableWalker(TableWalker *table_walker)
 }
 
 TlbEntry*
+TLB::getEntry(Addr vaddr)
+{
+    // Vector of TLB entry candidates.
+    // Only one of them will be assigned to retval and will
+    // be returned to the MMU (in case of a hit)
+    // The vector has one entry per lookup level as it stores
+    // both complete and partial matches
+    std::vector<std::pair<int, const TlbEntry*>> hits{
+        LookupLevel::Num_ArmLookupLevel, {0, nullptr}};
+
+    int x = 0;
+    while (x < size) {
+        if (table[x].vaddrMatch(vaddr)) {
+            const TlbEntry &entry = table[x];
+            hits[entry.lookupLevel] = std::make_pair(x, &entry);
+
+            // This is a complete translation, no need to loop further
+            if (!entry.partial)
+                break;
+        }
+        ++x;
+    }
+
+    // Loop over the list of TLB entries matching our translation
+    // request, starting from the highest lookup level (complete
+    // translation) and iterating backwards (using reverse iterators)
+    for (auto it = hits.rbegin(); it != hits.rend(); it++) {
+        const auto& [idx, entry] = *it;
+        if (!entry) {
+            // No match for the current LookupLevel
+            continue;
+        }
+
+        // sync access permissions
+        const AccessEntry& ae = accessTable[table[idx].access];
+        table[idx].syncAP(ae);
+        return &table[idx];
+    }
+
+    return nullptr;
+}
+
+TlbEntry*
 TLB::match(const Lookup &lookup_data)
 {
     // Vector of TLB entry candidates.
