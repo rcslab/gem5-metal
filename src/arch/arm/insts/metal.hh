@@ -166,7 +166,7 @@ namespace gem5
         };
 
         // Metal instructions with 3 args (rtlb64, wtlb64)
-        class MetalThreeRegOp : public ArmStaticInst
+        class MetalRegOp3 : public ArmStaticInst
         {
         protected:
             RegIndex rl;
@@ -174,7 +174,7 @@ namespace gem5
             RegIndex rn;
 
         public:
-            MetalThreeRegOp(const char *mnem, ExtMachInst _machInst,
+            MetalRegOp3(const char *mnem, ExtMachInst _machInst,
                 OpClass __opClass, RegIndex _rl, RegIndex _rm, RegIndex _rn)
                 : ArmStaticInst(mnem, _machInst, __opClass), rl(_rl),
                 rm(_rm), rn(_rn)
@@ -240,7 +240,7 @@ namespace gem5
         };
 
         // rtlb
-        class Rtlb64 : public MetalThreeRegOp
+        class Rtlb64 : public MetalRegOp3
         {
         public:
             Rtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
@@ -259,7 +259,7 @@ namespace gem5
         };
 
         // wrtlb
-        class Wtlb64 : public MetalThreeRegOp
+        class Wtlb64 : public MetalRegOp3
         {
         public:
             Wtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
