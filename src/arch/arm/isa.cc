@@ -84,7 +84,7 @@ RegClass floatRegClass(FloatRegClass, FloatRegClassName, 0, debug::FloatRegs);
 } // anonymous namespace
 
 ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
-    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), metalCtx(nullptr), mrlb(MroutineTableMaxEntryNum)
+    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), mrlb(MroutineTableMaxEntryNum)
 {
     _regClasses.push_back(&flatIntRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -148,7 +148,6 @@ ISA::clear()
     resetMetalRegs();
     flushInstInterceptTable();
     this->mrlb.flushAll();
-    freeMetalContext();
 
     updateRegMap(miscRegs[MISCREG_CPSR]);
 }
@@ -1392,10 +1391,11 @@ ISA::flushInstInterceptTable(void)
 }
 
 void
-ISA::loadInstInterceptTable(void)
+ISA::loadInstInterceptTable(void * rawMem, size_t size)
 {
-    assert(this->metalCtx != nullptr);
-    auto ents = reinterpret_cast<InstInterceptTableEntry *>(this->metalCtx);
+    assert((size % sizeof(InstInterceptTableEntry)) == 0);
+
+    auto ents = reinterpret_cast<InstInterceptTableEntry *>(rawMem);
     
     // we need to decode from the emulated PC but obtain flags from the read memory
     Addr mib = this->readMetalRegNoEffect(metal_reg::MIB);
@@ -1459,21 +1459,6 @@ ISA::loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int 
         const MRLBEntry entry(startIdx + i, ent.unshiftedAddr << ISA::MroutineTableEntryAddrShift, ent.valid);
         mrlb.add(entry);
     }
-}
-
-bool
-ISA::checkNextInstSkipped(void) const
-{
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
-    return metal_reg::isInstSkipEnabled(msr);
-}
-
-void
-ISA::doneNextInstSkipped(void)
-{
-    metal_reg::MSR_t msr = this->readMetalReg(metal_reg::MSR);
-    msr.is = 0;
-    this->setMetalReg(metal_reg::MSR, msr);
 }
 
 bool
@@ -1647,13 +1632,7 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
 
     switch (idx) {
         case metal_reg::MIB : {
-            if ((val & (sizeof(InstInterceptTableEntry) - 1)) != 0) {
-                METAL_DBGPRINT(ISA, REGS, "MIB is not %d byte aligned: 0x%lx.\n", sizeof(InstInterceptTableEntry), val);
-                val = val & (~((sizeof(InstInterceptTableEntry) - 1)));
-            }
             flushInstInterceptTable();
-            loadInstInterceptTable();
-            freeMetalContext();
             break;
         }
         case metal_reg::MBR : {
@@ -1680,32 +1659,12 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             if (msr.im != new_val.im) {
                 METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction intercept masking:  %d -> %d.\n", msr.im, new_val.im);
             }
-            if (msr.is != new_val.is) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction skip:  %d -> %d.\n", msr.is, new_val.is);
-            }
             break;
         }
     }
 
     METAL_DBGPRINT(ISA, REGS, "Setting %s to 0x%lx.\n", ArmStaticInst::printMetalReg(idx), val);
     setMetalRegNoEffect(idx, val);
-}
-
-void
-ISA::freeMetalContext(void)
-{
-    if (this->metalCtx != nullptr) {
-        delete[] this->metalCtx;
-        this->metalCtx = nullptr;
-    }
-}
-
-void *
-ISA::allocMetalContext(size_t sz)
-{
-    assert(this->metalCtx == nullptr);
-    this->metalCtx = new char[sz];
-    return this->metalCtx;
 }
 
 BaseISADevice &

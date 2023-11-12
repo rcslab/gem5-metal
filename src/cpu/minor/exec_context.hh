@@ -179,7 +179,7 @@ class ExecContext : public gem5::ExecContext
         panic("unimplemented");
     }
 
-    RegVal getReg(const RegId &reg, void *val) override
+    void getReg(const RegId &reg, void *val) override
     {
         panic("unimplemented");
     }

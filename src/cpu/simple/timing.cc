@@ -840,12 +840,6 @@ TimingSimpleCPU::completeIfetch(PacketPtr pkt)
 
     preExecute();
 
-    if (this->isCurInstSkipped) {
-        this->isCurInstSkipped = false;
-        advanceInst(NoFault);
-        goto cleanup;
-    }
-
     if (this->isInstPreIntercepted) {
         this->isInstPreIntercepted = false;
         advanceInst(NoFault);

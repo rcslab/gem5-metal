@@ -122,8 +122,6 @@ class BaseSimpleCPU : public BaseCPU
 
     Status _status;
 
-    /** flags for skipping the current inst **/
-    bool isCurInstSkipped;
     bool isInstPreIntercepted;
     bool isInstPostIntercepted;
 

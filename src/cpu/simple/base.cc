@@ -86,7 +86,6 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
       branchPred(p.branchPred),
       traceData(NULL),
       _status(Idle),
-      isCurInstSkipped(false),
       isInstPreIntercepted(false)
 {
     SimpleThread *thread;
@@ -369,12 +368,7 @@ BaseSimpleCPU::preExecute()
         }
 
         if (instPtr) {
-            if (thread->checkNextInstSkipped()) {
-                thread->doneNextInstSkipped();
-                this->isCurInstSkipped = true;
-                goto end;
-            }
-            else if (thread->checkInstInterceptMasked()) {
+            if (thread->checkInstInterceptMasked()) {
                 thread->doneInstInterceptMasked();
                 this->isInstPreIntercepted = false;
             } else if  (thread->checkInstPreIntercept(curStaticInst)) {

@@ -251,10 +251,6 @@ class ThreadContext : public PCEventScope
     virtual void doInstPostIntercept(const StaticInstPtr &inst) = 0;
     virtual bool checkInstInterceptMasked(void) const = 0;
     virtual void doneInstInterceptMasked(void) = 0;
-    // METAL_XXX: these should probably be architecture-specific and not "generically" supported by the base ThreadContext class
-    // as they can be implemented by just setting the PC to the correct value
-    virtual bool checkNextInstSkipped(void) const = 0;
-    virtual void doneNextInstSkipped(void) = 0;
 };
 
 /** @{ */

@@ -20,8 +20,7 @@ namespace metal_reg
     BitUnion64(MSR_t)
         Bitfield<63> init; // Metal initialization flag
         Bitfield<62> ii; // instruction intercept enable
-        Bitfield<61> is; // instruction skip
-        Bitfield<60> im; // instruction intercept mask
+        Bitfield<61> im; // instruction intercept mask
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
@@ -124,11 +123,6 @@ namespace metal_reg
         return (bool)msr.ii;
     }
 
-    static inline bool isInstSkipEnabled(MSR_t msr)
-    {
-        return (bool)msr.is;
-    }
-
     static inline bool isInstInterceptMasked(MSR_t msr)
     {
         return (bool)msr.im;
@@ -162,11 +156,6 @@ namespace metal_reg
         }
 
         return isInMetalMode(msr);
-    }
-
-    static inline bool isMetalRegWriteMemAccess(RegIndex mreg)
-    {
-        return mreg == MIB;
     }
 
 } // namespace metal_reg

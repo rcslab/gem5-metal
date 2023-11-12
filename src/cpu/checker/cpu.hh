@@ -187,7 +187,7 @@ class CheckerCPU : public BaseCPU, public ExecContext
         panic("unimplemented");
     }
 
-    RegVal getReg(const RegId &reg, void *val) override
+    void getReg(const RegId &reg, void *val) override
     {
         panic("unimplemented");
     }

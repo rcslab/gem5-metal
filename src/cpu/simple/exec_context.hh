@@ -192,7 +192,7 @@ class SimpleExecContext : public ExecContext
         return this->thread->getReg(reg);
     }
 
-    RegVal
+    void
     getReg(const RegId &reg, void *val) override
     {
         (*this->execContextStats.numRegReads[reg.classValue()])++;
