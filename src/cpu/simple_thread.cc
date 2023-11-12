@@ -152,19 +152,6 @@ SimpleThread::suspend()
     baseCpu->suspendContext(_threadId);
 }
 
-
-bool 
-SimpleThread::checkNextInstSkipped(void) const
-{
-    return getIsaPtr()->checkNextInstSkipped();
-}
-
-void
-SimpleThread::doneNextInstSkipped(void)
-{
-    return getIsaPtr()->doneNextInstSkipped();
-}
-
 bool 
 SimpleThread::checkInstInterceptMasked(void) const
 {

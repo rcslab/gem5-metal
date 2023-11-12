@@ -148,12 +148,6 @@ namespace MipsISA
     void doneInstInterceptMasked(void) override {
         panic("unimplemented!");
     }
-    bool checkNextInstSkipped(void) const override {
-        panic("unimplemented!");
-    }
-    void doneNextInstSkipped(void) override {
-        panic("unimplemented!");
-    }
 
         //////////////////////////////////////////////////////////
         //

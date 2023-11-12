@@ -1161,7 +1161,7 @@ class DynInst : public ExecContext, public RefCounted
         panic("unimplemented");
     }
 
-    RegVal getReg(const RegId &reg, void *val) override
+    void getReg(const RegId &reg, void *val) override
     {
         panic("unimplemented");
     }

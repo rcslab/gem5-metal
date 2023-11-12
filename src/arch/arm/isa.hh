@@ -128,7 +128,6 @@ namespace ArmISA
 
         std::array<RegVal, metal_reg::TotalGRegs> metalRegs;
         std::array<RegVal, metal_reg::NumMiscRegs> metalMiscRegs;
-        char * metalCtx;
         const RegId *intRegMap;
 
         MRLB mrlb;
@@ -160,11 +159,10 @@ public:
         };
         static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 4 && isPowerOf2(sizeof(InstInterceptTableEntry)));
 
-        static constexpr size_t InstInterceptTableMaxEntryNum = 64 / sizeof(InstInterceptTableEntry);
-        struct InstInterceptTable {
-            InstInterceptTableEntry entries[InstInterceptTableMaxEntryNum];
-        };
-        static_assert(sizeof(InstInterceptTable) == sizeof(InstInterceptTableEntry) * InstInterceptTableMaxEntryNum);
+        static constexpr size_t InstInterceptTableMaxEntryNum = 64;
+        static constexpr size_t InstInterceptTableLoadSize = 64;
+        static constexpr size_t InstInterceptTableTotalSize = InstInterceptTableMaxEntryNum * sizeof(InstInterceptTableEntry);
+        static_assert((InstInterceptTableTotalSize % InstInterceptTableLoadSize) == 0 && (InstInterceptTableLoadSize % sizeof(InstInterceptTableEntry)) == 0);
 private:
         struct InstInterceptMapEntry {
             std::string mnemonic;
@@ -180,8 +178,6 @@ private:
         void registerInstPostIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1);
         const InstInterceptMapEntry * checkInstIntercept(const StaticInstPtr &inst, bool post) const;
         void doInstIntercept(const StaticInstPtr &inst, bool post);
-        void flushInstInterceptTable(void);
-        void loadInstInterceptTable(void);
         static inline uint32_t shiftInstMask(uint32_t encoding, uint32_t mask)
         {
               if (!mask)
@@ -272,17 +268,15 @@ private:
         RegIndex flattenMetalGReg(RegIndex idx) const;
         RegIndex flattenMetalMReg(RegIndex idx) const;
 public:
-        void * allocMetalContext(size_t sz);
-        void freeMetalContext(void);
-public:
         bool checkInstPreIntercept(const StaticInstPtr &inst) const override;
         void doInstPreIntercept(const StaticInstPtr &inst) override;
         bool checkInstPostIntercept(const StaticInstPtr &inst) const override;
         void doInstPostIntercept(const StaticInstPtr &inst) override;
         bool checkInstInterceptMasked(void) const override;
         void doneInstInterceptMasked(void) override;
-        bool checkNextInstSkipped(void) const override;
-        void doneNextInstSkipped(void) override;
+
+        void flushInstInterceptTable(void);
+        void loadInstInterceptTable(void * rawMem, size_t size);
 
         int
         flattenMiscIndex(int reg) const
