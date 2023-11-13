@@ -86,7 +86,7 @@ void MRLB::add(const MRLBEntry & e)
 
     ent.set(e);
     ent.setLoaded(true);
-    METAL_DBGPRINT(MRLB, ADD, "added mroutine %d, addr = 0x%lx, valid = %d...\n", ent.getIdx(), ent.getAddr(), ent.isValid());
+    METAL_DBGPRINT(MRLB, ADD, "*added* MRLB entry [mroutine = %d, addr = 0x%lx, valid = %d].\n", ent.getIdx(), ent.getAddr(), ent.isValid());
 }
 
 const MRLBEntry & 
@@ -99,13 +99,13 @@ MRLB::get(unsigned int idx) const
     const MRLBEntry & ent = entries.at(idx);
 
     if (!ent.isLoaded()) {
-        METAL_DBGPRINT(MRLB, GET, "mroutine %d lookup is *miss*.\n", idx);
+        METAL_DBGPRINT(MRLB, GET, "*miss* for mroutine %d.\n", idx);
         return NullEntry;
     }
     
     assert(ent.getIdx() == idx);
 
-    METAL_DBGPRINT(MRLB, GET, "mroutine %d lookup is *hit*.\n", ent.getIdx(), ent.getAddr(), ent.isValid());
+    METAL_DBGPRINT(MRLB, GET, "*hit* for mroutine %d.\n", ent.getIdx(), ent.getAddr(), ent.isValid());
     return ent;
 }
 
@@ -246,7 +246,7 @@ void IILB::add(const IILBEntry & _ent)
         }
     }
     
-    METAL_DBGPRINT(IILB, ADD, "*added* inst = 0x%x, mnemonic = %s, opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x.\n", 
+    METAL_DBGPRINT(IILB, ADD, "*added* IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n", 
                                                                                     ent->getArmStaticInst()->encoding(),
                                                                                     ent->getInst()->getName(),
                                                                                     ent->getOpMask(), ent->isPost(), 
@@ -267,7 +267,10 @@ const IILBEntry & IILB::get(const IILBEntry & ent) const
     while (vit != vec->end()) {
         auto each = (*vit).get();
         if (each->match(ent)) {
-            METAL_DBGPRINT(IILB, ADD, "*matched* inst = 0x%x, opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x.\n", 
+            METAL_DBGPRINT(IILB, GET, "*matched* inst = 0x%x, mnemonic = \"%s\", post = %d -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x].\n",
+                                                                                    ent.getArmStaticInst()->encoding(),
+                                                                                    ent.getInst()->getName(),
+                                                                                    ent.isPost(), 
                                                                                     each->getArmStaticInst()->encoding(), 
                                                                                     each->getOpMask(), each->isPost(), 
                                                                                     each->getMroutine(), each->getMask0(), 

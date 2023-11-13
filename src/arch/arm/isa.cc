@@ -1364,7 +1364,7 @@ ISA::registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _
 {
     const IILBEntry ent(inst, _ent.opMask, _ent.ctrl.post, _ent.ctrl.mroutine, _ent.mask0, _ent.mask1, _ent.mask2);
     this->iilb.add(ent);
-    METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for \"%s\".", inst->getName());
+    METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for \"%s\".\n", inst->getName());
 }
 
 void
