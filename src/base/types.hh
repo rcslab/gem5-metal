@@ -46,6 +46,10 @@
 namespace gem5
 {
 
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+    TypeName(TypeName&) = delete;              \
+    TypeName& operator=(const TypeName&) = delete
+
 /** Statistics counter type.  Not much excuse for not using a 64-bit
  * integer here, but if you're desperate and only run short
  * simulations you could make this 32 bits.

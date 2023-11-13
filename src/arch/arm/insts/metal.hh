@@ -95,9 +95,6 @@ namespace gem5
         protected:
             void clearMicroOps(void)
             {
-                for (size_t i = 0; i < this->uops.size(); i++) {
-                    delete uops.at(i).get();
-                }
                 uops.clear();
             }
             void addMicroOps(StaticInstPtr inst)

@@ -150,7 +150,7 @@ namespace gem5
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
             
             Fault fault = NoFault;
-            if (&mrlbEnt == &MRLB::NullMRLBEntry) {
+            if (&mrlbEnt == &MRLB::NullEntry) {
                 const RegVal mbr = xc->readMetalReg(metal_reg::MBR);
 
                 // ensure mbr is 8 byte aligned (enforced by WMR)
@@ -203,7 +203,7 @@ namespace gem5
             // lookup MRLB again
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
             
-            assert(&mrlbEnt != &MRLB::NullMRLBEntry);
+            assert(&mrlbEnt != &MRLB::NullEntry);
 
             METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
             if (!mrlbEnt.isValid()) {
@@ -632,7 +632,7 @@ namespace gem5
 
         // Mliit64_u
         Mliit64_u::Mliit64_u(ExtMachInst _machInst, OpClass __opClass, uint32_t _offset, uint32_t _size) : 
-            MetalNakedOp("mliit_u", _machInst, __opClass)
+            MetalNakedOp("mliit_u", _machInst, __opClass), offset(_offset), size(_size)
         {
             this->flags[IsMicroop] = true;
             this->flags[IsLoad] = true;
@@ -643,15 +643,15 @@ namespace gem5
         {
             ThreadContext *tc = xc->tcBase();
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-            RegVal mbr = xc->readMetalReg(metal_reg::MBR);
+            RegVal mib = xc->readMetalReg(metal_reg::MIB);
 
-            METAL_DBGPRINT(INSTS, MLIIT_U, "Loading inst intercept table at 0x%lx + 0x%lx, size %u.\n", mbr, this->offset, this->size);
+            METAL_DBGPRINT(INSTS, MLIIT_U, "Loading inst intercept table at 0x%lx + 0x%lx, size %u.\n", mib, this->offset, this->size);
 
-            if (!metal_reg::canReadMetalReg(msr, metal_reg::MBR)) {
+            if (!metal_reg::canReadMetalReg(msr, metal_reg::MIB)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            Fault fault = initiateMemRead(xc, purifyTaggedAddr(this->offset + mbr, tc, currEL(tc), true), this->size, ArmISA::MMU::AllowUnaligned);
+            Fault fault = initiateMemRead(xc, purifyTaggedAddr(this->offset + mib, tc, currEL(tc), true), this->size, ArmISA::MMU::AllowUnaligned);
 
             return NoFault;
         }
@@ -660,6 +660,7 @@ namespace gem5
         {
             ThreadContext *tc = xc->tcBase();
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
+            RegVal mib = xc->readMetalReg(metal_reg::MIB);
 
             if (pkt->isError()) {
                 panic("Data fetch failed.");
@@ -668,7 +669,7 @@ namespace gem5
             static char buf[ISA::InstInterceptTableLoadSize];
             assert(this->size <= ISA::InstInterceptTableLoadSize);
             getMemRawPtr(pkt, buf, this->size, traceData);
-            isa->loadInstInterceptTable(buf, this->size);
+            isa->loadInstInterceptTable(buf, purifyTaggedAddr(this->offset + mib, tc, currEL(tc), true), this->size);
             return NoFault;
         }
 

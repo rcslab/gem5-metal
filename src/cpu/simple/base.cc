@@ -371,8 +371,8 @@ BaseSimpleCPU::preExecute()
             if (thread->checkInstInterceptMasked()) {
                 thread->doneInstInterceptMasked();
                 this->isInstPreIntercepted = false;
-            } else if  (thread->checkInstPreIntercept(curStaticInst)) {
-                thread->doInstPreIntercept(curStaticInst);
+            } else if  (thread->checkInstIntercept(curStaticInst, false)) {
+                thread->doInstIntercept(curStaticInst, false);
                 this->isInstPreIntercepted = true;
                 goto end;
             }
@@ -507,9 +507,9 @@ BaseSimpleCPU::postExecute()
     probeInstCommit(curStaticInst, instAddr);
 
     if (!isRomMicroPC(thread->pcState().microPC()) && !curMacroStaticInst &&
-         thread->checkInstPostIntercept(curStaticInst)) {
+         thread->checkInstIntercept(curStaticInst, true)) {
             // don't post intercept macro ops
-            thread->doInstPostIntercept(curStaticInst);
+            thread->doInstIntercept(curStaticInst, true);
             // this flag is currently unused in TimingCPU, but might be useful for other CPUs
             this->isInstPostIntercepted = true;
     }

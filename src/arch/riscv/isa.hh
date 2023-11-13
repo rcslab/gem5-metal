@@ -111,16 +111,10 @@ class ISA : public BaseISA
         return new PCState(new_inst_addr, _rvType, vlenb);
     }
 
-    bool checkInstPreIntercept(const StaticInstPtr &inst) const override {
+    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
         panic("unimplemented!");
     }
-    void doInstPreIntercept(const StaticInstPtr &inst) override {
-        panic("unimplemented!");
-    }
-    bool checkInstPostIntercept(const StaticInstPtr &inst) const override {
-        panic("unimplemented!");
-    }
-    void doInstPostIntercept(const StaticInstPtr &inst) override {
+    void doInstIntercept(const StaticInstPtr inst, bool post) override {
         panic("unimplemented!");
     }
     bool checkInstInterceptMasked(void) const override {
