@@ -131,6 +131,7 @@ namespace ArmISA
         const RegId *intRegMap;
 
         MRLB mrlb;
+        IILB iilb;
 public:
         // mroutine stuff
         static constexpr size_t MroutineTableMaxEntryNum = 1 << 8;
@@ -142,9 +143,6 @@ public:
         EndBitUnion(MroutineTableEntry)
         static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) && isPowerOf2(sizeof(MroutineTableEntry)));
 
-        MRLB & getMrlbPtr();
-        void loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx);
-
         // Instruction intercept
         BitUnion32(InstInterceptCtrl)
             Bitfield<7, 0> mroutine;
@@ -152,40 +150,20 @@ public:
             Bitfield<31> valid;
         EndBitUnion(InstInterceptCtrl)
         struct InstInterceptTableEntry {
-            uint32_t inst;
+            MachInst inst;
+            MachInst opMask;
             InstInterceptCtrl ctrl;
-            uint32_t mask0;
-            uint32_t mask1;
+            MachInst mask0;
+            MachInst mask1;
+            MachInst mask2;
         };
-        static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 4 && isPowerOf2(sizeof(InstInterceptTableEntry)));
+        static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 6);
 
         static constexpr size_t InstInterceptTableMaxEntryNum = 64;
-        static constexpr size_t InstInterceptTableLoadSize = 64;
+        static constexpr size_t InstInterceptTableLoadSize = 2 * sizeof(InstInterceptTableEntry);
         static constexpr size_t InstInterceptTableTotalSize = InstInterceptTableMaxEntryNum * sizeof(InstInterceptTableEntry);
         static_assert((InstInterceptTableTotalSize % InstInterceptTableLoadSize) == 0 && (InstInterceptTableLoadSize % sizeof(InstInterceptTableEntry)) == 0);
 private:
-        struct InstInterceptMapEntry {
-            std::string mnemonic;
-            bool post;
-            bool pre;
-            uint32_t mask0;
-            uint32_t mask1;
-            unsigned int mroutine;
-        };
-        std::unordered_map<std::string, InstInterceptMapEntry *> instPreInterceptMap;
-        std::unordered_map<std::string, InstInterceptMapEntry *> instPostInterceptMap;
-        void registerInstPreIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1);
-        void registerInstPostIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1);
-        const InstInterceptMapEntry * checkInstIntercept(const StaticInstPtr &inst, bool post) const;
-        void doInstIntercept(const StaticInstPtr &inst, bool post);
-        static inline uint32_t shiftInstMask(uint32_t encoding, uint32_t mask)
-        {
-              if (!mask)
-                  return 0;
-              int firstBit = ffs(mask);
-              return (encoding & mask) >> (firstBit - 1);
-        }
-
         void
         updateRegMap(CPSR cpsr)
         {
@@ -267,16 +245,24 @@ private:
         void resetMetalRegs(void);
         RegIndex flattenMetalGReg(RegIndex idx) const;
         RegIndex flattenMetalMReg(RegIndex idx) const;
+        void registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent);
+        static MachInst shiftInstMask(MachInst encoding, MachInst mask)
+        {
+              if (!mask)
+                  return 0;
+              int firstBit = ffs(mask);
+              return (encoding & mask) >> (firstBit - 1);
+        }
 public:
-        bool checkInstPreIntercept(const StaticInstPtr &inst) const override;
-        void doInstPreIntercept(const StaticInstPtr &inst) override;
-        bool checkInstPostIntercept(const StaticInstPtr &inst) const override;
-        void doInstPostIntercept(const StaticInstPtr &inst) override;
+        MRLB & getMrlbPtr();
+        IILB & getIilbPtr();
+        void loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx);
+        void loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size);
+
+        bool checkInstIntercept(const StaticInstPtr inst, bool post) const override;
+        void doInstIntercept(const StaticInstPtr inst, bool post) override;
         bool checkInstInterceptMasked(void) const override;
         void doneInstInterceptMasked(void) override;
-
-        void flushInstInterceptTable(void);
-        void loadInstInterceptTable(void * rawMem, size_t size);
 
         int
         flattenMiscIndex(int reg) const

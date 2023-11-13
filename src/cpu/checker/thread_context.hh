@@ -359,21 +359,18 @@ class CheckerThreadContext : public ThreadContext
         panic("function not implemented");
     }
 
-    bool checkInstPreIntercept(const StaticInstPtr &inst) const override {
+    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
         panic("unimplemented!");
     }
-    void doInstPreIntercept(const StaticInstPtr &inst) override {
+
+    void doInstIntercept(const StaticInstPtr inst, bool post) override {
         panic("unimplemented!");
     }
-    bool checkInstPostIntercept(const StaticInstPtr &inst) const override {
-        panic("unimplemented!");
-    }
-    void doInstPostIntercept(const StaticInstPtr &inst) override {
-        panic("unimplemented!");
-    }
+
     bool checkInstInterceptMasked(void) const override {
         panic("unimplemented!");
     }
+
     void doneInstInterceptMasked(void) override {
         panic("unimplemented!");
     }

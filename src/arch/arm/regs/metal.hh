@@ -51,8 +51,9 @@ namespace metal_reg
         MR21,
         MR22,
         MR23,
-        MIR0 = MR21,
-        MIR1 = MR22,
+        MIR0 = MR20,
+        MIR1 = MR21,
+        MIR2 = MR22,
         MLR = MR23,
         NumGenRegs,
 

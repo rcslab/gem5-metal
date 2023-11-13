@@ -146,7 +146,7 @@ ISA::clear()
     }
 
     resetMetalRegs();
-    flushInstInterceptTable();
+    this->iilb.flush();
     this->mrlb.flushAll();
 
     updateRegMap(miscRegs[MISCREG_CPSR]);
@@ -202,7 +202,12 @@ ISA::copyRegsFrom(ThreadContext *src)
     for (int i = 0; i < NUM_MISCREGS; i++)
         tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
 
-    for (int i = 0; i < metal_reg::NumRegs; i++)
+    // copy window
+    for (int i = 0; i < metal_reg::NumGenRegs; i++)
+        // need to copy window
+        panic("unimplemented");
+
+    for (int i = metal_reg::NumGenRegs; i < metal_reg::NumRegs; i++)
         tc->setMetalRegNoEffect(i, src->readMetalRegNoEffect(i));
 
     ArmISA::VecRegContainer vc;
@@ -1354,67 +1359,42 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
     }
 }
 
-void
-ISA::registerInstPreIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1)
-{
-    InstInterceptMapEntry * ent = new InstInterceptMapEntry;
-    ent->mnemonic = mnemonic;
-    ent->mask0 = mask0;
-    ent->mask1 = mask1;
-    ent->mroutine = mroutine;
-    this->instPreInterceptMap[mnemonic] = ent;
-}
-
 void 
-ISA::registerInstPostIntercept(std::string mnemonic, unsigned int mroutine, uint32_t mask0, uint32_t mask1)
+ISA::registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent)
 {
-    InstInterceptMapEntry * ent = new InstInterceptMapEntry;
-    ent->mnemonic = mnemonic;
-    ent->mask0 = mask0;
-    ent->mask1 = mask1;
-    ent->mroutine = mroutine;
-    this->instPostInterceptMap[mnemonic] = ent;
-}
-
-void 
-ISA::flushInstInterceptTable(void)
-{
-    METAL_DBGPRINT(ISA, INSTINTR, "Flushing instruction intercept table...\n");
-    for (auto it = this->instPreInterceptMap.begin(); it != this->instPreInterceptMap.end(); it++) {
-        delete it->second;
-    }
-    for (auto it = this->instPostInterceptMap.begin(); it != this->instPostInterceptMap.end(); it++) {
-        delete it->second;
-    }
-    this->instPreInterceptMap.clear();
-    this->instPostInterceptMap.clear();
+    const IILBEntry ent(inst, _ent.opMask, _ent.ctrl.post, _ent.ctrl.mroutine, _ent.mask0, _ent.mask1, _ent.mask2);
+    this->iilb.add(ent);
+    METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for \"%s\".", inst->getName());
 }
 
 void
-ISA::loadInstInterceptTable(void * rawMem, size_t size)
+ISA::loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size)
 {
     assert((size % sizeof(InstInterceptTableEntry)) == 0);
 
     auto ents = reinterpret_cast<InstInterceptTableEntry *>(rawMem);
     
     // we need to decode from the emulated PC but obtain flags from the read memory
-    Addr mib = this->readMetalRegNoEffect(metal_reg::MIB);
     InstDecoder * decoder = this->tc->getDecoderPtr();
-    // reset decoder state and start fresh
-    // decoder->reset();
+    decoder->reset();
 
-    for (int i = 0; i < InstInterceptTableMaxEntryNum; i++) {
+    for (int i = 0; i < size / sizeof(InstInterceptTableEntry); i++) {
         auto ent = ents[i];
-        ent.ctrl = isBigEndian64(this->tc) ? betoh(ent.ctrl) : letoh(ent.ctrl);
-        ent.mask0 = isBigEndian64(this->tc) ? betoh(ent.mask0) : letoh(ent.mask0);
-        ent.mask1 = isBigEndian64(this->tc) ? betoh(ent.mask1) : letoh(ent.mask1);
+        MachInst instEncoding = ent.inst;
+
+        ent.inst = gtoh(ent.inst, byteOrder(this->tc));
+        ent.ctrl = gtoh(ent.ctrl, byteOrder(this->tc));
+        ent.opMask = gtoh(ent.opMask, byteOrder(this->tc));
+        ent.mask0 = gtoh(ent.mask0, byteOrder(this->tc));
+        ent.mask1 = gtoh(ent.mask1, byteOrder(this->tc));
+        ent.mask2 = gtoh(ent.mask2, byteOrder(this->tc));
 
         if (!ent.ctrl.valid) {
             continue;
         }
 
-        Addr inst_addr = mib + i * sizeof(InstInterceptTableEntry);
-        inst_addr = purifyTaggedAddr(inst_addr, this->tc, currEL(), true);
+        auto memEnt = reinterpret_cast<InstInterceptTableEntry *>(memAddr + i * sizeof(InstInterceptTableEntry));
+        Addr inst_addr = reinterpret_cast<Addr>(&memEnt->inst);
 
         // copy current thread's PCState info
         PCState pc;
@@ -1422,25 +1402,22 @@ ISA::loadInstInterceptTable(void * rawMem, size_t size)
         pc.uReset();
         pc.pc(inst_addr);
 
+        assert(decoder->needMoreBytes() && decoder->moreBytesSize() == sizeof(MachInst));
+        memcpy(decoder->moreBytesPtr(), &instEncoding, decoder->moreBytesSize());
         decoder->moreBytes(pc, inst_addr);
         if (!decoder->instReady()) {
-            panic("Instruction decoder isn't ready after reading 32 bits.\n");
+            panic("Instruction decoder isn't ready after reading %d bytes.\n", sizeof(MachInst));
         }
         StaticInstPtr inst = decoder->decode(pc);
         // XXX: properly handle wrong encodings
         if (!inst) {
-            panic("Cannot decode inst intercept table instruction at pc=%d, encoding=0x%x\n", inst_addr, ent.inst);
+            panic("Cannot decode inst intercept table instruction at pc=0x%lx, encoding=0x%x\n", inst_addr, ent.inst);
         }
 
-        // check flags
-        if (ent.ctrl.post) {
-            METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for %s.PRE mask0=0x%x mask1=0x%x.\n", inst->getName(), ent.mask0, ent.mask1);
-            registerInstPostIntercept(inst->getName(), ent.ctrl.mroutine, ent.mask0, ent.mask1);
-        } else {
-            METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for %s.POST mask0=0x%x mask1=0x%x.\n", inst->getName(), ent.mask0, ent.mask1);
-            registerInstPreIntercept(inst->getName(), ent.ctrl.mroutine, ent.mask0, ent.mask1);
-        }
+        registerInstIntercept(inst, ent);
     }
+
+    decoder->reset();
 }
 
 MRLB &
@@ -1449,13 +1426,19 @@ ISA::getMrlbPtr(void)
     return this->mrlb;
 }
 
+IILB &
+ISA::getIilbPtr(void)
+{
+    return this->iilb;
+}
+
 void 
 ISA::loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx)
 {
     for (int i = 0; i < count; i++) {
         MroutineTableEntry ent = rawEnts[i];
         // table format is little endian
-        ent = isBigEndian64(this->tc) ? betoh<ISA::MroutineTableEntry>(ent) : letoh<ISA::MroutineTableEntry>(ent);
+        ent = gtoh(ent, byteOrder(this->tc));
         const MRLBEntry entry(startIdx + i, ent.unshiftedAddr << ISA::MroutineTableEntryAddrShift, ent.valid);
         mrlb.add(entry);
     }
@@ -1477,75 +1460,50 @@ ISA::doneInstInterceptMasked(void)
 }
 
 bool
-ISA::checkInstPreIntercept(const StaticInstPtr &inst) const
-{
-    return checkInstIntercept(inst, false) != nullptr;
-}
-
-void 
-ISA::doInstPreIntercept(const StaticInstPtr &inst)
-{
-    return doInstIntercept(inst, false);
-}
-
-bool
-ISA::checkInstPostIntercept(const StaticInstPtr &inst) const
-{
-    return checkInstIntercept(inst, true) != nullptr;
-}
-
-void 
-ISA::doInstPostIntercept(const StaticInstPtr &inst)
-{
-    return doInstIntercept(inst, true);
-}
-
-void
-ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
-{
-    const InstInterceptMapEntry * ent = checkInstIntercept(inst, post);
-    if (ent == nullptr) {
-        panic("doInstIntercept called on a non-intercepted inst.");
-    }
-
-    // lookup mroutine
-    unsigned int mroutine = ent->mroutine;
-    assert(mroutine < MroutineTableMaxEntryNum);
-
-    const MRLBEntry & ment = this->mrlb.get(mroutine);
-    if (&ment == &MRLB::NullMRLBEntry) {
-        panic("MRLB miss during inst intercept.\n");
-    }
-
-    Menter64::doMenter(this->tc, purifyTaggedAddr(ment.getAddr(), tc, currEL(), true), reinterpret_cast<const ArmStaticInst &>(inst));
-
-    // set MIRs
-    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
-    uint32_t instBits = armInst->encoding();
-
-    this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent->mask0));
-    this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent->mask1));
-}
-
-const ISA::InstInterceptMapEntry * 
-ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
+ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
 {
     metal_reg::MSR_t msr = readMetalRegNoEffect(metal_reg::MSR);
 
     if (!metal_reg::isInstInterceptEnabled(msr) || !metal_reg::isMetalInitialized(msr)) {
         // ic flag is currently disabled or metal mode is disabled
-        return nullptr;
+        return false;
     }
 
-    auto &map = post ? this->instPostInterceptMap : this->instPreInterceptMap;
-    auto it = map.find(inst->getName());
-    if (it == map.end()) {
-        return nullptr;
-    } else {
-        // look up mroutine table to find the address
-        const InstInterceptMapEntry * ent = it->second;
-        return ent;
+    const IILBEntry ent(inst, post);  
+    const IILBEntry & resultEnt = iilb.get(ent);
+    if (&resultEnt == &IILB::NullEntry) {
+        return false;
     }
+
+    return true;
+}
+
+void 
+ISA::doInstIntercept(const StaticInstPtr inst, bool post)
+{
+    // METAL_XXX: probably somehow should only look it up once
+    const IILBEntry findEnt(inst, post);  
+    const IILBEntry & ent = iilb.get(findEnt);
+    assert (&ent != &IILB::NullEntry);
+
+    // lookup mroutine
+    unsigned int mroutine = ent.getMroutine();
+    assert(mroutine < MroutineTableMaxEntryNum);
+
+    const MRLBEntry & mrEnt = this->mrlb.get(mroutine);
+    if (&mrEnt == &MRLB::NullEntry) {
+        panic("MRLB miss during inst intercept.\n");
+    }
+
+    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), reinterpret_cast<const ArmStaticInst &>(inst));
+
+    // set MIRs in the new reg window
+    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
+    MachInst instBits = armInst->encoding();
+
+    this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent.getMask0()));
+    this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent.getMask1()));
+    this->setMetalReg(metal_reg::MIR2, shiftInstMask(instBits, ent.getMask2()));
 }
 
 RegVal
@@ -1632,7 +1590,7 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
 
     switch (idx) {
         case metal_reg::MIB : {
-            flushInstInterceptTable();
+            this->iilb.flush();
             break;
         }
         case metal_reg::MBR : {
