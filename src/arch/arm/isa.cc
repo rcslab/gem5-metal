@@ -1477,7 +1477,7 @@ ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
         return false;
     }
     ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
-    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%x.\n", armInst->encoding(), inst->getName().c_str(), tc->pcState().instAddr());
+    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%x, post = %d.\n", armInst->encoding(), inst->getName().c_str(), tc->pcState().instAddr(), post);
     return true;
 }
 
@@ -1498,10 +1498,10 @@ ISA::doInstIntercept(const StaticInstPtr inst, bool post)
         panic("MRLB miss during inst intercept.\n");
     }
 
-    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), this->tc->pcState().instAddr());
+    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
+    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), post ? this->tc->pcState().instAddr() + armInst->instSize() : this->tc->pcState().instAddr());
 
     // set MIRs in the new reg window
-    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
     MachInst instBits = armInst->encoding();
 
     this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent.getMask0()));
