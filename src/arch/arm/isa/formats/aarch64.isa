@@ -611,7 +611,7 @@ namespace Aarch64
                           return new Menter64(machInst, mroutine);
                         }
                         case 0b001: {
-                          uint8_t flags = (uint8_t)bits(machInst, 6, 5);
+                          uint8_t flags = (uint8_t)bits(machInst, 7, 0);
                           return new Mexit64(machInst, flags);
                         }
                         case 0b010: {

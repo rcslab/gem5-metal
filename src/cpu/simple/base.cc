@@ -371,8 +371,8 @@ BaseSimpleCPU::preExecute()
             if (thread->checkInstInterceptMasked()) {
                 thread->doneInstInterceptMasked();
                 this->isInstPreIntercepted = false;
-            } else if  (thread->checkInstIntercept(curStaticInst, false)) {
-                thread->doInstIntercept(curStaticInst, false);
+            } else if  (thread->checkInstIntercept(instPtr, false)) {
+                thread->doInstIntercept(instPtr, false);
                 this->isInstPreIntercepted = true;
                 goto end;
             }
