@@ -105,7 +105,7 @@ MRLB::get(unsigned int idx) const
     
     assert(ent.getIdx() == idx);
 
-    METAL_DBGPRINT(MRLB, GET, "*hit* for mroutine %d.\n", ent.getIdx(), ent.getAddr(), ent.isValid());
+    METAL_DBGPRINT(MRLB, GET, "*hit* for mroutine %d, addr = 0x%lx, valid = %d.\n", ent.getIdx(), ent.getAddr(), ent.isValid());
     return ent;
 }
 
@@ -267,16 +267,18 @@ const IILBEntry & IILB::get(const IILBEntry & ent) const
     while (vit != vec->end()) {
         auto each = (*vit).get();
         if (each->match(ent)) {
-            METAL_DBGPRINT(IILB, GET, "*matched* inst = 0x%x, mnemonic = \"%s\", post = %d -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x].\n",
+            METAL_DBGPRINT(IILB, GET, "*matched* inst = 0x%x, mnemonic = \"%s\", post = %d -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n",
                                                                                     ent.getArmStaticInst()->encoding(),
-                                                                                    ent.getInst()->getName(),
+                                                                                    ent.getInst()->getName().c_str(),
                                                                                     ent.isPost(), 
-                                                                                    each->getArmStaticInst()->encoding(), 
+                                                                                    each->getArmStaticInst()->encoding(),
+                                                                                    each->getInst()->getName().c_str(), 
                                                                                     each->getOpMask(), each->isPost(), 
                                                                                     each->getMroutine(), each->getMask0(), 
-                                                                                    each->getMask1());
+                                                                                    each->getMask1(), each->getMask2());
             return *each;
         }
+        ++vit;
     }
     return NullEntry;
 }

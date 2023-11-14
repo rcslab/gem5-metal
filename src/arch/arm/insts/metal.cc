@@ -24,7 +24,7 @@ namespace gem5
             std::stringstream ss;
             ss << MetalDisasmPrefix;
             printMnemonic(ss, "", false);
-            ss << this->imm;
+            ss << (unsigned int)this->imm;
             return ss.str();
         }
 
@@ -144,7 +144,7 @@ namespace gem5
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
             MRLB & mrlb = isa->getMrlbPtr();
 
-            METAL_DBGPRINT(INSTS, MENTER, "MBR = 0x%lx, mroutine = %d.\n", xc->readMetalReg(metal_reg::MBR), this->imm);
+            METAL_DBGPRINT(INSTS, MENTER, "entering Metal mode - MBR = 0x%lx, mroutine = %d.\n", xc->readMetalReg(metal_reg::MBR), this->imm);
 
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
@@ -267,7 +267,7 @@ namespace gem5
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            METAL_DBGPRINT(INSTS, MEXIT, "MLR = 0x%x, flags = 0x%x\n", ret, this->imm);
+            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode - MLR = 0x%x, flags = 0x%x\n", ret, this->imm);
 
             // set new PC
             const Addr target_addr = purifyTaggedAddr(ret, xc->tcBase(), currEL(xc->tcBase()), true);
@@ -619,7 +619,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            METAL_DBGPRINT(INSTS, MCLI, "Masking instruction intercept.\n");
+            METAL_DBGPRINT(INSTS, MSTI, "Setting instruction intercept.\n");
 
             if (!metal_reg::canWriteMetalReg(msr, metal_reg::MSR)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);

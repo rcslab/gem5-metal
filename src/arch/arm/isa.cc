@@ -1476,7 +1476,8 @@ ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
     if (&resultEnt == &IILB::NullEntry) {
         return false;
     }
-
+    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
+    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%x.\n", armInst->encoding(), inst->getName().c_str(), tc->pcState().instAddr());
     return true;
 }
 
@@ -1497,7 +1498,7 @@ ISA::doInstIntercept(const StaticInstPtr inst, bool post)
         panic("MRLB miss during inst intercept.\n");
     }
 
-    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), reinterpret_cast<const ArmStaticInst &>(inst));
+    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), this->tc->pcState().instAddr());
 
     // set MIRs in the new reg window
     ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
