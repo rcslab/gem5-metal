@@ -117,14 +117,7 @@ enum : RegIndex
     _Ureg1Idx,
     _Ureg2Idx,
 
-    _Sp0Idx,
-    _Sp1Idx,
-    _Sp2Idx,
-    _Sp3Idx,
-    _SpxIdx,
-    NumRegularModeRegs,
-
-    _MX0Idx = NumRegularModeRegs,
+    _MX0Idx,
     _MX1Idx,
     _MX2Idx,
     _MX3Idx,
@@ -156,7 +149,13 @@ enum : RegIndex
     _MX29Idx,
     _MX30Idx,
     _MX31Idx,
+
+    _Sp0Idx,
+    _Sp1Idx,
+    _Sp2Idx,
+    _Sp3Idx,
     NumRegs,
+    _SpxIdx = NumRegs,
 
     NumArchRegs = 32,
 
@@ -668,7 +667,7 @@ fiq(unsigned index)
     return RegFiqMap[index];
 }
 
-static const unsigned regsPerMode = NumRegularModeRegs;
+static const unsigned regsPerMode = NumRegs;
 
 static inline int
 regInMode(OperatingMode mode, int reg)
