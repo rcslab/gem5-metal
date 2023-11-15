@@ -10,10 +10,6 @@ namespace gem5
 
     namespace ArmISA
     {
-        #define METAL_STR(x) #x
-        #define METAL_STR2(x) METAL_STR(x)
-        #define METAL_DBGPRINT(subsys, subsys2, format, ...) DPRINTF(Metal, "Metal." METAL_STR2(subsys) "." METAL_STR2(subsys2) ": " format, ##__VA_ARGS__)
-
         static constexpr size_t MAX_METAL_OPERANDS = 4;
         static constexpr std::string_view MetalDisasmPrefix = "";
 
@@ -300,21 +296,39 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
+        // Write Architectural Register 
+        class War64 : public MetalRegOp2
+        {
+        public:
+            War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        
+        // rpr
+        class Rpr64 : public MetalRegOp2
+        {
+        public:
+            Rpr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        
+        // wpr
+        class Wpr64 : public MetalRegOp2
+        {
+        public:
+            Wpr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        
         // rtlb
         class Rtlb64 : public MetalRegOp3
         {
         public:
             Rtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
                    RegIndex _rn);
-
-            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
-        };
-
-        // Write Architectural Register 
-        class War64 : public MetalRegOp2
-        {
-        public:
-            War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };

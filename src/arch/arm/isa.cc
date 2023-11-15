@@ -149,7 +149,8 @@ ISA::clear()
     this->iilb.flush();
     this->mrlb.flushAll();
 
-    updateRegMap(miscRegs[MISCREG_CPSR]);
+    updateRegMap(miscRegs[MISCREG_CPSR], this->readMetalRegNoEffect(metal_reg::MSR));
+    this->prevIntRegMap = nullptr;
 }
 
 void
@@ -676,7 +677,7 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
     SCR scr;
 
     if (idx == MISCREG_CPSR) {
-        updateRegMap(val);
+        updateRegMap(val, this->readMetalRegNoEffect(metal_reg::MSR));
 
 
         CPSR old_cpsr = miscRegs[MISCREG_CPSR];
@@ -1624,6 +1625,21 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
 
     METAL_DBGPRINT(ISA, REGS, "Setting %s to 0x%lx.\n", ArmStaticInst::printMetalReg(idx), val);
     setMetalRegNoEffect(idx, val);
+    updateRegMap(this->miscRegs[MISCREG_CPSR], readMetalRegNoEffect(metal_reg::MSR));
+}
+
+void ISA::setPrevIntReg(RegIndex idx, RegVal val)
+{
+    // manually flatten
+    const RegId & id = mapPrevIntRegMap(idx);
+    this->tc->setReg(flatIntRegClass[id.index()], val);
+}
+
+RegVal ISA::readPrevIntReg(RegIndex idx) const
+{
+    // manually flatten
+    const RegId & id = mapPrevIntRegMap(idx);
+    return this->tc->getReg(flatIntRegClass[id.index()]);
 }
 
 BaseISADevice &
@@ -1830,7 +1846,7 @@ ISA::unserialize(CheckpointIn &cp)
     }
 
     CPSR tmp_cpsr = miscRegs[MISCREG_CPSR];
-    updateRegMap(tmp_cpsr);
+    updateRegMap(tmp_cpsr, this->readMetalRegNoEffect(metal_reg::MSR));
 }
 
 void

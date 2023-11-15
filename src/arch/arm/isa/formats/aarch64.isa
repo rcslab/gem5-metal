@@ -602,8 +602,7 @@ namespace Aarch64
                   case 0x0:
                     if ((op3 >> 5) == 1) {
                       return new Rtlb64(machInst, rl, rn, rm);
-                    }
-                    if ((op3 >> 3) == 0b001) {
+                    } else if ((op3 >> 3) == 0b001) {
                       uint8_t opm = bits(machInst, 12, 10);
                       switch (opm) {
                         case 0b000: {
@@ -643,7 +642,22 @@ namespace Aarch64
                         default:
                           return new Unknown64(machInst);
                       }
-                      return new Unknown64(machInst);
+                    } else if ((op3) >> 4 == 0b01) {
+                      uint8_t opm = bits(machInst, 13, 10);
+                      switch (opm) {
+                          case 0b0000: {
+                            RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                            RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                            return new Rpr64(machInst, mreg, greg);
+                          }
+                          case 0b0001: {
+                            RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                            RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                            return new Wpr64(machInst, mreg, greg);
+                          }
+                          default:
+                            return new Unknown64(machInst);
+                      }
                     }
                     if (bits(machInst, 11) == 0)
                         return new Br64(machInst, rn);

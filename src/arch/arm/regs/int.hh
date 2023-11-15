@@ -121,9 +121,42 @@ enum : RegIndex
     _Sp1Idx,
     _Sp2Idx,
     _Sp3Idx,
+    _SpxIdx,
+    NumRegularModeRegs,
 
+    _MX0Idx = NumRegularModeRegs,
+    _MX1Idx,
+    _MX2Idx,
+    _MX3Idx,
+    _MX4Idx,
+    _MX5Idx,
+    _MX6Idx,
+    _MX7Idx,
+    _MX8Idx,
+    _MX9Idx,
+    _MX10Idx,
+    _MX11Idx,
+    _MX12Idx,
+    _MX13Idx,
+    _MX14Idx,
+    _MX15Idx,
+    _MX16Idx,
+    _MX17Idx,
+    _MX18Idx,
+    _MX19Idx,
+    _MX20Idx,
+    _MX21Idx,
+    _MX22Idx,
+    _MX23Idx,
+    _MX24Idx,
+    _MX25Idx,
+    _MX26Idx,
+    _MX27Idx,
+    _MX28Idx,
+    _MX29Idx,
+    _MX30Idx,
+    _MX31Idx,
     NumRegs,
-    _SpxIdx = NumRegs,
 
     NumArchRegs = 32,
 
@@ -268,7 +301,40 @@ inline constexpr RegId
     X28 = intRegClass[_X28Idx],
     X29 = intRegClass[_X29Idx],
     X30 = intRegClass[_X30Idx],
-    X31 = intRegClass[_X31Idx];
+    X31 = intRegClass[_X31Idx],
+
+    MX0 = intRegClass[_MX0Idx],
+    MX1 = intRegClass[_MX1Idx],
+    MX2 = intRegClass[_MX2Idx],
+    MX3 = intRegClass[_MX3Idx],
+    MX4 = intRegClass[_MX4Idx],
+    MX5 = intRegClass[_MX5Idx],
+    MX6 = intRegClass[_MX6Idx],
+    MX7 = intRegClass[_MX7Idx],
+    MX8 = intRegClass[_MX8Idx],
+    MX9 = intRegClass[_MX9Idx],
+    MX10 = intRegClass[_MX10Idx],
+    MX11 = intRegClass[_MX11Idx],
+    MX12 = intRegClass[_MX12Idx],
+    MX13 = intRegClass[_MX13Idx],
+    MX14 = intRegClass[_MX14Idx],
+    MX15 = intRegClass[_MX15Idx],
+    MX16 = intRegClass[_MX16Idx],
+    MX17 = intRegClass[_MX17Idx],
+    MX18 = intRegClass[_MX18Idx],
+    MX19 = intRegClass[_MX19Idx],
+    MX20 = intRegClass[_MX20Idx],
+    MX21 = intRegClass[_MX21Idx],
+    MX22 = intRegClass[_MX22Idx],
+    MX23 = intRegClass[_MX23Idx],
+    MX24 = intRegClass[_MX24Idx],
+    MX25 = intRegClass[_MX25Idx],
+    MX26 = intRegClass[_MX26Idx],
+    MX27 = intRegClass[_MX27Idx],
+    MX28 = intRegClass[_MX28Idx],
+    MX29 = intRegClass[_MX29Idx],
+    MX30 = intRegClass[_MX30Idx],
+    MX31 = intRegClass[_MX31Idx];
 
 inline constexpr auto
     &Sp = R13,
@@ -430,7 +496,42 @@ inline constexpr auto
     &R6Fiq = R6,
     &R7Fiq = R7,
     &PcFiq = Pc,
-    &R15Fiq = R15;
+    &R15Fiq = R15,
+
+    /* Metal mode */
+    &R0Metal = MX0,
+    &R1Metal = MX1,
+    &R2Metal = MX2,
+    &R3Metal = MX3,
+    &R4Metal = MX4,
+    &R5Metal = MX5,
+    &R6Metal = MX6,
+    &R7Metal = MX7,
+    &R8Metal = MX8,
+    &R9Metal = MX9,
+    &R10Metal = MX10,
+    &R11Metal = MX11,
+    &R12Metal = MX12,
+    &R13Metal = MX13,
+    &R14Metal = MX14,
+    &R15Metal = MX15,
+    &R16Metal = MX16,
+    &R17Metal = MX17,
+    &R18Metal = MX18,
+    &R19Metal = MX19,
+    &R20Metal = MX20,
+    &R21Metal = MX21,
+    &R22Metal = MX22,
+    &R23Metal = MX23,
+    &R24Metal = MX24,
+    &R25Metal = MX25,
+    &R26Metal = MX26,
+    &R27Metal = MX27,
+    &R28Metal = MX28,
+    &R29Metal = MX29,
+    &R30Metal = MX30,
+    &R31Metal = MX31;
+
 
 typedef const RegId RegMap[NumArchRegs];
 
@@ -439,6 +540,13 @@ const RegMap Reg64Map = {
     R8Usr,  R9Usr,  R10Usr, R11Usr, R12Usr, R13Usr, R14Usr, R13Hyp,
     R14Irq, R13Irq, R14Svc, R13Svc, R14Abt, R13Abt, R14Und, R13Und,
     R8Fiq,  R9Fiq,  R10Fiq, R11Fiq, R12Fiq, R13Fiq, R14Fiq, Zero
+};
+
+const RegMap Reg64MetalMap = {
+    R0Metal, R1Metal, R2Metal, R3Metal, R4Metal, R5Metal, R6Metal, R7Metal,
+    R8Metal, R9Metal,  R10Metal, R11Metal, R12Metal, R13Metal, R14Metal, R15Metal,
+    R16Metal, R17Metal, R18Metal, R19Metal, R20Metal, R21Metal, R22Metal, R23Metal,
+    R24Metal, R25Metal, R26Metal, R27Metal, R28Metal, R29Metal, R30Metal, R31Metal
 };
 
 static inline RegId
@@ -560,7 +668,7 @@ fiq(unsigned index)
     return RegFiqMap[index];
 }
 
-static const unsigned regsPerMode = NumRegs;
+static const unsigned regsPerMode = NumRegularModeRegs;
 
 static inline int
 regInMode(OperatingMode mode, int reg)
