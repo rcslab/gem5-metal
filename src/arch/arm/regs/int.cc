@@ -60,6 +60,8 @@ IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const
 
     if (reg_idx < int_reg::NumArchRegs) {
         return {flatIntRegClass, arm_isa.mapIntRegId(reg_idx)};
+    } else if (reg_idx < int_reg::NumRegs) {
+        return {flatIntRegClass, id};
     } else if (reg_idx == int_reg::Spx) {
         auto &arm_isa = static_cast<const ArmISA::ISA &>(isa);
         CPSR cpsr = arm_isa.readMiscRegNoEffect(MISCREG_CPSR);
@@ -80,8 +82,6 @@ IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const
           default:
             panic("Invalid exception level");
         }
-    } else if (reg_idx < int_reg::NumRegs) {
-        return {flatIntRegClass, id};
     } else {
         panic("Who really calls this?\n");
         return {flatIntRegClass, flattenIntRegModeIndex(reg_idx)};
