@@ -58,6 +58,7 @@
 #include "enums/DecoderFlavor.hh"
 #include "sim/sim_object.hh"
 #include "arch/arm/mlb.hh"
+#include "debug/Metal.hh"
 
 namespace gem5
 {
@@ -69,6 +70,9 @@ class EventManager;
 
 namespace ArmISA
 {
+    #define METAL_STR(x) #x
+    #define METAL_STR2(x) METAL_STR(x)
+    #define METAL_DBGPRINT(subsys, subsys2, format, ...) DPRINTF(Metal, "Metal." METAL_STR2(subsys) "." METAL_STR2(subsys2) ": " format, ##__VA_ARGS__)
     class ISA : public BaseISA
     {
       protected:
@@ -129,6 +133,7 @@ namespace ArmISA
         std::array<RegVal, metal_reg::TotalGRegs> metalRegs;
         std::array<RegVal, metal_reg::NumMiscRegs> metalMiscRegs;
         const RegId *intRegMap;
+        const RegId *prevIntRegMap;
 
         MRLB mrlb;
         IILB iilb;
@@ -165,9 +170,12 @@ public:
         static_assert((InstInterceptTableTotalSize % InstInterceptTableLoadSize) == 0 && (InstInterceptTableLoadSize % sizeof(InstInterceptTableEntry)) == 0);
 private:
         void
-        updateRegMap(CPSR cpsr)
+        updateRegMap(CPSR cpsr, metal_reg::MSR_t msr)
         {
-            if (cpsr.width == 0) {
+            const RegId * tmpRegMap = intRegMap;
+            if (metal_reg::isInMetalMode(msr)) {
+                intRegMap = int_reg::Reg64MetalMap;
+            } else if (cpsr.width == 0) {
                 intRegMap = int_reg::Reg64Map;
             } else {
                 switch (cpsr.mode) {
@@ -200,10 +208,24 @@ private:
                     panic("Unrecognized mode setting in CPSR.\n");
                 }
             }
+
+            if (intRegMap != tmpRegMap) {
+                prevIntRegMap = tmpRegMap;
+
+                if (prevIntRegMap == int_reg::Reg64MetalMap) {
+                    METAL_DBGPRINT(ISA, REGS, "Switching to regular reg banks.\n");
+                } else if (intRegMap == int_reg::Reg64MetalMap) {
+                    METAL_DBGPRINT(ISA, REGS, "Switching to Metal reg bank.\n");
+                }
+            }
         }
 
       public:
         const RegId &mapIntRegId(RegIndex idx) const { return intRegMap[idx]; }
+        const RegId &mapPrevIntRegMap(RegIndex idx) const { 
+          assert(prevIntRegMap != nullptr && idx < int_reg::NumArchRegs);
+          return prevIntRegMap[idx]; 
+        }
 
       public:
         void clear() override;
@@ -241,6 +263,9 @@ private:
         RegVal readMetalReg(RegIndex idx) override;
         void setMetalRegNoEffect(RegIndex idx, RegVal val) override;
         void setMetalReg(RegIndex, RegVal val) override;
+
+        void setPrevIntReg(RegIndex idx, RegVal reg);
+        RegVal readPrevIntReg(RegIndex idx) const;
 private:
         void resetMetalRegs(void);
         RegIndex flattenMetalGReg(RegIndex idx) const;

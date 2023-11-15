@@ -96,13 +96,15 @@ namespace gem5
             pcState.instNPC(npc);
             tc->pcState(pcState);
 
-            // increase metal level
+            // increase metal level and switch to metal int bank
             metal_reg::MSR_t msr = tc->readMetalReg(metal_reg::MSR);
             msr.lv = msr.lv + 1;
             tc->setMetalReg(metal_reg::MSR, msr);
     
             // save link address
             tc->setMetalReg(metal_reg::MLR, lpc);
+
+            // METAL_XXX: need to copy the sp from regular bank to Metal bank for arm32
         }
 
         void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst)
@@ -368,8 +370,7 @@ namespace gem5
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            const RegId &id = intRegClass[idx];
-            RegVal v = xc->getReg(id);
+            RegVal v = xc->getReg(intRegClass[idx]);
             xc->setMetalReg(this->gReg, v);
 
             return NoFault;
@@ -399,8 +400,67 @@ namespace gem5
             }
 
             RegVal v = xc->readMetalReg(this->gReg);
-            const RegId & reg = intRegClass[idx];
-            xc->setReg(reg, v);
+            xc->setReg(intRegClass[idx], v);
+
+            return NoFault;
+        }
+
+        // rpr64
+        Rpr64::Rpr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("rpr", _machInst, IntAluOp, _mreg, _greg)
+        {
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[gReg]);
+            // writing to metal class
+            _numTypedDestRegs[metalRegClass.type()]++;
+
+            this->flags[IsInteger] = true;
+        }
+
+        Fault Rpr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal idx = xc->readMetalReg(this->mReg);
+            ISA * isa = reinterpret_cast<ISA *>(xc->tcBase()->getIsaPtr());
+
+            METAL_DBGPRINT(INSTS, RPR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
+
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg) 
+                || idx >= int_reg::NumArchRegs || !metal_reg::isInMetalMode(msr)) {
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+
+            RegVal v = isa->readPrevIntReg(idx);
+            xc->setMetalReg(gReg, v);
+
+            return NoFault;
+        }
+
+        // wpr64
+        Wpr64::Wpr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("wpr", _machInst, IntAluOp, _mreg, _greg)
+        {
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
+            setSrcRegIdx(_numDestRegs++, metalRegClass[gReg]);\
+            // writing to int class
+            _numTypedDestRegs[intRegClass.type()]++;
+
+            this->flags[IsInteger] = true;
+        }
+
+        Fault Wpr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal idx = xc->readMetalReg(this->mReg);
+            ISA * isa = reinterpret_cast<ISA *>(xc->tcBase()->getIsaPtr());
+
+            METAL_DBGPRINT(INSTS, WPR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
+
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg) 
+                || idx >= int_reg::NumArchRegs || !metal_reg::isInMetalMode(msr)) {
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+            
+            RegVal v = xc->readMetalReg(this->gReg);
+            isa->setPrevIntReg(idx, v);
 
             return NoFault;
         }
