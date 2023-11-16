@@ -100,7 +100,7 @@ namespace gem5
             metal_reg::MSR_t msr = tc->readMetalReg(metal_reg::MSR);
             msr.lv = msr.lv + 1;
             tc->setMetalReg(metal_reg::MSR, msr);
-    
+
             // save link address
             tc->setMetalReg(metal_reg::MLR, lpc);
 
@@ -124,7 +124,7 @@ namespace gem5
             const Addr mroutineAddr = base + sizeof(ISA::MroutineTableEntry) * idx;
             const Addr loadAddr = mroutineAddr & (~(align - 1));
             assert(mroutineAddr >= loadAddr && mroutineAddr - loadAddr <= align);
-            
+
             Addr nextAlign = loadAddr + align;
             // check that the entry is not crossing align boundry
             assert(mroutineAddr + sizeof(ISA::MroutineTableEntry) <= nextAlign);
@@ -150,7 +150,7 @@ namespace gem5
 
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
-            
+
             Fault fault = NoFault;
             if (&mrlbEnt == &MRLB::NullEntry) {
                 const RegVal mbr = xc->readMetalReg(metal_reg::MBR);
@@ -174,7 +174,7 @@ namespace gem5
                     doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
                 }
             }
-    
+
             return fault;
         }
 
@@ -204,7 +204,7 @@ namespace gem5
 
             // lookup MRLB again
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
-            
+
             assert(&mrlbEnt != &MRLB::NullEntry);
 
             METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
@@ -303,7 +303,7 @@ namespace gem5
             this->flags[IsMacroop] = true;
             this->flags[IsInteger] = true;
             StaticInstPtr uop;
-            
+
             uop = new Wmr64_u(_machInst, _opClass, mReg, gReg);
             this->addMicroOps(uop);
             if (mReg == metal_reg::MIB) {
@@ -394,7 +394,7 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, WAR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg) 
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg)
                 || idx >= int_reg::NumArchRegs) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
@@ -424,7 +424,7 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, RPR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg) 
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg)
                 || idx >= int_reg::NumArchRegs || !metal_reg::isInMetalMode(msr)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
@@ -454,11 +454,11 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, WPR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg) 
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg)
                 || idx >= int_reg::NumArchRegs || !metal_reg::isInMetalMode(msr)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
-            
+
             RegVal v = xc->readMetalReg(this->gReg);
             isa->setPrevIntReg(idx, v);
 
@@ -501,38 +501,36 @@ namespace gem5
                     xc->tcBase()->getMMUPtr()->itb)
                     ->getEntry(va);
 
+            assert(te);
+
             // Create and fill a new page table entry
 
             tei.set_isHyp(te->isHyp);
             tei.set_asid(te->asid);
             tei.set_vmid(te->vmid);
-            // insertBits(ld.data, )
+            // ld.data = insertBits(ld.data, )
             switch (te->N) {
                 // type == Page
                 case Grain4KB:
                 case Grain16KB:
                 case Grain64KB:
-                    // ld.type() set for block
-                    insertBits(ld.data, 1, 0, 0x1);
+                    ld.data = insertBits(ld.data, 1, 0, 0x3);
                     ld.grainSize = (GrainSize)te->N;
                     break;
 
                 // type == Block
                 case 21:    // 2 MiB
                 case 30:    // 1 GiB
-                    // ld.type() set for page/table
-                    insertBits(ld.data, 1, 0, 0x3);
+                    ld.data = insertBits(ld.data, 1, 0, 0x1);
                     ld.grainSize = Grain4KB;
                     break;
                 case 25:    // 32 MiB
-                    // ld.type() set for page/table
-                    insertBits(ld.data, 1, 0, 0x3);
+                    ld.data = insertBits(ld.data, 1, 0, 0x1);
                     ld.grainSize = Grain16KB;
                     break;
                 case 29:    // 256 MiB
                 case 42:    // 4 TiB
-                    // ld.type() set for page/table
-                    insertBits(ld.data, 1, 0, 0x3);
+                    ld.data = insertBits(ld.data, 1, 0, 0x1);
                     ld.grainSize = Grain64KB;
                     break;
                 default:
@@ -544,29 +542,32 @@ namespace gem5
 
             va              = te->vpn << te->N;
             // pfn
-            insertBits(ld.data, 47, te->N, mbits(te->pfn, 47, te->N));
-            insertBits(ld.data, 15, 12, bits(te->pfn, 51, 48));
+            ld.data = insertBits(ld.data, 47, te->N, bits(te->pfn << te->N, 47,
+                                 te->N));
+            if (te->N == 16)
+                ld.data = insertBits(ld.data, 15, 12, bits(te->pfn << te->N,
+                                     51, 48)); // 64k pages
             // domain always TlbEntry::DomainType::Client for LongDescriptor
             // te.domain         = ld.domain();
             ld.lookupLevel  = te->lookupLevel;
-            insertBits(ld.data, 5, te->ns);
+            ld.data = insertBits(ld.data, 5, te->ns);
             tei.set_isSecure(!te->nstid);
             // xn
-            insertBits(ld.data, 54, te->xn);
+            ld.data = insertBits(ld.data, 54, te->xn);
             tei.set_type(te->type == TypeTLB::instruction ? true : false);
             tei.set_el(te->el);
             // ld.global()
-            insertBits(ld.data, 11, !te->global);
+            ld.data = insertBits(ld.data, 11, !te->global);
             // ld.pxn()
-            insertBits(ld.data, 53, te->pxn);
+            ld.data = insertBits(ld.data, 53, te->pxn);
             // ld.ap()
-            insertBits(ld.data, 7, 6, te->ap);
+            ld.data = insertBits(ld.data, 7, 6, te->ap);
             tei.set_mtype(te->mtype);
             tei.set_nc(te->nonCacheable);
             // Attributes formatted according to the 64-bit PAR
             tei.set_attr(te->attributes >> 56);
             // ld.sh()
-            insertBits(ld.data, 9, 8, (te->attributes >> 7) & 0b11);
+            ld.data = insertBits(ld.data, 9, 8, (te->attributes >> 7) & 0b11);
 
 
             xc->setMetalReg(rl, (RegVal)ld.data);
@@ -604,6 +605,7 @@ namespace gem5
             TableWalker::LongDescriptor ld;
             ld.data = desc;
             ld.aarch64 = true;
+            ld.lookupLevel = enums::ArmLookupLevel::L3;
 
             TLBEntryInfo tei;
             tei.data = info;
@@ -691,7 +693,7 @@ namespace gem5
         }
 
         // Mliit64_u
-        Mliit64_u::Mliit64_u(ExtMachInst _machInst, OpClass __opClass, uint32_t _offset, uint32_t _size) : 
+        Mliit64_u::Mliit64_u(ExtMachInst _machInst, OpClass __opClass, uint32_t _offset, uint32_t _size) :
             MetalNakedOp("mliit_u", _machInst, __opClass), offset(_offset), size(_size)
         {
             this->flags[IsMicroop] = true;
@@ -725,7 +727,7 @@ namespace gem5
             if (pkt->isError()) {
                 panic("Data fetch failed.");
             }
-            
+
             static char buf[ISA::InstInterceptTableLoadSize];
             assert(this->size <= ISA::InstInterceptTableLoadSize);
             getMemRawPtr(pkt, buf, this->size, traceData);
@@ -748,9 +750,9 @@ namespace gem5
             ccprintf(ss, "0x%x, 0x%x", this->offset, this->size);
             return ss.str();
         }
-        
+
         // Wmr64_u
-        Wmr64_u::Wmr64_u(ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : 
+        Wmr64_u::Wmr64_u(ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) :
             MetalRegOp2("wmr64_u", _machInst, __opClass, _mReg, _gReg)
         {
             setSrcRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
@@ -762,7 +764,7 @@ namespace gem5
             this->flags[IsInteger] = true;
         }
 
-        Fault Wmr64_u::execute(ExecContext *xc, trace::InstRecord *traceData) const 
+        Fault Wmr64_u::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
