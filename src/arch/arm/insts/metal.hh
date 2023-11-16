@@ -23,63 +23,63 @@ namespace gem5
                     return bits(data, 63, 48);
                 }
                 void set_asid(uint16_t asid) {
-                    insertBits(data, 63, 48, asid);
+                    data = insertBits(data, 63, 48, asid);
                 }
 
                 uint16_t vmid() {
                     return bits(data, 47, 32);
                 }
                 void set_vmid(uint16_t vmid) {
-                    insertBits(data, 47, 32, vmid);
+                    data = insertBits(data, 47, 32, vmid);
                 }
 
                 uint8_t attr() {
                     return bits(data, 31, 24);
                 }
                 void set_attr(uint8_t attr) {
-                    insertBits(data, 31, 24, attr);
+                    data = insertBits(data, 31, 24, attr);
                 }
 
                 ExceptionLevel el() {
                     return (ExceptionLevel)bits(data, 23, 22);
                 }
                 void set_el(ExceptionLevel el) {
-                    insertBits(data, 23, 22, el);
+                    data = insertBits(data, 23, 22, el);
                 }
 
                 TlbEntry::MemoryType mtype() {
                     return (TlbEntry::MemoryType)bits(data, 21, 20);
                 }
                 void set_mtype(TlbEntry::MemoryType mtype) {
-                    insertBits(data, 21, 20, mtype);
+                    data = insertBits(data, 21, 20, mtype);
                 }
 
                 bool isHyp() {
                     return bits(data, 19);
                 }
                 void set_isHyp(bool isHyp) {
-                    insertBits(data, 19, isHyp);
+                    data = insertBits(data, 19, isHyp);
                 }
 
                 bool isSecure() {
                     return bits(data, 18);
                 }
                 void set_isSecure(bool isSecure) {
-                    insertBits(data, 18, isSecure);
+                    data = insertBits(data, 18, isSecure);
                 }
 
                 bool type() {
                     return bits(data, 17);
                 }
                 void set_type(bool type) {
-                    insertBits(data, 17, type);
+                    data = insertBits(data, 17, type);
                 }
 
                 bool nc() {
                     return bits(data, 16);
                 }
                 void set_nc(bool nc) {
-                    insertBits(data, 16, nc);
+                    data = insertBits(data, 16, nc);
                 }
         };
 
@@ -293,7 +293,7 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
-        // Read Architectural Register 
+        // Read Architectural Register
         class Rar64 : public MetalRegOp2
         {
         public:
@@ -302,7 +302,7 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
 
-        // Write Architectural Register 
+        // Write Architectural Register
         class War64 : public MetalRegOp2
         {
         public:
@@ -310,7 +310,7 @@ namespace gem5
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
-        
+
         // rpr
         class Rpr64 : public MetalRegOp2
         {
@@ -319,7 +319,7 @@ namespace gem5
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
-        
+
         // wpr
         class Wpr64 : public MetalRegOp2
         {
@@ -328,7 +328,7 @@ namespace gem5
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
-        
+
         // rtlb
         class Rtlb64 : public MetalRegOp3
         {
