@@ -509,7 +509,7 @@ namespace gem5
 
             ArmISA::TlbEntry *te =
                 dynamic_cast<ArmISA::TLB *>(
-                    xc->tcBase()->getMMUPtr()->itb)
+                    xc->tcBase()->getMMUPtr()->dtb)
                     ->getEntry(va);
 
             assert(te);
@@ -656,8 +656,12 @@ namespace gem5
                 (te.ns << 9) |  // NS bit
                 (ld.sh() << 7);
 
-            dynamic_cast<ArmISA::TLB *>(xc->tcBase()->getMMUPtr()->itb)
-                ->insert(te);
+            if (tei.itb())
+                dynamic_cast<ArmISA::TLB *>(xc->tcBase()->getMMUPtr()->itb)
+                    ->insert(te);
+            else
+                dynamic_cast<ArmISA::TLB *>(xc->tcBase()->getMMUPtr()->dtb)
+                    ->insert(te);
 
             return NoFault;
         }
