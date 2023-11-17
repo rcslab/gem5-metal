@@ -81,6 +81,13 @@ namespace gem5
                 void set_nc(bool nc) {
                     data = insertBits(data, 16, nc);
                 }
+
+                bool itb() {
+                    return bits(data, 15);
+                }
+                void set_itb(bool nc) {
+                    data = insertBits(data, 15, nc);
+                }
         };
 
         // a Metal instruction that can be either a regular op, a micro op or a macro op
