@@ -526,8 +526,13 @@ BaseSimpleCPU::advancePC(const Fault &fault)
     //Since we're moving to a new pc, zero out the offset
     t_info.fetchOffset = 0;
     if (fault != NoFault) {
+        BaseISA * isa = thread->getIsaPtr();
         curMacroStaticInst = nullStaticInstPtr;
-        fault->invoke(threadContexts[curThread], curStaticInst);
+        if (isa->checkExcIntercept(fault)) {
+            isa->doExcInstercept(fault);
+        } else {
+            fault->invoke(threadContexts[curThread], curStaticInst);
+        }
         thread->decoder->reset();
     } else {
         if (curStaticInst) {

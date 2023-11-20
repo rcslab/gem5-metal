@@ -254,8 +254,8 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
-            static void doMenter(ThreadContext *xc, Addr npc, Addr lpc);
-            static void doMenter(ThreadContext *xc, Addr npc, const ArmStaticInst &inst);
+            static void doMenter(ThreadContext *xc, Addr npc, Addr lpc, bool intr);
+            static void doMenter(ThreadContext *xc, Addr npc, const ArmStaticInst &inst, bool intr);
         private:
             static void calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count);
         };
@@ -263,6 +263,12 @@ namespace gem5
         // mexit
         class Mexit64 : public MetalImmOp8
         {
+        private:
+            BitUnion8(MexitFlags)
+            Bitfield<1> iim; // mask instruction intercept for the next inst
+            Bitfield<0> rfi; // this is a return from intercept (Inst & Exc) mroutine (restore CPSR from MSPSR)
+            EndBitUnion(MexitFlags)
+
         public:
             Mexit64(ExtMachInst _machInst, uint8_t _imm);
 
@@ -367,6 +373,22 @@ namespace gem5
             uint32_t size;
         public:
             Mliit64_u(ExtMachInst _machInst, OpClass __opClass,
+                       uint32_t _offset, uint32_t _size);
+
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        class Mleit64_u : public MetalNakedOp
+        {
+        protected:
+            uint32_t offset;
+            uint32_t size;
+        public:
+            Mleit64_u(ExtMachInst _machInst, OpClass __opClass,
                        uint32_t _offset, uint32_t _size);
 
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;

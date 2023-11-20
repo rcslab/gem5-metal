@@ -211,6 +211,7 @@ const IILBEntry IILB::NullEntry(nullStaticInstPtr, false);
 
 void IILB::flush()
 {
+    METAL_DBGPRINT(IILB, FLUSH, "flushing...\n");
     map.clear();
 }
 
@@ -237,7 +238,7 @@ void IILB::add(const IILBEntry & _ent)
     // check for duplicates
     auto vit = vec->begin();
     while (vit != vec->end()) {
-        auto other = (*vit).get();
+        const auto other = vit->get();
         if (*other == *ent) {
             vit = vec->erase(vit);
             break;
@@ -265,9 +266,9 @@ const IILBEntry & IILB::get(const IILBEntry & ent) const
     auto vec = it->second.get();
     auto vit = vec->begin();
     while (vit != vec->end()) {
-        auto each = (*vit).get();
+        const auto each = vit->get();
         if (each->match(ent)) {
-            METAL_DBGPRINT(IILB, GET, "*matched* inst = 0x%x, mnemonic = \"%s\", post = %d -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n",
+            METAL_DBGPRINT(IILB, GET, "*matched* [inst = 0x%x, mnemonic = \"%s\", post = %d] -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n",
                                                                                     ent.getArmStaticInst()->encoding(),
                                                                                     ent.getInst()->getName().c_str(),
                                                                                     ent.isPost(), 
@@ -282,6 +283,145 @@ const IILBEntry & IILB::get(const IILBEntry & ent) const
     }
     return NullEntry;
 }
+
+EILBEntry::EILBEntry(ESR _esrBits, ESR _esrMask, EILBMode _mode, unsigned int _mroutine) :
+    esrBits(_esrBits), esrMask(_esrMask), mode(_mode), mroutine(_mroutine)
+{
 }
+
+EILBEntry::EILBEntry(ESR _esrBits, EILBMode _mode) :
+    esrBits(_esrBits), esrMask(0), mode(_mode), mroutine(0)
+{
+}
+
+ESR EILBEntry::getEsrBits() const
+{
+    return this->esrBits;
+}
+
+ESR EILBEntry::getEsrMask() const
+{
+    return this->esrMask;
+}
+
+unsigned int EILBEntry::getMroutine() const
+{
+    return this->mroutine;
+}
+
+EILBMode EILBEntry::getMode() const
+{
+    return this->mode;
+}
+
+EILBMode EILBEntry::vecOffsetToMode(Addr offset)
+{
+    switch(offset) {
+        case 0x0:
+        case 0x200:
+        case 0x400:
+        case 0x600:
+            return EILBMode::MODE_SYNC;
+        case 0x80:
+        case 0x280:
+        case 0x480:
+        case 0x680:
+            return EILBMode::MODE_IRQ;
+        case 0x100:
+        case 0x300:
+        case 0x500:
+        case 0x700:
+            return EILBMode::MODE_FIQ;
+        case 0x180:
+        case 0x380:
+        case 0x580:
+        case 0x780:
+            return EILBMode::MODE_SERROR;
+        default:
+            panic("unknown vector offset: 0x%lx.", offset);
+    }
+}
+
+bool EILBEntry::match(const EILBEntry &other) const
+{
+    return ((other.esrBits & this->esrMask) == (this->esrBits & this->esrMask)) && (other.mode == this->mode);
+}
+
+bool EILBEntry::operator==(const EILBEntry &other) const
+{
+    return (other.esrBits == this->esrBits) && (other.esrMask == this->esrMask) && (other.mode == this->mode);
+}
+
+EILB::~EILB(void)
+{
+    flush();
+}
+
+const EILBEntry EILB::NullEntry(0, 0, EILBMode::NumMode, 0);
+
+void EILB::add(const EILBEntry & _ent)
+{
+    unsigned int modeVal = static_cast<unsigned int>(_ent.getMode());
+    assert(modeVal < static_cast<unsigned int>(EILBMode::NumMode));
+
+    auto ptr = std::make_unique<EILBEntry>(_ent);
+
+    auto &vec = map.at(modeVal);
+    auto it = vec.begin();
+    while (it != vec.end()) {
+        const auto each = it->get();
+        assert(each->getMode() == _ent.getMode());
+        if (*each == _ent) {
+            it = vec.erase(it);
+            break;
+        } else {
+            ++it;
+        }
+    }
+
+    vec.push_back(std::move(ptr));
+    METAL_DBGPRINT(EILB, ADD, "*added* EILB entry [esr = 0x%x, esrMask = \"%s\", mode = 0x%x, mroutine = %d, mroutine = %u]\n", 
+                                                            _ent.getEsrBits(),
+                                                            _ent.getEsrMask(),
+                                                            static_cast<int>(_ent.getMode()),
+                                                            _ent.getMroutine());
+}
+
+const EILBEntry & EILB::get(const EILBEntry & ent) const
+{
+    unsigned int modeVal = static_cast<unsigned int>(ent.getMode());
+    assert(modeVal < static_cast<unsigned int>(EILBMode::NumMode));
+
+    auto &vec = map.at(modeVal);
+    auto it = vec.begin();
+    while (it != vec.end()) {
+        const auto each = it->get();
+        assert(each->getMode() == ent.getMode());
+        if (each->match(ent)) {
+            METAL_DBGPRINT(EILB, GET, "*matched* [esr = 0x%x, mode = 0x%x] with EILB entry [esr = 0x%x, esrMask = \"%s\", mode = 0x%x, mroutine = %d, mroutine = %u]\n", 
+                                                        ent.getEsrBits(),
+                                                        static_cast<int>(ent.getMode()),
+                                                        each->getEsrBits(),
+                                                        each->getEsrMask(),
+                                                        static_cast<int>(each->getMode()),
+                                                        each->getMroutine());
+            return *each;
+        } else {
+            ++it;
+        }
+    }
+
+    return NullEntry;
+}
+
+void EILB::flush(void)
+{
+    METAL_DBGPRINT(EILB, FLUSH, "flushing...\n");
+    for (size_t i = 0; i < map.size(); i++) {
+        map.at(i).clear();
+    }
+}
+
+} // namespace ArmISA
 
 } // namespace gem5
