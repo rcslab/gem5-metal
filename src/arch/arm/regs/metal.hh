@@ -21,6 +21,7 @@ namespace metal_reg
         Bitfield<63> init; // Metal initialization flag
         Bitfield<62> ii; // instruction intercept enable
         Bitfield<61> im; // instruction intercept mask
+        Bitfield<60> ei; // exc intercept enable
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
@@ -51,19 +52,28 @@ namespace metal_reg
         MR21,
         MR22,
         MR23,
-        MIR0 = MR20,
-        MIR1 = MR21,
-        MIR2 = MR22,
+        MIR0 = MR16,
+        MIR1 = MR17,
+        MIR2 = MR18,
+        MER0 = MR16,
+        MER1 = MR17,
+        MER2 = MR18,
+        MSPSR = MR22,
         MLR = MR23,
         NumGenRegs,
 
         MSR = NumGenRegs, // Metal Status Register
         MBR, // Metal Base Register
         MIB, // Metal Instruction Base Register
+        MEB, // Metal Exception Base Register
+        MG4,
+        MG5,
+        MG6,
+        MG7,
         NumRegs,
         NumMiscRegs = NumRegs - NumGenRegs,
     };
-    static_assert(NumRegs < (1 << 5));
+    static_assert(NumRegs <= (1 << 5));
     static constexpr size_t NumWindow = 64;
     static constexpr size_t WindowSize = NumGenRegs;
     static constexpr size_t WindowOverlap = 8;
@@ -96,8 +106,14 @@ namespace metal_reg
         "mlr",
         "msr",
         "mbr",
-        "mib"
+        "mib",
+        "meb",
+        "mg4",
+        "mg5",
+        "mg6",
+        "mg7"
     };
+    static_assert((sizeof(regNames) / sizeof(regNames[0])) == NumRegs);
 
     static inline bool isGeneralReg(RegIndex idx)
     {
@@ -116,17 +132,22 @@ namespace metal_reg
 
     static inline bool isMetalInitialized(MSR_t msr)
     {
-        return (bool)msr.init;
+        return static_cast<bool>(msr.init);
     }
 
     static inline bool isInstInterceptEnabled(MSR_t msr)
     {
-        return (bool)msr.ii;
+        return static_cast<bool>(msr.ii);
     }
 
     static inline bool isInstInterceptMasked(MSR_t msr)
     {
-        return (bool)msr.im;
+        return static_cast<bool>(msr.im);
+    }
+
+    static inline bool isExcInterceptEnabled(MSR_t msr)
+    {
+        return static_cast<bool>(msr.ei);
     }
 
     static inline bool canWriteMetalReg(MSR_t msr, RegIndex mreg)
@@ -136,11 +157,12 @@ namespace metal_reg
             return false;
         }
 
-        // allow non metal mode to access metal reg 0 through 7
-        if (mreg <= MR7) {
+        // allow non metal mode to access all metal general regs because of windowing
+        if (mreg < NumGenRegs) {
             return true;
         }
 
+        // the rest of metal regs can only be accessed in metal mode
         return isInMetalMode(msr);
     }
 
@@ -151,11 +173,13 @@ namespace metal_reg
             return false;
         }
 
-        // allow non metal mode to access metal reg 0 through 7
-        if (mreg <= MR7) {
+        // allow non metal mode to access all metal general regs because of windowing
+        if (mreg < NumGenRegs) {
             return true;
         }
 
+        
+        // the rest of metal regs can only be accessed in metal mode
         return isInMetalMode(msr);
     }
 

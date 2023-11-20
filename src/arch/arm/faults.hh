@@ -231,15 +231,18 @@ class ArmFault : public FaultBase
     void invoke64(ThreadContext *tc, const StaticInstPtr &inst =
                   nullStaticInstPtr);
     void update(ThreadContext *tc);
-    bool isResetSPSR(){ return bStep; }
+    bool isResetSPSR() const { return bStep; }
+    bool isUpdated() const { return faultUpdated; }
+    bool isFrom64() const { return from64; }
+    bool isTo64() const { return to64; }
 
     bool vectorCatch(ThreadContext *tc, const StaticInstPtr &inst);
 
     ArmStaticInst *instrAnnotate(const StaticInstPtr &inst);
     virtual void annotate(AnnotationIDs id, uint64_t val) {}
-    virtual FaultOffset offset(ThreadContext *tc) = 0;
-    virtual FaultOffset offset64(ThreadContext *tc) = 0;
-    virtual OperatingMode nextMode() = 0;
+    virtual FaultOffset offset(ThreadContext *tc) const = 0;
+    virtual FaultOffset offset64(ThreadContext *tc) const = 0;
+    virtual OperatingMode nextMode() const = 0;
     virtual bool routeToMonitor(ThreadContext *tc) const = 0;
     virtual bool routeToHyp(ThreadContext *tc) const { return false; }
     virtual uint8_t armPcOffset(bool is_hyp) = 0;
@@ -255,6 +258,7 @@ class ArmFault : public FaultBase
     virtual bool isStage2() const { return false; }
     virtual FSR getFsr(ThreadContext *tc) const { return 0; }
     virtual void setSyndrome(ThreadContext *tc, MiscRegIndex syndrome_reg);
+    virtual ESR getSyndrome(ThreadContext *tc) const;
     virtual bool getFaultVAddr(Addr &va) const { return false; }
     OperatingMode getToMode() const { return toMode; }
 };
@@ -269,11 +273,11 @@ class ArmFaultVals : public ArmFault
     ArmFaultVals<T>(ExtMachInst mach_inst = 0, uint32_t _iss = 0) :
         ArmFault(mach_inst, _iss) {}
     FaultName name() const override { return vals.name; }
-    FaultOffset offset(ThreadContext *tc) override;
+    FaultOffset offset(ThreadContext *tc) const override;
 
-    FaultOffset offset64(ThreadContext *tc) override;
+    FaultOffset offset64(ThreadContext *tc) const override;
 
-    OperatingMode nextMode() override { return vals.nextMode; }
+    OperatingMode nextMode() const override { return vals.nextMode; }
 
     virtual bool
     routeToMonitor(ThreadContext *tc) const override

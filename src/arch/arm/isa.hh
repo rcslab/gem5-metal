@@ -137,6 +137,7 @@ namespace ArmISA
 
         MRLB mrlb;
         IILB iilb;
+        EILB eilb;
 public:
         // mroutine stuff
         static constexpr size_t MroutineTableMaxEntryNum = 1 << 8;
@@ -168,6 +169,25 @@ public:
         static constexpr size_t InstInterceptTableLoadSize = 2 * sizeof(InstInterceptTableEntry);
         static constexpr size_t InstInterceptTableTotalSize = InstInterceptTableMaxEntryNum * sizeof(InstInterceptTableEntry);
         static_assert((InstInterceptTableTotalSize % InstInterceptTableLoadSize) == 0 && (InstInterceptTableLoadSize % sizeof(InstInterceptTableEntry)) == 0);
+
+        // Exception intercept
+        BitUnion32(ExcInterceptCtrl)
+            Bitfield<7, 0> mroutine;
+            Bitfield<9, 8> mode;
+            Bitfield<31> valid;
+        EndBitUnion(ExcInterceptCtrl)
+
+        struct ExcInterceptTableEntry {
+            ESR esrBits;
+            ESR esrMask;
+            ExcInterceptCtrl ctrl;
+        };
+        static_assert(sizeof(ExcInterceptTableEntry) == sizeof(uint32_t) * 3);
+        static constexpr size_t ExcInterceptTableMaxEntryNum = 64;
+        static constexpr size_t ExcInterceptTableLoadSize = 4 * sizeof(ExcInterceptTableEntry);
+        static constexpr size_t ExcInterceptTableTotalSize = ExcInterceptTableMaxEntryNum * sizeof(ExcInterceptTableEntry);
+        static_assert((ExcInterceptTableTotalSize % ExcInterceptTableLoadSize) == 0 && (ExcInterceptTableLoadSize % sizeof(ExcInterceptTableEntry)) == 0);
+
 private:
         void
         updateRegMap(CPSR cpsr, metal_reg::MSR_t msr)
@@ -278,12 +298,17 @@ private:
               int firstBit = ffs(mask);
               return (encoding & mask) >> (firstBit - 1);
         }
+        const EILBEntry & getEILBEntryFromFault(const ArmFault * fault) const;
 public:
         MRLB & getMrlbPtr();
         IILB & getIilbPtr();
+        EILB & getEilbPtr();
         void loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx);
         void loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size);
+        void loadExcInterceptTable(void * rawMem, Addr memAddr, size_t size);
 
+        bool checkExcIntercept(const Fault &fault) const override;
+        void doExcInstercept(const Fault &fault) override;
         bool checkInstIntercept(const StaticInstPtr inst, bool post) const override;
         void doInstIntercept(const StaticInstPtr inst, bool post) override;
         bool checkInstInterceptMasked(void) const override;

@@ -4,6 +4,7 @@
 #include <vector>
 #include "arch/arm/system.hh"
 #include "arch/arm/types.hh"
+#include "arch/arm/regs/misc_types.hh"
 
 namespace gem5
 {
@@ -74,6 +75,7 @@ private:
     const MachInst mask2;
 public:
     IILBEntry(void) = delete;
+    IILBEntry(const IILBEntry & other) = default;
     IILBEntry(const StaticInstPtr _inst, MachInst _opMask, bool _post, unsigned int _mroutine, MachInst _mask0, MachInst _mask1, MachInst _mask2);
     IILBEntry(const StaticInstPtr _inst, bool _post);
 
@@ -89,6 +91,7 @@ public:
     static bool isSameInstClass(MachInst s, MachInst d, MachInst opMask);
     bool match(const IILBEntry &other) const;
     bool operator==(const IILBEntry &other) const;
+    IILBEntry & operator=(const IILBEntry &other) = delete;
 };
 
 class IILB
@@ -106,6 +109,51 @@ public:
     void flush(void);
 };
 
+enum class EILBMode {
+    MODE_SYNC = 0,
+    MODE_IRQ = 1,
+    MODE_FIQ = 2,
+    MODE_SERROR = 3,
+    NumMode
+};
+
+class EILBEntry
+{
+private:
+    const ESR esrBits;
+    const ESR esrMask;
+    const EILBMode mode;
+    const unsigned int mroutine;
+public:
+    EILBEntry(const EILBEntry & other) = default;
+    EILBEntry(void) = delete;
+    EILBEntry(ESR _esrBits, ESR _esrMask, EILBMode _mode, unsigned int _mroutine);
+    EILBEntry(ESR _esrBits, EILBMode _mode);
+    ESR getEsrBits() const;
+    ESR getEsrMask() const;
+    EILBMode getMode() const;
+    unsigned int getMroutine() const;
+    static EILBMode vecOffsetToMode(Addr offset);    
+
+    bool match(const EILBEntry &other) const;
+    bool operator==(const EILBEntry &other) const;
+    EILBEntry & operator=(const EILBEntry &other) = delete;
+};
+
+class EILB
+{
+private:
+    std::array<std::vector<std::unique_ptr<EILBEntry>>, static_cast<int>(EILBMode::NumMode)> map;
+public:
+    DISALLOW_COPY_AND_ASSIGN(EILB);
+    ~EILB(void);
+    EILB(void) = default;
+    static const EILBEntry NullEntry;
+    
+    void add(const EILBEntry & _ent);
+    const EILBEntry & get(const EILBEntry & ent) const;
+    void flush(void);
+};
 
 } // namespace ArmISA
 } // namespace gem5

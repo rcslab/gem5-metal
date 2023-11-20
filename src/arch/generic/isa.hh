@@ -92,6 +92,8 @@ class BaseISA : public SimObject
     virtual void doInstIntercept(const StaticInstPtr inst, bool post) = 0;
     virtual bool checkInstInterceptMasked(void) const = 0;
     virtual void doneInstInterceptMasked(void) = 0;
+    virtual bool checkExcIntercept(const Fault &fault) const = 0;
+    virtual void doExcInstercept(const Fault &fault) = 0;
 
     virtual void takeOverFrom(ThreadContext *new_tc, ThreadContext *old_tc) {}
     virtual void setThreadContext(ThreadContext *_tc) { tc = _tc; }

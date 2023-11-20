@@ -88,7 +88,7 @@ namespace gem5
             this->flags[IsLoad] = true;
         }
 
-        void Menter64::doMenter(ThreadContext *tc, Addr npc, Addr lpc)
+        void Menter64::doMenter(ThreadContext *tc, Addr npc, Addr lpc, bool rfi)
         {
             PCState pcState;
             set(pcState, tc->pcState());
@@ -105,11 +105,15 @@ namespace gem5
             tc->setMetalReg(metal_reg::MLR, lpc);
 
             // METAL_XXX: need to copy the sp from regular bank to Metal bank for arm32
+            if (rfi) {
+                // if it's a intr-like menter, also save CPSR to MSPSR
+                tc->setMetalReg(metal_reg::MSPSR, tc->readMiscReg(MISCREG_CPSR));
+            }
         }
 
-        void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst)
+        void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst, bool intr)
         {
-            doMenter(tc, npc, tc->pcState().instAddr() + inst.instSize());
+            doMenter(tc, npc, tc->pcState().instAddr() + inst.instSize(), intr);
         }
 
         void Menter64::calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count)
@@ -146,7 +150,7 @@ namespace gem5
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
             MRLB & mrlb = isa->getMrlbPtr();
 
-            METAL_DBGPRINT(INSTS, MENTER, "entering Metal mode - MBR = 0x%lx, mroutine = %d.\n", xc->readMetalReg(metal_reg::MBR), this->imm);
+            METAL_DBGPRINT(INSTS, MENTER, "entering Metal mode: MBR = 0x%lx, mroutine = %d, CPSR = 0x%lx.\n", xc->readMetalReg(metal_reg::MBR), this->imm, xc->readMiscReg(MISCREG_CPSR));
 
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
@@ -171,7 +175,7 @@ namespace gem5
                 if (!mrlbEnt.isValid()) {
                     return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
                 } else {
-                    doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
+                    doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this, false);
                 }
             }
     
@@ -188,11 +192,11 @@ namespace gem5
             static ISA::MroutineTableEntry buf[ISA::MroutineTableMaxEntryNum];
             assert(sizeof(buf) >= cacheLineSz);
 
-            getMemRawPtr(pkt, buf, cacheLineSz, traceData);
-
             if(pkt->isError()) {
                 panic("MENTER: memory fetch (%s) failed: %s", pkt->getAddrRange().to_string(), pkt->print());
             }
+
+            getMemRawPtr(pkt, buf, cacheLineSz, traceData);
 
             const RegVal mbr = xc->readMetalReg(metal_reg::MBR);
 
@@ -211,7 +215,7 @@ namespace gem5
             if (!mrlbEnt.isValid()) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             } else {
-                doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
+                doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this, false);
             }
 
             return NoFault;
@@ -263,13 +267,14 @@ namespace gem5
             // get mroutine table's base address
             const RegVal ret = xc->readMetalReg(metal_reg::MLR);
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            const MexitFlags flags = static_cast<MexitFlags>(this->imm);
 
             // must be in Metal mode to mexit
             if (!metal_reg::isInMetalMode(msr)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode - MLR = 0x%x, flags = 0x%x\n", ret, this->imm);
+            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode: MLR = 0x%lx, MSPSR = 0x%lx, flags = [rfi = %d, iim = %d]\n", ret, xc->readMetalReg(metal_reg::MSPSR), flags.rfi, flags.iim);
 
             // set new PC
             const Addr target_addr = purifyTaggedAddr(ret, xc->tcBase(), currEL(xc->tcBase()), true);
@@ -278,18 +283,18 @@ namespace gem5
             pcState.instNPC(target_addr);
             xc->pcState(pcState);
 
-            // handle intercept mask flags
-            if (this->imm & 0b01) {
-                msr.im = 1;
+            if (flags.rfi) {
+                xc->setMiscReg(MISCREG_CPSR, xc->readMetalReg(metal_reg::MSPSR));
             }
-            if (this->imm != 0) {
-                xc->setMetalReg(metal_reg::MSR, msr);
+
+            if (flags.iim) {
+                msr.im = 1;
             }
 
             // decrease Metal level
-            msr = xc->readMetalReg(metal_reg::MSR);
             msr.lv = msr.lv - 1;
             xc->setMetalReg(metal_reg::MSR, msr);
+    
 
             return NoFault;
         }
@@ -310,6 +315,12 @@ namespace gem5
                 this->flags[IsLoad] = true;
                 for (int i = 0; i < ISA::InstInterceptTableTotalSize / ISA::InstInterceptTableLoadSize; i++) {
                     uop = new Mliit64_u(_machInst, _opClass, i * ISA::InstInterceptTableLoadSize, ISA::InstInterceptTableLoadSize);
+                    this->addMicroOps(uop);
+                }
+            } else if (mReg == metal_reg::MEB) {
+                this->flags[IsLoad] = true;
+                for (int i = 0; i < ISA::ExcInterceptTableTotalSize / ISA::ExcInterceptTableLoadSize; i++) {
+                    uop = new Mleit64_u(_machInst, _opClass, i * ISA::ExcInterceptTableLoadSize, ISA::ExcInterceptTableLoadSize);
                     this->addMicroOps(uop);
                 }
             }
@@ -334,15 +345,15 @@ namespace gem5
         Fault Rmr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal v = xc->readMetalReg(mReg);
 
-            METAL_DBGPRINT(INSTS, RMR, "mReg = %s, gReg = %d.\n", printMetalReg(mReg), gReg);
+            METAL_DBGPRINT(INSTS, RMR, "mReg = %s (0x%lx), gReg = %d.\n", printMetalReg(mReg), v, gReg);
 
             if (!metal_reg::canReadMetalReg(msr, mReg))
             {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            RegVal v = xc->readMetalReg(mReg);
             xc->setRegOperand(this, 0, v);
 
             return NoFault;
@@ -748,6 +759,65 @@ namespace gem5
             ccprintf(ss, "0x%x, 0x%x", this->offset, this->size);
             return ss.str();
         }
+
+        // Mleit64_u
+        Mleit64_u::Mleit64_u(ExtMachInst _machInst, OpClass __opClass, uint32_t _offset, uint32_t _size) : 
+            MetalNakedOp("mleit_u", _machInst, __opClass), offset(_offset), size(_size)
+        {
+            this->flags[IsMicroop] = true;
+            this->flags[IsLoad] = true;
+            this->flags[IsInteger] = true;
+        }
+
+        Fault Mleit64_u::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            ThreadContext *tc = xc->tcBase();
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal meb = xc->readMetalReg(metal_reg::MEB);
+
+            METAL_DBGPRINT(INSTS, MLEIT_U, "Loading exc intercept table at 0x%lx + 0x%lx, size %u.\n", meb, this->offset, this->size);
+
+            if (!metal_reg::canReadMetalReg(msr, metal_reg::MEB)) {
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+
+            Fault fault = initiateMemRead(xc, purifyTaggedAddr(this->offset + meb, tc, currEL(tc), true), this->size, ArmISA::MMU::AllowUnaligned);
+
+            return NoFault;
+        }
+
+        Fault Mleit64_u::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            ThreadContext *tc = xc->tcBase();
+            ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
+            RegVal meb = xc->readMetalReg(metal_reg::MEB);
+
+            if (pkt->isError()) {
+                panic("Data fetch failed.");
+            }
+            
+            static char buf[ISA::ExcInterceptTableLoadSize];
+            assert(this->size <= ISA::ExcInterceptTableLoadSize);
+            getMemRawPtr(pkt, buf, this->size, traceData);
+            isa->loadExcInterceptTable(buf, purifyTaggedAddr(this->offset + meb, tc, currEL(tc), true), this->size);
+            return NoFault;
+        }
+
+        Fault Mleit64_u::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            panic("unimplemented");
+        }
+
+        std::string
+        Mleit64_u::generateDisassembly(
+            Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            ccprintf(ss, "0x%x, 0x%x", this->offset, this->size);
+            return ss.str();
+        }
         
         // Wmr64_u
         Wmr64_u::Wmr64_u(ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : 
@@ -765,8 +835,9 @@ namespace gem5
         Fault Wmr64_u::execute(ExecContext *xc, trace::InstRecord *traceData) const 
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal v = xc->getRegOperand(this, 0);
 
-            METAL_DBGPRINT(INSTS, WMR_U, "mReg = %s, gReg = %d.\n", printMetalReg(mReg), gReg);
+            METAL_DBGPRINT(INSTS, WMR_U, "mReg = %s, gReg = %d (0x%lx).\n", printMetalReg(mReg), gReg, v);
 
             bool allowWriting = false;
             // allow writing to Metal Base Register outside of Metal mode to initialize Metal
@@ -786,7 +857,6 @@ namespace gem5
             }
 
             Fault fault = NoFault;
-            RegVal v = xc->getRegOperand(this, 0);
             switch(this->mReg) {
                 case metal_reg::MSR: {
                     metal_reg::MSR_t new_val = v;

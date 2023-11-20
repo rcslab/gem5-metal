@@ -394,8 +394,8 @@ ArmFault::getFaultAddrReg64() const
     }
 }
 
-void
-ArmFault::setSyndrome(ThreadContext *tc, MiscRegIndex syndrome_reg)
+ESR
+ArmFault::getSyndrome(ThreadContext *tc) const
 {
     ESR esr = 0;
     uint32_t exc_class = (uint32_t) ec(tc);
@@ -421,7 +421,14 @@ ArmFault::setSyndrome(ThreadContext *tc, MiscRegIndex syndrome_reg)
     } else {
         esr.iss = iss_val;
     }
-    tc->setMiscReg(syndrome_reg, esr);
+
+    return esr;
+}
+
+void
+ArmFault::setSyndrome(ThreadContext *tc, MiscRegIndex syndrome_reg)
+{
+    tc->setMiscReg(syndrome_reg, getSyndrome(tc));
 }
 
 void
@@ -938,7 +945,7 @@ HypervisorTrap::ec(ThreadContext *tc) const
 
 template<class T>
 FaultOffset
-ArmFaultVals<T>::offset(ThreadContext *tc)
+ArmFaultVals<T>::offset(ThreadContext *tc) const
 {
     bool isHypTrap = false;
 
@@ -958,7 +965,7 @@ ArmFaultVals<T>::offset(ThreadContext *tc)
 
 template<class T>
 FaultOffset
-ArmFaultVals<T>::offset64(ThreadContext *tc)
+ArmFaultVals<T>::offset64(ThreadContext *tc) const
 {
     if (toEL == fromEL) {
         if (opModeIsT(fromMode))

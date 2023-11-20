@@ -147,6 +147,7 @@ ISA::clear()
 
     resetMetalRegs();
     this->iilb.flush();
+    this->eilb.flush();
     this->mrlb.flushAll();
 
     updateRegMap(miscRegs[MISCREG_CPSR], this->readMetalRegNoEffect(metal_reg::MSR));
@@ -1369,11 +1370,38 @@ ISA::registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _
 }
 
 void
+ISA::loadExcInterceptTable(void * rawMem, Addr memAddr, size_t size)
+{
+    assert((size % sizeof(ExcInterceptTableEntry)) == 0);
+
+    auto ents = static_cast<ExcInterceptTableEntry *>(rawMem);
+
+    for (int i = 0; i < size / sizeof(InstInterceptTableEntry); i++) {
+        auto ent = ents[i];
+        ent.ctrl = gtoh(ent.ctrl, byteOrder(this->tc));
+        ent.esrMask = gtoh(ent.esrMask, byteOrder(this->tc));
+        ent.esrBits = gtoh(ent.esrBits, byteOrder(this->tc));
+
+        if (!ent.ctrl.valid) {
+            continue;
+        }
+
+        const EILBEntry newEnt(ent.esrBits, ent.esrMask, static_cast<EILBMode>(static_cast<int>(ent.ctrl.mode)), ent.ctrl.mroutine);
+        this->eilb.add(newEnt);
+        METAL_DBGPRINT(ISA, EXCINTR, "Registered exc intercept [esr = 0x%lx, mask = 0x%lx, mode = 0x%x, mroutine = %d].\n", 
+                                                                    newEnt.getEsrBits(), 
+                                                                    newEnt.getEsrMask(),
+                                                                    static_cast<int>(newEnt.getMode()),
+                                                                    newEnt.getMroutine());
+    }
+}
+
+void
 ISA::loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size)
 {
     assert((size % sizeof(InstInterceptTableEntry)) == 0);
 
-    auto ents = reinterpret_cast<InstInterceptTableEntry *>(rawMem);
+    auto ents = static_cast<InstInterceptTableEntry *>(rawMem);
     
     // we need to decode from the emulated PC but obtain flags from the read memory
     InstDecoder * decoder = this->tc->getDecoderPtr();
@@ -1433,6 +1461,12 @@ ISA::getIilbPtr(void)
     return this->iilb;
 }
 
+EILB &
+ISA::getEilbPtr(void)
+{
+    return this->eilb;
+}
+
 void 
 ISA::loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx)
 {
@@ -1465,7 +1499,7 @@ ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
 {
     metal_reg::MSR_t msr = readMetalRegNoEffect(metal_reg::MSR);
 
-    if (!metal_reg::isInstInterceptEnabled(msr) || !metal_reg::isMetalInitialized(msr)) {
+    if (!metal_reg::isInstInterceptEnabled(msr)) {
         // ic flag is currently disabled or metal mode is disabled
         return false;
     }
@@ -1475,8 +1509,14 @@ ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
     if (&resultEnt == &IILB::NullEntry) {
         return false;
     }
-    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
-    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%x, post = %d.\n", armInst->encoding(), inst->getName().c_str(), tc->pcState().instAddr(), post);
+    ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+    assert(armInst);
+    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%lx, cpsr = 0x%lx, post = %d.\n", 
+                                            armInst->encoding(), 
+                                            inst->getName().c_str(), 
+                                            tc->pcState().instAddr(), 
+                                            tc->readMiscRegNoEffect(MISCREG_CPSR),
+                                            post);
     return true;
 }
 
@@ -1490,15 +1530,15 @@ ISA::doInstIntercept(const StaticInstPtr inst, bool post)
 
     // lookup mroutine
     unsigned int mroutine = ent.getMroutine();
-    assert(mroutine < MroutineTableMaxEntryNum);
-
     const MRLBEntry & mrEnt = this->mrlb.get(mroutine);
     if (&mrEnt == &MRLB::NullEntry) {
         panic("MRLB miss during inst intercept.\n");
     }
 
-    ArmStaticInst * armInst = reinterpret_cast<ArmStaticInst *>(inst.get());
-    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), post ? this->tc->pcState().instAddr() + armInst->instSize() : this->tc->pcState().instAddr());
+    ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+    assert(armInst);
+    Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), 
+                post ? this->tc->pcState().instAddr() + armInst->instSize() : this->tc->pcState().instAddr(), true);
 
     // set MIRs in the new reg window
     MachInst instBits = armInst->encoding();
@@ -1506,6 +1546,86 @@ ISA::doInstIntercept(const StaticInstPtr inst, bool post)
     this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent.getMask0()));
     this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent.getMask1()));
     this->setMetalReg(metal_reg::MIR2, shiftInstMask(instBits, ent.getMask2()));
+}
+
+const EILBEntry & 
+ISA::getEILBEntryFromFault(const ArmFault * armFault) const
+{
+    ESR esr = armFault->getSyndrome(tc);
+    FaultOffset offset = armFault->offset64(tc);
+    const EILBEntry ent(esr, EILBEntry::vecOffsetToMode(offset));
+
+    const EILBEntry & result = this->eilb.get(ent);
+    return result;
+}
+
+bool 
+ISA::checkExcIntercept(const Fault &fault) const
+{
+    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+
+    if (!metal_reg::isExcInterceptEnabled(msr)) {
+        return false;
+    }
+
+    auto armFault = dynamic_cast<ArmFault *>(fault.get());
+    assert(armFault);
+
+    if (!armFault->isUpdated()) {
+        armFault->update(tc);
+    }
+
+    if (!armFault->isFrom64() || !armFault->isTo64()) {
+        // must be from 64 to 64
+        return false;
+    }
+
+    const EILBEntry & result = getEILBEntryFromFault(armFault);
+    if (&result != &EILB::NullEntry) {
+        METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception esr = 0x%lx, mode = 0x%x at pc = 0x%lx, cpsr = 0x%lx to mroutine %d.\n", 
+                                                armFault->getSyndrome(tc), static_cast<int>(result.getMode()), 
+                                                tc->pcState().instAddr(), tc->readMiscRegNoEffect(MISCREG_CPSR), result.getMroutine());
+        return true;
+    }
+
+    return false;
+}
+
+void 
+ISA::doExcInstercept(const Fault &fault)
+{
+    assert(inAArch64(tc));
+
+    auto armFault = dynamic_cast<ArmFault *>(fault.get());
+    assert(armFault && armFault->isUpdated() && armFault->isFrom64() && armFault->isTo64());
+
+    const EILBEntry & result = getEILBEntryFromFault(armFault);
+    assert(&result != &EILB::NullEntry);
+
+    const unsigned int mroutine = result.getMroutine();
+    const MRLBEntry & mrEnt = this->mrlb.get(mroutine);
+    if (&mrEnt == &MRLB::NullEntry) {
+        panic("MRLB miss during exc intercept.\n");
+    }
+
+    // METAL_XXX: this assumes the exception is taken from aarch64 mode so we don't care about thumb mode etc.
+    const Addr curr_pc = tc->pcState().instAddr();
+    const Addr ret_addr = curr_pc + armFault->armPcElrOffset();
+
+    Menter64::doMenter(tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), ret_addr, true);
+
+    // set registers in the current window
+    // MER0 = Fault PC
+    this->setMetalReg(metal_reg::MER0, this->readMiscReg(MISCREG_CPSR));
+
+    // MER1 = ESR
+    this->setMetalReg(metal_reg::MER1, armFault->getSyndrome(tc));
+
+    // MER2 = Fault VADDR (if available)
+    Addr fvaddr;
+    if (armFault->getFaultVAddr(fvaddr)) {
+        this->setMetalReg(metal_reg::MER2, fvaddr);
+    }
 }
 
 RegVal
@@ -1618,6 +1738,9 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             }
             if (msr.im != new_val.im) {
                 METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction intercept masking:  %d -> %d.\n", msr.im, new_val.im);
+            }
+            if (msr.ei != new_val.ei) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.exception intercept:  %d -> %d.\n", msr.ei, new_val.ei);
             }
             break;
         }
