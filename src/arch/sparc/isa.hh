@@ -194,19 +194,6 @@ class ISA : public BaseISA
     void setMiscRegNoEffect(RegIndex idx, RegVal val) override;
     void setMiscReg(RegIndex idx, RegVal val) override;
 
-    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
-        panic("unimplemented!");
-    }
-    void doInstIntercept(const StaticInstPtr inst, bool post) override {
-        panic("unimplemented!");
-    }
-    bool checkInstInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-    void doneInstInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-
     uint64_t
     getExecutingAsid() const override
     {

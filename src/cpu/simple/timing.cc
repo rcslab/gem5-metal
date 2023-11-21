@@ -754,15 +754,14 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
 {
     SimpleExecContext &t_info = *threadInfo[curThread];
     SimpleThread * thread = t_info.thread;
-    BaseISA * isa = thread->getIsaPtr();
 
     if (_status == Faulting)
         return;
 
     Fault overrideFault = fault;
     if (fault != NoFault) {
-        if (isa->checkExcIntercept(fault, curStaticInst)) {
-            isa->doExcIntercept(fault, curStaticInst);
+        if (thread->checkExcIntercept(fault, curStaticInst)) {
+            thread->doExcIntercept(fault, curStaticInst);
             overrideFault = NoFault;
             goto end;
         }
@@ -814,8 +813,8 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
                 checkIntercept = curStaticInst->isLastMicroop();
             }
 
-            if (checkIntercept && isa->checkInstIntercept(curStaticInst, true)) {
-                isa->doInstIntercept(curStaticInst, true);
+            if (checkIntercept && thread->checkInstIntercept(curStaticInst, true)) {
+                thread->doInstIntercept(curStaticInst, true);
             }
         }
     }

@@ -165,15 +165,27 @@ SimpleThread::doneInstInterceptMasked(void)
 }
 
 bool 
-SimpleThread::checkInstIntercept(const StaticInstPtr inst, bool post) const
+SimpleThread::checkInstIntercept(const StaticInstPtr &inst, bool post) const
 {
     return getIsaPtr()->checkInstIntercept(inst, post);
 }
 
 void 
-SimpleThread::doInstIntercept(const StaticInstPtr inst, bool post)
+SimpleThread::doInstIntercept(const StaticInstPtr &inst, bool post)
 {
     getIsaPtr()->doInstIntercept(inst, post);
+}
+
+bool 
+SimpleThread::checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const
+{
+    return getIsaPtr()->checkExcIntercept(fault, inst);
+}
+
+void 
+SimpleThread::doExcIntercept(const Fault & fault, const StaticInstPtr &inst)
+{
+    getIsaPtr()->doExcIntercept(fault, inst);
 }
 
 void

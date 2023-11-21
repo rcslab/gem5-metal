@@ -1653,7 +1653,7 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
 
     // set registers in the current window
     // MER0 = Fault PC
-    this->setMetalReg(metal_reg::MER0, this->readMiscReg(MISCREG_CPSR));
+    this->setMetalReg(metal_reg::MER0, tc->pcState().instAddr());
 
     // MER1 = ESR
     this->setMetalReg(metal_reg::MER1, armFault->getSyndrome(tc));
