@@ -158,7 +158,7 @@ def create(args):
         args.mem_size,
         platform=platform(),
         mem_mode=mem_mode,
-        readfile=args.readfile,
+        readfile=args.readfile
     )
 
     MemConfig.config_mem(args, system)
@@ -213,6 +213,9 @@ def create(args):
 
     workload_class = workloads.workload_list.get(args.workload)
     system.workload = workload_class(object_file, system)
+
+    if args.bootloader != "":
+        system.realview.setupBootLoader(system, SysPaths.binary, args.bootloader)
 
     if args.with_pmu:
         enabled_pmu_events = set(
@@ -450,6 +453,12 @@ def main():
         "sets max_insts_all_threads for cpus 0, 1, 3, 5 and 7 "
         "Direct parameters of the root object are not accessible, "
         "only parameters of its children.",
+    )
+    parser.add_argument(
+        "--bootloader",
+        type=str,
+        default="",
+        help="Bootloader the system uses.",
     )
 
     args = parser.parse_args()

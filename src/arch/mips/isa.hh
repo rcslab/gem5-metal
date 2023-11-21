@@ -130,19 +130,6 @@ namespace MipsISA
             setMiscReg(idx, val, 0);
         }
 
-    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
-        panic("unimplemented!");
-    }
-    void doInstIntercept(const StaticInstPtr inst, bool post) override {
-        panic("unimplemented!");
-    }
-    bool checkInstInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-    void doneInstInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-
         //////////////////////////////////////////////////////////
         //
         // DECLARE INTERFACE THAT WILL ALLOW A MiscRegFile (Cop0)

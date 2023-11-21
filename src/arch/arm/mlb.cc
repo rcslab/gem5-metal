@@ -380,7 +380,7 @@ void EILB::add(const EILBEntry & _ent)
     }
 
     vec.push_back(std::move(ptr));
-    METAL_DBGPRINT(EILB, ADD, "*added* EILB entry [esr = 0x%x, esrMask = \"%s\", mode = 0x%x, mroutine = %d, mroutine = %u]\n", 
+    METAL_DBGPRINT(EILB, ADD, "*added* EILB entry [esr = 0x%lx, esrMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
                                                             _ent.getEsrBits(),
                                                             _ent.getEsrMask(),
                                                             static_cast<int>(_ent.getMode()),
@@ -398,7 +398,7 @@ const EILBEntry & EILB::get(const EILBEntry & ent) const
         const auto each = it->get();
         assert(each->getMode() == ent.getMode());
         if (each->match(ent)) {
-            METAL_DBGPRINT(EILB, GET, "*matched* [esr = 0x%x, mode = 0x%x] with EILB entry [esr = 0x%x, esrMask = \"%s\", mode = 0x%x, mroutine = %d, mroutine = %u]\n", 
+            METAL_DBGPRINT(EILB, GET, "*matched* [esr = 0x%x, mode = 0x%x] with EILB entry [esr = 0x%lx, esrMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
                                                         ent.getEsrBits(),
                                                         static_cast<int>(ent.getMode()),
                                                         each->getEsrBits(),

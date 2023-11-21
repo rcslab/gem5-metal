@@ -417,8 +417,10 @@ class SimpleThread : public ThreadState, public ThreadContext
     BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
 
-    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override;
-    void doInstIntercept(const StaticInstPtr inst, bool post) override;
+    bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override;
+    void doInstIntercept(const StaticInstPtr &inst, bool post) override;
+    bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const override;
+    void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) override;
     bool checkInstInterceptMasked(void) const override;
     void doneInstInterceptMasked(void) override;
 };

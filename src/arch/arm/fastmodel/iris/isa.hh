@@ -82,19 +82,6 @@ class ISA : public BaseISA
     {
         panic("setMiscReg not implemented.");
     }
-
-    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
-        panic("unimplemented!");
-    }
-    void doInstIntercept(const StaticInstPtr inst, bool post) override {
-        panic("unimplemented!");
-    }
-    bool checkInstInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-    void doneInstInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
 };
 
 } // namespace Iris

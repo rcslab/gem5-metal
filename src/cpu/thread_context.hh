@@ -245,8 +245,10 @@ class ThreadContext : public PCEventScope
     // instruction interception
     // check* functions only checks if an instruction should be intercepted
     // do*/done* functions actually perform the intercept by changing architectural states, including PC
-    virtual bool checkInstIntercept(const StaticInstPtr inst, bool post) const = 0;
-    virtual void doInstIntercept(const StaticInstPtr inst, bool post) = 0;
+    virtual bool checkInstIntercept(const StaticInstPtr &inst, bool post) const = 0;
+    virtual void doInstIntercept(const StaticInstPtr &inst, bool post) = 0;
+    virtual bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const = 0;
+    virtual void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) = 0;
     virtual bool checkInstInterceptMasked(void) const = 0;
     virtual void doneInstInterceptMasked(void) = 0;
 };

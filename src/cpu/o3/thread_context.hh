@@ -272,10 +272,16 @@ class ThreadContext : public gem5::ThreadContext
     BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
 
-    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
+    bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override {
         panic("unimplemented!");
     }
-    void doInstIntercept(const StaticInstPtr inst, bool post) override {
+    void doInstIntercept(const StaticInstPtr &inst, bool post) override {
+        panic("unimplemented!");
+    }
+    bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const override {
+        panic("unimplemented!");
+    }
+    void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) override{
         panic("unimplemented!");
     }
     bool checkInstInterceptMasked(void) const override {

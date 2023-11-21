@@ -275,7 +275,6 @@ BaseSimpleCPU::checkForInterrupts()
     SimpleExecContext&t_info = *threadInfo[curThread];
     SimpleThread* thread = t_info.thread;
     ThreadContext* tc = thread->getTC();
-    BaseISA * isa = tc->getIsaPtr();
 
     if (checkInterrupts(curThread)) {
         Fault interrupt = interrupts[curThread]->getInterrupt();
@@ -294,8 +293,8 @@ BaseSimpleCPU::checkForInterrupts()
 
             // check for interrupt intercept
             t_info.fetchOffset = 0;
-            if (isa->checkExcIntercept(interrupt, nullStaticInstPtr)) {
-                isa->doExcIntercept(interrupt, nullStaticInstPtr);
+            if (tc->checkExcIntercept(interrupt, nullStaticInstPtr)) {
+                tc->doExcIntercept(interrupt, nullStaticInstPtr);
                 advancePC(NoFault);
             } else {
                 interrupts[curThread]->updateIntrInfo();

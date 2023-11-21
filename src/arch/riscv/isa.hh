@@ -99,19 +99,6 @@ class ISA : public BaseISA
         load_reservation_addr = INVALID_RESERVATION_ADDR;
     }
 
-    bool checkInstIntercept(const StaticInstPtr inst, bool post) const override {
-        panic("unimplemented!");
-    }
-    void doInstIntercept(const StaticInstPtr inst, bool post) override {
-        panic("unimplemented!");
-    }
-    bool checkInstInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-    void doneInstInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-
   public:
     RegVal readMiscRegNoEffect(RegIndex idx) const override;
     RegVal readMiscReg(RegIndex idx) override;
