@@ -637,6 +637,33 @@ ArmFault::invoke32(ThreadContext *tc, const StaticInstPtr &inst)
     tc->pcState(pc);
 }
 
+CPSR
+ArmFault::dumpPState64(ThreadContext *tc, bool from64, bool step)
+{
+    CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
+    CPSR spsr = cpsr;
+    spsr.nz = tc->getReg(cc_reg::Nz);
+    spsr.c = tc->getReg(cc_reg::C);
+    spsr.v = tc->getReg(cc_reg::V);
+    spsr.ss = step ? 0: cpsr.ss;
+    if (from64) {
+        // Force some bitfields to 0
+        spsr.q = 0;
+        spsr.it1 = 0;
+        spsr.j = 0;
+        spsr.ge = 0;
+        spsr.it2 = 0;
+        spsr.t = 0;
+    } else {
+        spsr.ge = tc->getReg(cc_reg::Ge);
+        ITSTATE it = tc->pcState().as<PCState>().itstate();
+        spsr.it2 = it.top6;
+        spsr.it1 = it.bottom2;
+        spsr.uao = 0;
+    }
+    return spsr;
+}
+
 void
 ArmFault::invoke64(ThreadContext *tc, const StaticInstPtr &inst)
 {
@@ -664,26 +691,7 @@ ArmFault::invoke64(ThreadContext *tc, const StaticInstPtr &inst)
 
     // Save process state into SPSR_ELx
     CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
-    CPSR spsr = cpsr;
-    spsr.nz = tc->getReg(cc_reg::Nz);
-    spsr.c = tc->getReg(cc_reg::C);
-    spsr.v = tc->getReg(cc_reg::V);
-    spsr.ss = isResetSPSR() ? 0: cpsr.ss;
-    if (from64) {
-        // Force some bitfields to 0
-        spsr.q = 0;
-        spsr.it1 = 0;
-        spsr.j = 0;
-        spsr.ge = 0;
-        spsr.it2 = 0;
-        spsr.t = 0;
-    } else {
-        spsr.ge = tc->getReg(cc_reg::Ge);
-        ITSTATE it = tc->pcState().as<PCState>().itstate();
-        spsr.it2 = it.top6;
-        spsr.it1 = it.bottom2;
-        spsr.uao = 0;
-    }
+    CPSR spsr = dumpPState64(tc, from64, bStep);
     tc->setMiscReg(spsr_idx, spsr);
 
     // Save preferred return address into ELR_ELx

@@ -88,7 +88,7 @@ namespace gem5
             this->flags[IsLoad] = true;
         }
 
-        void Menter64::doMenter(ThreadContext *tc, Addr npc, Addr lpc, bool rfi)
+        void Menter64::doMenter(ThreadContext *tc, Addr npc, Addr lpc)
         {
             PCState pcState;
             set(pcState, tc->pcState());
@@ -104,16 +104,12 @@ namespace gem5
             // save link address
             tc->setMetalReg(metal_reg::MLR, lpc);
 
-            // METAL_XXX: need to copy the sp from regular bank to Metal bank for arm32
-            if (rfi) {
-                // if it's a intr-like menter, also save CPSR to MSPSR
-                tc->setMetalReg(metal_reg::MSPSR, tc->readMiscReg(MISCREG_CPSR));
-            }
+            METAL_DBGPRINT(INSTS, MENTER, "entering Metal mode: MBR = 0x%lx, npc = 0x%lx, MLR = 0x%lx.\n", tc->readMetalReg(metal_reg::MBR), npc, lpc);
         }
 
-        void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst, bool intr)
+        void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst)
         {
-            doMenter(tc, npc, tc->pcState().instAddr() + inst.instSize(), intr);
+            doMenter(tc, npc, tc->pcState().instAddr() + inst.instSize());
         }
 
         void Menter64::calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count)
@@ -150,8 +146,6 @@ namespace gem5
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
             MRLB & mrlb = isa->getMrlbPtr();
 
-            METAL_DBGPRINT(INSTS, MENTER, "entering Metal mode: MBR = 0x%lx, mroutine = %d, CPSR = 0x%lx.\n", xc->readMetalReg(metal_reg::MBR), this->imm, xc->readMiscReg(MISCREG_CPSR));
-
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
 
@@ -175,7 +169,7 @@ namespace gem5
                 if (!mrlbEnt.isValid()) {
                     return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
                 } else {
-                    doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this, false);
+                    doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
                 }
             }
 
@@ -215,7 +209,7 @@ namespace gem5
             if (!mrlbEnt.isValid()) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             } else {
-                doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this, false);
+                doMenter(xc->tcBase(), purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true), *this);
             }
 
             return NoFault;
@@ -274,8 +268,6 @@ namespace gem5
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
-            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode: MLR = 0x%lx, MSPSR = 0x%lx, flags = [rfi = %d, iim = %d]\n", ret, xc->readMetalReg(metal_reg::MSPSR), flags.rfi, flags.iim);
-
             // set new PC
             const Addr target_addr = purifyTaggedAddr(ret, xc->tcBase(), currEL(xc->tcBase()), true);
             PCState pcState;
@@ -283,9 +275,20 @@ namespace gem5
             pcState.instNPC(target_addr);
             xc->pcState(pcState);
 
+            CPSR newCpsr = 0;
+            CPSR mspsr = 0;
             if (flags.rfi) {
-                xc->setMiscReg(MISCREG_CPSR, xc->readMetalReg(metal_reg::MSPSR));
+                // restore PSTATE from MSPSR
+                mspsr = xc->readMetalReg(metal_reg::MSPSR);
+                const CPSR cpsr = xc->readMiscReg(MISCREG_CPSR);
+                newCpsr = getPSTATEFromPSR(xc->tcBase(), cpsr, mspsr);
+                // restore flags that are in separate regs
+                xc->setMiscReg(MISCREG_NZCV, newCpsr);
+                // restore other flags that are stored in CPSR
+                xc->setMiscReg(MISCREG_CPSR, newCpsr);
             }
+
+            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode: MLR = 0x%lx, flags = [rfi = %d (MSPSR = 0x%lx, NCPSR = 0x%lx), iim = %d]\n", ret, flags.rfi, mspsr, newCpsr, flags.iim);
 
             if (flags.iim) {
                 msr.im = 1;

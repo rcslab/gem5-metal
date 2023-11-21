@@ -1495,7 +1495,7 @@ ISA::doneInstInterceptMasked(void)
 }
 
 bool
-ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
+ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
 {
     metal_reg::MSR_t msr = readMetalRegNoEffect(metal_reg::MSR);
 
@@ -1511,17 +1511,11 @@ ISA::checkInstIntercept(const StaticInstPtr inst, bool post) const
     }
     ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
     assert(armInst);
-    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%lx, cpsr = 0x%lx, post = %d.\n", 
-                                            armInst->encoding(), 
-                                            inst->getName().c_str(), 
-                                            tc->pcState().instAddr(), 
-                                            tc->readMiscRegNoEffect(MISCREG_CPSR),
-                                            post);
     return true;
 }
 
 void 
-ISA::doInstIntercept(const StaticInstPtr inst, bool post)
+ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
 {
     // METAL_XXX: probably somehow should only look it up once
     const IILBEntry findEnt(inst, post);  
@@ -1537,8 +1531,13 @@ ISA::doInstIntercept(const StaticInstPtr inst, bool post)
 
     ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
     assert(armInst);
+    // reset upc in case we intercept a macro inst
+    PCState pc = tc->pcState().as<PCState>();
+    pc.uReset();
+    tc->pcState(pc);
+
     Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), 
-                post ? this->tc->pcState().instAddr() + armInst->instSize() : this->tc->pcState().instAddr(), true);
+                post ? this->tc->pcState().instAddr() + armInst->instSize() : this->tc->pcState().instAddr());
 
     // set MIRs in the new reg window
     MachInst instBits = armInst->encoding();
@@ -1546,6 +1545,23 @@ ISA::doInstIntercept(const StaticInstPtr inst, bool post)
     this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent.getMask0()));
     this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent.getMask1()));
     this->setMetalReg(metal_reg::MIR2, shiftInstMask(instBits, ent.getMask2()));
+    
+    // set MSPSR
+    CPSR spsr = ArmFault::dumpPState64(tc, true, false);
+    this->setMetalReg(metal_reg::MSPSR, spsr);
+
+    // set CPSR
+    CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
+    cpsr.il = 0; // illegal execution
+    cpsr.ss = 0; // single step
+    tc->setMiscReg(MISCREG_CPSR, cpsr);
+
+    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%lx, spsr = 0x%lx, post = %d.\n", 
+                                        armInst->encoding(), 
+                                        inst->getName().c_str(), 
+                                        pc.instAddr(), 
+                                        spsr,
+                                        post);
 }
 
 const EILBEntry & 
@@ -1560,7 +1576,7 @@ ISA::getEILBEntryFromFault(const ArmFault * armFault) const
 }
 
 bool 
-ISA::checkExcIntercept(const Fault &fault) const
+ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
 {
     metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
 
@@ -1579,25 +1595,39 @@ ISA::checkExcIntercept(const Fault &fault) const
         // must be from 64 to 64
         return false;
     }
+    
+    if (inst) {
+        auto armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+        assert(armInst);
+        // annotate the fault for correct ESR
+        armInst->annotateFault(armFault);
+    }
 
     const EILBEntry & result = getEILBEntryFromFault(armFault);
-    if (&result != &EILB::NullEntry) {
-        METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception esr = 0x%lx, mode = 0x%x at pc = 0x%lx, cpsr = 0x%lx to mroutine %d.\n", 
-                                                armFault->getSyndrome(tc), static_cast<int>(result.getMode()), 
-                                                tc->pcState().instAddr(), tc->readMiscRegNoEffect(MISCREG_CPSR), result.getMroutine());
+    if (&result != &EILB::NullEntry) { 
         return true;
     }
 
     return false;
 }
 
+// Below is how PSTATE is stored in gem5 for aarch64:
+// 
+// SPSEL (SS 21), CURRENTEL, PAN, UAO, Execution mode (M 0-3), Register Width (M 4), D/A/I/F still in CPSR
+// [NZ], [C], [V] each in a separate register
+// see https://developer.arm.com/documentation/100076/0100/Instruction-Set-Overview/Overview-of-AArch64-stateSaved-Program-Status-Registers-in-AArch64-state
 void 
-ISA::doExcInstercept(const Fault &fault)
+ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
 {
-    assert(inAArch64(tc));
-
     auto armFault = dynamic_cast<ArmFault *>(fault.get());
     assert(armFault && armFault->isUpdated() && armFault->isFrom64() && armFault->isTo64());
+
+    if (inst) {
+        auto armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+        assert(armInst);
+        // annotate the fault for correct ESR
+        armInst->annotateFault(armFault);
+    }
 
     const EILBEntry & result = getEILBEntryFromFault(armFault);
     assert(&result != &EILB::NullEntry);
@@ -1612,7 +1642,12 @@ ISA::doExcInstercept(const Fault &fault)
     const Addr curr_pc = tc->pcState().instAddr();
     const Addr ret_addr = curr_pc + armFault->armPcElrOffset();
 
-    Menter64::doMenter(tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), ret_addr, true);
+    // reset upc in case we intercept a macro inst
+    PCState pc = tc->pcState().as<PCState>();
+    pc.uReset();
+    tc->pcState(pc);
+
+    Menter64::doMenter(tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), ret_addr);
 
     // set registers in the current window
     // MER0 = Fault PC
@@ -1626,6 +1661,23 @@ ISA::doExcInstercept(const Fault &fault)
     if (armFault->getFaultVAddr(fvaddr)) {
         this->setMetalReg(metal_reg::MER2, fvaddr);
     }
+
+    // write MSPSR
+    CPSR spsr = ArmFault::dumpPState64(tc, armFault->isFrom64(), armFault->isResetSPSR());
+    this->setMetalReg(metal_reg::MSPSR, spsr);
+
+    // set CPSR for exceptions
+    CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
+    cpsr.daif = 0b1111; // mask interrupts and exceptions
+    cpsr.il = 0; // illegal execution
+    cpsr.ss = 0; // single step
+    cpsr.pan = 0; // privileged access never
+    cpsr.uao = 0; // user access override
+    tc->setMiscReg(MISCREG_CPSR, cpsr);
+
+    METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception esr = 0x%lx, mode = 0x%x at pc = 0x%lx, spsr = 0x%lx to mroutine %d.\n", 
+                                        armFault->getSyndrome(tc), static_cast<int>(result.getMode()), 
+                                        tc->pcState().instAddr(), spsr, result.getMroutine());
 }
 
 RegVal

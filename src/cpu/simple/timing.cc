@@ -753,11 +753,20 @@ void
 TimingSimpleCPU::advanceInst(const Fault &fault)
 {
     SimpleExecContext &t_info = *threadInfo[curThread];
+    SimpleThread * thread = t_info.thread;
+    BaseISA * isa = thread->getIsaPtr();
 
     if (_status == Faulting)
         return;
 
+    bool faultOverride = false;
     if (fault != NoFault) {
+        if (isa->checkExcIntercept(fault, curStaticInst)) {
+            isa->doExcIntercept(fault, curStaticInst);
+            faultOverride = true;
+            goto end;
+        }
+
         // hardware transactional memory
         // If a fault occurred within a transaction
         // ensure that the transaction aborts
@@ -796,10 +805,24 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
         }
 
         return;
+    } else {
+        // check intercept when we don't have a sync exception
+        if (curStaticInst) {
+            bool checkIntercept = true;
+            if (curMacroStaticInst) {
+                // skip microops
+                checkIntercept = curStaticInst->isLastMicroop();
+            }
+
+            if (checkIntercept && isa->checkInstIntercept(curStaticInst, true)) {
+                isa->doInstIntercept(curStaticInst, true);
+            }
+        }
     }
 
+end:
     if (!t_info.stayAtPC)
-        advancePC(fault);
+        advancePC(faultOverride ? NoFault : fault);
 
     if (tryCompleteDrain())
         return;
@@ -819,6 +842,7 @@ void
 TimingSimpleCPU::completeIfetch(PacketPtr pkt)
 {
     SimpleExecContext& t_info = *threadInfo[curThread];
+    SimpleThread * thread = t_info.thread;
 
     DPRINTF(SimpleCPU, "Complete ICache Fetch for addr %#x\n", pkt ?
             pkt->getAddr() : 0);
@@ -840,10 +864,26 @@ TimingSimpleCPU::completeIfetch(PacketPtr pkt)
 
     preExecute();
 
-    if (this->isInstPreIntercepted) {
-        this->isInstPreIntercepted = false;
-        advanceInst(NoFault);
-        goto cleanup;
+    if (curStaticInst) {
+        if (thread->checkInstInterceptMasked()) {
+            thread->doneInstInterceptMasked();
+        } else {
+            bool checkInstIntercept = true;
+            const StaticInstPtr * ptr = &curStaticInst;
+            if (curMacroStaticInst) {
+                // for macro instructions
+                // skip intercepting microops except when the first microop is loaded
+                assert(curStaticInst->isMicroop());
+                checkInstIntercept = curStaticInst->isFirstMicroop();
+                ptr = &curMacroStaticInst;
+            }
+
+            if (checkInstIntercept && thread->checkInstIntercept(*ptr, false)) {
+                thread->doInstIntercept(*ptr, false);
+                advanceInst(NoFault);
+                goto cleanup;
+            }
+        }
     }
 
     // hardware transactional memory

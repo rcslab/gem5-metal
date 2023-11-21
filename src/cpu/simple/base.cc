@@ -85,8 +85,7 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
       curThread(0),
       branchPred(p.branchPred),
       traceData(NULL),
-      _status(Idle),
-      isInstPreIntercepted(false)
+      _status(Idle)
 {
     SimpleThread *thread;
 
@@ -276,6 +275,7 @@ BaseSimpleCPU::checkForInterrupts()
     SimpleExecContext&t_info = *threadInfo[curThread];
     SimpleThread* thread = t_info.thread;
     ThreadContext* tc = thread->getTC();
+    BaseISA * isa = tc->getIsaPtr();
 
     if (checkInterrupts(curThread)) {
         Fault interrupt = interrupts[curThread]->getInterrupt();
@@ -292,9 +292,14 @@ BaseSimpleCPU::checkForInterrupts()
                 return;
             }
 
+            // check for interrupt intercept
             t_info.fetchOffset = 0;
-            interrupts[curThread]->updateIntrInfo();
-            interrupt->invoke(tc);
+            if (isa->checkExcIntercept(interrupt, nullStaticInstPtr)) {
+                isa->doExcIntercept(interrupt, nullStaticInstPtr);
+            } else {
+                interrupts[curThread]->updateIntrInfo();
+                interrupt->invoke(tc);
+            }
             thread->decoder->reset();
         }
     }
@@ -367,17 +372,6 @@ BaseSimpleCPU::preExecute()
             t_info.fetchOffset += decoder->moreBytesSize();
         }
 
-        if (instPtr) {
-            if (thread->checkInstInterceptMasked()) {
-                thread->doneInstInterceptMasked();
-                this->isInstPreIntercepted = false;
-            } else if  (thread->checkInstIntercept(instPtr, false)) {
-                thread->doInstIntercept(instPtr, false);
-                this->isInstPreIntercepted = true;
-                goto end;
-            }
-        }
-
         //If we decoded an instruction and it's microcoded, start pulling
         //out micro ops
         if (instPtr && instPtr->isMacroop()) {
@@ -413,7 +407,7 @@ BaseSimpleCPU::preExecute()
         if (predict_taken)
             ++t_info.execContextStats.numPredictedBranches;
     }
-end:
+
     // increment the fetch instruction stat counters
     if (curStaticInst) {
         countFetchInst();
@@ -424,7 +418,6 @@ void
 BaseSimpleCPU::postExecute()
 {
     SimpleExecContext &t_info = *threadInfo[curThread];
-    SimpleThread * thread = t_info.thread;
 
     assert(curStaticInst);
 
@@ -505,14 +498,6 @@ BaseSimpleCPU::postExecute()
 
     // Call CPU instruction commit probes
     probeInstCommit(curStaticInst, instAddr);
-
-    if (!isRomMicroPC(thread->pcState().microPC()) && !curMacroStaticInst &&
-         thread->checkInstIntercept(curStaticInst, true)) {
-            // don't post intercept macro ops
-            thread->doInstIntercept(curStaticInst, true);
-            // this flag is currently unused in TimingCPU, but might be useful for other CPUs
-            this->isInstPostIntercepted = true;
-    }
 }
 
 void
@@ -526,13 +511,8 @@ BaseSimpleCPU::advancePC(const Fault &fault)
     //Since we're moving to a new pc, zero out the offset
     t_info.fetchOffset = 0;
     if (fault != NoFault) {
-        BaseISA * isa = thread->getIsaPtr();
         curMacroStaticInst = nullStaticInstPtr;
-        if (isa->checkExcIntercept(fault)) {
-            isa->doExcInstercept(fault);
-        } else {
-            fault->invoke(threadContexts[curThread], curStaticInst);
-        }
+        fault->invoke(threadContexts[curThread], curStaticInst);
         thread->decoder->reset();
     } else {
         if (curStaticInst) {

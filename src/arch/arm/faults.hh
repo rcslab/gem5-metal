@@ -235,6 +235,7 @@ class ArmFault : public FaultBase
     bool isUpdated() const { return faultUpdated; }
     bool isFrom64() const { return from64; }
     bool isTo64() const { return to64; }
+    static CPSR dumpPState64(ThreadContext *tc, bool from64, bool step);
 
     bool vectorCatch(ThreadContext *tc, const StaticInstPtr &inst);
 
