@@ -261,8 +261,8 @@ namespace gem5
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
-            static void doMenter(ThreadContext *xc, Addr npc, Addr lpc, bool intr);
-            static void doMenter(ThreadContext *xc, Addr npc, const ArmStaticInst &inst, bool intr);
+            static void doMenter(ThreadContext *xc, Addr npc, Addr lpc);
+            static void doMenter(ThreadContext *xc, Addr npc, const ArmStaticInst &inst);
         private:
             static void calcLoadAddr(Addr base, unsigned long align, unsigned int idx, Addr & _loadAddr, unsigned int & _count);
         };

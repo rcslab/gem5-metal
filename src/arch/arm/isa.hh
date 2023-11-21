@@ -174,6 +174,7 @@ public:
         BitUnion32(ExcInterceptCtrl)
             Bitfield<7, 0> mroutine;
             Bitfield<9, 8> mode;
+            Bitfield<10> im;
             Bitfield<31> valid;
         EndBitUnion(ExcInterceptCtrl)
 
@@ -307,10 +308,10 @@ public:
         void loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size);
         void loadExcInterceptTable(void * rawMem, Addr memAddr, size_t size);
 
-        bool checkExcIntercept(const Fault &fault) const override;
-        void doExcInstercept(const Fault &fault) override;
-        bool checkInstIntercept(const StaticInstPtr inst, bool post) const override;
-        void doInstIntercept(const StaticInstPtr inst, bool post) override;
+        bool checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const override;
+        void doExcIntercept(const Fault &fault, const StaticInstPtr &nst) override;
+        bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override;
+        void doInstIntercept(const StaticInstPtr &inst, bool post) override;
         bool checkInstInterceptMasked(void) const override;
         void doneInstInterceptMasked(void) override;
 

@@ -122,9 +122,6 @@ class BaseSimpleCPU : public BaseCPU
 
     Status _status;
 
-    bool isInstPreIntercepted;
-    bool isInstPostIntercepted;
-
     /**
      * Handler used when encountering a fault; its purpose is to
      * tear down the InstRecord. If a fault is meant to be traced,
