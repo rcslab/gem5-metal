@@ -296,6 +296,7 @@ BaseSimpleCPU::checkForInterrupts()
             t_info.fetchOffset = 0;
             if (isa->checkExcIntercept(interrupt, nullStaticInstPtr)) {
                 isa->doExcIntercept(interrupt, nullStaticInstPtr);
+                advancePC(NoFault);
             } else {
                 interrupts[curThread]->updateIntrInfo();
                 interrupt->invoke(tc);
