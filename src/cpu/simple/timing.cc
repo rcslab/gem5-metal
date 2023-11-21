@@ -759,11 +759,11 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
     if (_status == Faulting)
         return;
 
-    bool faultOverride = false;
+    Fault overrideFault = fault;
     if (fault != NoFault) {
         if (isa->checkExcIntercept(fault, curStaticInst)) {
             isa->doExcIntercept(fault, curStaticInst);
-            faultOverride = true;
+            overrideFault = NoFault;
             goto end;
         }
 
@@ -822,7 +822,7 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
 
 end:
     if (!t_info.stayAtPC)
-        advancePC(faultOverride ? NoFault : fault);
+        advancePC(overrideFault);
 
     if (tryCompleteDrain())
         return;
