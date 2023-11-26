@@ -228,7 +228,7 @@ namespace gem5
                     &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
             }
 
-            std::string generateDisassembly(
+            virtual std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
@@ -239,16 +239,22 @@ namespace gem5
             RegIndex rl;
             RegIndex rm;
             RegIndex rn;
-
+            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
+            RegId destRegIdxArr[MAX_METAL_OPERANDS];
         public:
             MetalRegOp3(const char *mnem, ExtMachInst _machInst,
                 OpClass __opClass, RegIndex _rl, RegIndex _rm, RegIndex _rn)
                 : MetalStaticInst(mnem, _machInst, __opClass), rl(_rl),
                 rm(_rm), rn(_rn)
             {
+                setRegIdxArrays(
+                reinterpret_cast<RegIdArrayPtr>(
+                    &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+                reinterpret_cast<RegIdArrayPtr>(
+                    &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
             }
 
-            std::string generateDisassembly(
+            virtual std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
@@ -411,6 +417,100 @@ namespace gem5
             Wmr64_u(ExtMachInst _machInst, OpClass __opClass, RegIndex mReg, RegIndex gReg);
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
+
+        class MetalPMemRegOp : public MetalRegOp3
+        {
+        public:
+            MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) : 
+                MetalRegOp3(mnem, _machInst, __opClass, _dReg, _bReg, _oReg)
+            {
+            }
+
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        class MetalPMemRegImmOp : public MetalRegOp2
+        {
+        public:
+            enum class Mode {
+                NORMAL,
+                PREINDEX,
+                POSTINDEX
+            };
+        protected:
+            int32_t imm;
+            Mode mode;
+        public:
+            MetalPMemRegImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg, int32_t _imm, Mode _mode) : 
+                MetalRegOp2(mnem, _machInst, __opClass, _mReg, _gReg), imm(_imm), mode(_mode)
+            {
+            }
+
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        template <typename T>
+        class Pldri : public MetalPMemRegImmOp
+        {
+            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)) && (sizeof(T) > 0));
+        public:
+            Pldri(ExtMachInst _machInst, RegIndex _dReg, RegIndex _sReg, int32_t _imm, Mode _mode);
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        template class Pldri<uint8_t>;
+        template class Pldri<uint16_t>;
+        template class Pldri<uint32_t>;
+        template class Pldri<uint64_t>;
+
+        template <typename T>
+        class Pstri : public MetalPMemRegImmOp
+        {
+            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)) && (sizeof(T) > 0));
+        public:
+            Pstri(ExtMachInst _machInst, RegIndex _dReg, RegIndex _sReg, int32_t _imm, Mode _mode);
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        template class Pstri<uint8_t>;
+        template class Pstri<uint16_t>;
+        template class Pstri<uint32_t>;
+        template class Pstri<uint64_t>;
+
+        template <typename T>
+        class Pldrr : public MetalPMemRegOp
+        {
+            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)) && (sizeof(T) > 0));
+        public:
+            Pldrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg);
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        template class Pldrr<uint8_t>;
+        template class Pldrr<uint16_t>;
+        template class Pldrr<uint32_t>;
+        template class Pldrr<uint64_t>;
+
+        template <typename T>
+        class Pstrr : public MetalPMemRegOp
+        {
+            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)) && (sizeof(T) > 0));
+        public:
+            Pstrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg);
+            Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+        template class Pstrr<uint8_t>;
+        template class Pstrr<uint16_t>;
+        template class Pstrr<uint32_t>;
+        template class Pstrr<uint64_t>;
+
     } // namespace ArmISA
 } // namespace gem5
 

@@ -999,7 +999,7 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
 
     Fault fault = NoFault;
     // If guest MMU is off or hcr.vm=0 go straight to stage2
-    if ((state.isStage2 && !vm) || (!state.isStage2 && !state.sctlr.m)) {
+    if ((state.isStage2 && !vm) || (!state.isStage2 && !state.sctlr.m) || (flags & BypassMMU)) {
         fault = translateMmuOff(tc, req, mode, tran_type, vaddr,
                                 long_desc_format, state);
     } else {

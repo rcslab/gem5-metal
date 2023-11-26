@@ -103,7 +103,7 @@ Decoder::process()
                           bits(data, 20) == 0);
         }
         consumeBytes(4);
-        DPRINTF(Decoder, "Arm inst: %#x.\n", (uint64_t)emi);
+        DPRINTF(Decoder, "Arm inst: %#x raw: %#x.\n", (uint64_t)emi, emi.instBits);
     } else {
         uint16_t word = (data >> (offset * 8));
         if (bigThumb) {

@@ -108,7 +108,9 @@ class MMU : public BaseMMU
 
         AllowUnaligned = 0x8,
         // Priv code operating as if it wasn't
-        UserMode = 0x10
+        UserMode = 0x10,
+        // directly accesses physical address
+        BypassMMU = 0x20
     };
 
     enum ArmTranslationType

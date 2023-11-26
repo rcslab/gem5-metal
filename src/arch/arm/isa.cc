@@ -1780,19 +1780,22 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             metal_reg::MSR_t new_val = val;
             metal_reg::MSR_t msr = readMetalRegNoEffect(idx);
             if (msr.init != new_val.init) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.init: %d -> %d.\n", msr.init, new_val.init);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[init]: %d -> %d.\n", msr.init, new_val.init);
             }
             if (msr.lv != new_val.lv) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.level: %d -> %d.\n", msr.lv, new_val.lv);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[level]: %d -> %d.\n", msr.lv, new_val.lv);
             }
             if (msr.ii != new_val.ii) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction intercept:  %d -> %d.\n", msr.ii, new_val.ii);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[instruction intercept]:  %d -> %d.\n", msr.ii, new_val.ii);
             }
             if (msr.im != new_val.im) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.instruction intercept masking:  %d -> %d.\n", msr.im, new_val.im);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[instruction intercept masking]:  %d -> %d.\n", msr.im, new_val.im);
             }
             if (msr.ei != new_val.ei) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.exception intercept:  %d -> %d.\n", msr.ei, new_val.ei);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[exception intercept]:  %d -> %d.\n", msr.ei, new_val.ei);
+            }
+            if (msr.pd != new_val.pd) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[privilege disable]:  %d -> %d.\n", msr.pd, new_val.pd);
             }
             break;
         }
