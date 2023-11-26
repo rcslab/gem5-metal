@@ -22,6 +22,7 @@ namespace metal_reg
         Bitfield<62> ii; // instruction intercept enable
         Bitfield<61> im; // instruction intercept mask
         Bitfield<60> ei; // exc intercept enable
+        Bitfield<59> pd; // privilege check disable
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
@@ -150,8 +151,17 @@ namespace metal_reg
         return static_cast<bool>(msr.ei);
     }
 
+    static inline bool isPrivilegeCheckDisabled(MSR_t msr)
+    {
+        return static_cast<bool>(msr.pd);
+    }
+
     static inline bool canWriteMetalReg(MSR_t msr, RegIndex mreg)
     {
+        if (isPrivilegeCheckDisabled(msr)) {
+            return true;
+        }
+
         if (mreg >= NumRegs) {
             // access beyond the number of parameters
             return false;
@@ -168,6 +178,10 @@ namespace metal_reg
 
     static inline bool canReadMetalReg(MSR_t msr, RegIndex mreg)
     {
+        if (isPrivilegeCheckDisabled(msr)) {
+            return true;
+        }
+
         if (mreg >= NumRegs) {
             // access beyond the number of parameters
             return false;

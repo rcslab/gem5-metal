@@ -1526,7 +1526,105 @@ namespace Aarch64
                     return new Unknown64(machInst);
                 }
             } else if (bits(machInst, 31)) {
-                return new Unknown64(machInst);
+                // 0-21:
+                //     IMM:
+                //         0-4: reg1
+                //         5-9: reg2
+                //         10-19: signed imm (-512 - 511)
+                //         20-21: mode: normal = 00, preidx = 01, postidx=10
+                //     Reg:
+                //         0-4: reg1
+                //         5-9: reg2
+                //         10-14: reg3
+                //         17-21: res0
+                //
+                // 22: load 0 / store 1
+                // 23-24: size (00 = 8, 01 = 16, 10 = 32, 11 = 64)
+                // 25: 0
+                // 26: 1
+                // 27: 1
+                // 28-29: 00
+                // 30: Reg 0 vs Imm 1
+                // 31: 1
+                // 
+                //
+                // bit 31 - 28 = 1x00
+                // bit 27, 25 = 10
+                // bit 26 = 1
+
+                const uint8_t isImm = bits(machInst, 30);
+                const uint8_t isStore = bits(machInst, 22);
+                const uint8_t rmode = bits(machInst, 21, 20);
+                const uint8_t size = bits(machInst, 24, 23);
+                const uint8_t reg1 = bits(machInst, 4, 0);
+                const uint8_t reg2 = bits(machInst, 9, 5);
+
+                if (rmode > 3) {
+                    return new Unknown64(machInst);
+                }
+
+                const MetalPMemRegImmOp::Mode mode =  static_cast<MetalPMemRegImmOp::Mode>(rmode);
+
+                if (isImm) {
+                    const int32_t imm = sext<10>(bits(machInst, 19, 10));
+                    if (!isStore) {
+                      switch (size) {
+                        case 0b00:
+                          return new Pldri<uint8_t>(machInst,reg1, reg2, imm, mode);
+                        case 0b01:
+                          return new Pldri<uint16_t>(machInst,reg1, reg2, imm, mode);
+                        case 0b10:
+                          return new Pldri<uint32_t>(machInst,reg1, reg2, imm, mode);
+                        case 0b11:
+                          return new Pldri<uint64_t>(machInst,reg1, reg2, imm, mode);
+                        default:
+                          GEM5_UNREACHABLE;
+                      }
+                    } else {
+                      switch (size) {
+                        case 0b00:
+                          return new Pstri<uint8_t>(machInst,reg1, reg2, imm, mode);
+                        case 0b01:
+                          return new Pstri<uint16_t>(machInst,reg1, reg2, imm, mode);
+                        case 0b10:
+                          return new Pstri<uint32_t>(machInst,reg1, reg2, imm, mode);
+                        case 0b11:
+                          return new Pstri<uint64_t>(machInst,reg1, reg2, imm, mode);
+                        default:
+                          GEM5_UNREACHABLE;
+                      }
+                    }
+                } else {
+                    const uint8_t reg3 = bits(machInst, 14, 10);
+                    if (!isStore) {
+                      switch (size) {
+                        case 0b00:
+                          return new Pldrr<uint8_t>(machInst,reg1, reg2, reg3);
+                        case 0b01:
+                          return new Pldrr<uint16_t>(machInst,reg1, reg2, reg3);
+                        case 0b10:
+                          return new Pldrr<uint32_t>(machInst,reg1, reg2, reg3);
+                        case 0b11:
+                          return new Pldrr<uint64_t>(machInst,reg1, reg2, reg3);
+                        default:
+                          GEM5_UNREACHABLE;
+                      }     
+                    } else {
+                      switch (size) {
+                        case 0b00:
+                          return new Pstrr<uint8_t>(machInst,reg1, reg2, reg3);
+                        case 0b01:
+                          return new Pstrr<uint16_t>(machInst,reg1, reg2, reg3);
+                        case 0b10:
+                          return new Pstrr<uint32_t>(machInst,reg1, reg2, reg3);
+                        case 0b11:
+                          return new Pstrr<uint64_t>(machInst,reg1, reg2, reg3);
+                        default:
+                          GEM5_UNREACHABLE;
+                      }
+                    }
+                }
+                GEM5_UNREACHABLE;
             } else {
                 return decodeNeonMem(machInst);
             }

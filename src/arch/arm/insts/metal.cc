@@ -77,6 +77,49 @@ namespace gem5
             return ss.str();
         }
 
+        std::string MetalPMemRegOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printIntReg(ss, rl);
+            ccprintf(ss, ", [");
+            printIntReg(ss, rm);
+            ccprintf(ss, ", ");
+            printIntReg(ss, rn);
+            ccprintf(ss, "]");
+            return ss.str();
+        }
+
+        std::string MetalPMemRegImmOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printIntReg(ss, mReg);
+            ccprintf(ss, ", ");
+            switch(mode) {
+                case Mode::NORMAL:
+                case Mode::PREINDEX:
+                    ccprintf(ss, "[");
+                    printIntReg(ss, gReg);
+                    ccprintf(ss, ", ");
+                    ccprintf(ss, "#%#x]", imm);
+                    if (mode == Mode::PREINDEX) {
+                        ccprintf(ss, "!");
+                    }
+                    break;
+                case Mode::POSTINDEX:
+                    ccprintf(ss, "[");
+                    printIntReg(ss, gReg);
+                    ccprintf(ss, "], #%#x", imm);
+                    break;
+                default:
+                    panic("Unknown Metal PMem mode: %d", static_cast<int>(this->mode));
+            }
+            return ss.str();
+        }
+
         // menter
         Menter64::Menter64(ExtMachInst _machInst, uint8_t _imm) : MetalImmOp8("menter", _machInst, IntAluOp, _imm)
         {
@@ -438,8 +481,10 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, RPR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg)
-                || idx >= int_reg::NumArchRegs || !metal_reg::isInMetalMode(msr)) {
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) 
+                || !metal_reg::canReadMetalReg(msr, this->mReg)
+                || idx >= int_reg::NumArchRegs 
+                || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) ) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
@@ -468,8 +513,10 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, WPR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) || !metal_reg::canReadMetalReg(msr, this->mReg)
-                || idx >= int_reg::NumArchRegs || !metal_reg::isInMetalMode(msr)) {
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg) 
+                || !metal_reg::canReadMetalReg(msr, this->mReg)
+                || idx >= int_reg::NumArchRegs 
+                || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr))) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
 
@@ -497,7 +544,8 @@ namespace gem5
 
             if (!metal_reg::canWriteMetalReg(msr, rl)
                 || !metal_reg::canWriteMetalReg(msr, rm)
-                || !metal_reg::canReadMetalReg(msr, rn))
+                || !metal_reg::canReadMetalReg(msr, rn)
+                || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)))
             {
                 return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
@@ -607,7 +655,8 @@ namespace gem5
 
             if (!metal_reg::canReadMetalReg(msr, rl)
                 || !metal_reg::canReadMetalReg(msr, rm)
-                || !metal_reg::canReadMetalReg(msr, rn))
+                || !metal_reg::canReadMetalReg(msr, rn)
+                || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) )
             {
                 return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
@@ -886,6 +935,287 @@ namespace gem5
             }
 
             return fault;
+        }
+
+        // pldri
+        template <typename T>
+        Pldri<T>::Pldri(ExtMachInst _machInst, RegIndex _dReg, RegIndex _sReg, int32_t _imm, Mode _mode) :
+            MetalPMemRegImmOp("pldr", _machInst, MemReadOp, _dReg, _sReg, _imm, _mode)
+        {
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_sReg]);
+            setDestRegIdx(_numDestRegs++, intRegClass[_dReg]);
+            setDestRegIdx(_numDestRegs++, intRegClass[_sReg]);
+            _numTypedDestRegs[intRegClass.type()] += 2;
+
+            this->flags[IsInteger] = true;
+            this->flags[IsLoad] = true;
+        }
+
+        template <typename T>
+        Fault Pldri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            Addr base = xc->getRegOperand(this, 0);
+
+            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n", 
+                    mReg, gReg, imm, 
+                    static_cast<int>(mode) , 
+                    sizeof(T));
+
+            if (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) {
+                // only available in Metal mode
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+
+            switch (mode) {
+                case Mode::PREINDEX:
+                    base = base + imm;
+                    xc->setRegOperand(this, 1, base);
+                    break;
+                case Mode::NORMAL:
+                    base = base + imm;
+                    break;
+                default:
+                    break;
+            }
+
+            Fault fault = NoFault;
+
+            fault = initiateMemRead(xc, base, sizeof(T), ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
+
+            return fault;
+        }
+
+        template <typename T>
+        Fault Pldri<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) 
+                    || metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
+            
+            if (pkt->isError()) {
+                panic("Data fetch failed.");
+            }
+
+            T mem;
+            if (isBigEndian64(xc->tcBase())) {
+                getMem<ByteOrder::big, T>(pkt, mem, traceData);
+            } else {
+                getMem<ByteOrder::little, T>(pkt, mem, traceData);
+            }
+
+            xc->setRegOperand(this, 0, static_cast<RegVal>(mem));
+            
+            if (mode == Mode::POSTINDEX) {
+                xc->setRegOperand(this, 1, xc->getRegOperand(this, 0) + imm);
+            }
+
+            return NoFault;
+        }
+
+        template <typename T>
+        Fault Pldri<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            panic("unimplemented.");   
+        }
+
+        // pstri
+        template <typename T>
+        Pstri<T>::Pstri(ExtMachInst _machInst, RegIndex _sReg, RegIndex _aReg, int32_t _imm, Mode _mode) :
+            MetalPMemRegImmOp("pstr", _machInst, MemWriteOp, _sReg, _aReg, _imm, _mode)
+        {
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_sReg]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_aReg]);
+            setDestRegIdx(_numDestRegs++,intRegClass[_aReg]);
+            _numTypedDestRegs[intRegClass.type()]++;
+
+            this->flags[IsInteger] = true;
+            this->flags[IsStore] = true;
+        }
+
+        template <typename T>
+        Fault Pstri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+
+            METAL_DBGPRINT(INSTS, PSTRI, "sReg = %u, aReg = %u, imm = %d, mode = %#x, size = %u.\n", 
+                    mReg, gReg, imm, 
+                    static_cast<int>(mode) , 
+                    sizeof(T));
+
+            if (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) {
+                // only available in Metal mode
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+            
+            Addr base = xc->getRegOperand(this, 1);
+
+            switch (mode) {
+                case Mode::PREINDEX:
+                    base = base + imm;
+                    xc->setRegOperand(this, 0, base);
+                    break;
+                case Mode::NORMAL:
+                    base = base + imm;
+                    break;
+                default:
+                    break;
+            }
+
+            Fault fault = NoFault;
+
+            T mem = static_cast<T>(xc->getRegOperand(this, 0));
+
+            if (isBigEndian64(xc->tcBase())) {
+                fault = writeMemTimingBE(xc, traceData, mem, base, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU, nullptr);
+            } else {
+                fault = writeMemTimingLE(xc, traceData, mem, base, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU, nullptr);
+            }
+
+            return fault;
+        }
+
+        template <typename T>
+        Fault Pstri<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) 
+                || metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
+            
+            if (pkt->isError()) {
+                panic("Data write failed.");
+            }
+
+            return NoFault;
+        }
+
+        template <typename T>
+        Fault Pstri<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            panic("unimplemented.");   
+        }
+
+
+        // pldrr
+        template <typename T>
+        Pldrr<T>::Pldrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
+            MetalPMemRegOp("pldr", _machInst, MemReadOp, _dReg, _bReg, _oReg)
+        {
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_bReg]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_oReg]);
+            setDestRegIdx(_numDestRegs++, intRegClass[_dReg]);
+            _numTypedDestRegs[intRegClass.type()]++;
+
+            this->flags[IsInteger] = true;
+            this->flags[IsLoad] = true;
+        }
+
+        template <typename T>
+        Fault Pldrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            const Addr addr = xc->getRegOperand(this, 0) + xc->getRegOperand(this, 1);
+
+            METAL_DBGPRINT(INSTS, PLDRR, "dReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n", 
+                    rl, rm, rn, addr,
+                    sizeof(T));
+
+            if (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) {
+                // only available in Metal mode
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+
+
+            Fault fault = initiateMemRead(xc, addr, sizeof(T), ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
+
+            return fault;
+        }
+
+        template <typename T>
+        Fault Pldrr<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) || 
+                metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
+            
+            if (pkt->isError()) {
+                panic("Data fetch failed.");
+            }
+
+            T mem;
+            if (isBigEndian64(xc->tcBase())) {
+                getMem<ByteOrder::big, T>(pkt, mem, traceData);
+            } else {
+                getMem<ByteOrder::little, T>(pkt, mem, traceData);
+            }
+
+            xc->setRegOperand(this, 0, static_cast<RegVal>(mem));
+
+            return NoFault;
+        }
+
+        template <typename T>
+        Fault Pldrr<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            panic("unimplemented.");   
+        }
+
+
+        // pstrr
+        template <typename T>
+        Pstrr<T>::Pstrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
+            MetalPMemRegOp("pstr", _machInst, MemWriteOp, _dReg, _bReg, _oReg)
+        {
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_dReg]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_bReg]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_oReg]);
+
+            this->flags[IsInteger] = true;
+            this->flags[IsStore] = true;
+        }
+
+        template <typename T>
+        Fault Pstrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            const Addr addr = xc->getRegOperand(this, 1) + xc->getRegOperand(this, 2);
+
+            METAL_DBGPRINT(INSTS, PSTRR, "sReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n", 
+                    rl, rm, rn, addr,
+                    sizeof(T));
+
+            if (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) {
+                // only available in Metal mode
+                return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
+            }
+
+            Fault fault = NoFault;
+
+            T mem = static_cast<T>(xc->getRegOperand(this, 0));
+
+            if (isBigEndian64(xc->tcBase())) {
+                fault = writeMemTimingBE(xc, traceData, mem, addr, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU, nullptr);
+            } else {
+                fault = writeMemTimingLE(xc, traceData, mem, addr, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU, nullptr);
+            }
+
+            return fault;
+        }
+
+        template <typename T>
+        Fault Pstrr<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) || 
+                    metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
+            
+            if (pkt->isError()) {
+                panic("Data fetch failed.");
+            }
+
+            return NoFault;
+        }
+
+        template <typename T>
+        Fault Pstrr<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            panic("unimplemented.");   
         }
     } // namespace ArmISA
 } // namespace gem5
