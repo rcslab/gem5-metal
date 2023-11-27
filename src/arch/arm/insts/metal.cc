@@ -477,7 +477,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
             RegVal idx = xc->readMetalReg(this->mReg);
-            ISA * isa = reinterpret_cast<ISA *>(xc->tcBase()->getIsaPtr());
+            ISA * isa = static_cast<ISA *>(xc->tcBase()->getIsaPtr());
 
             METAL_DBGPRINT(INSTS, RPR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
@@ -509,7 +509,7 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
             RegVal idx = xc->readMetalReg(this->mReg);
-            ISA * isa = reinterpret_cast<ISA *>(xc->tcBase()->getIsaPtr());
+            ISA * isa = static_cast<ISA *>(xc->tcBase()->getIsaPtr());
 
             METAL_DBGPRINT(INSTS, WPR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
