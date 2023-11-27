@@ -99,11 +99,21 @@ class TlbTestInterface
                             enums::ArmLookupLevel lookup_level) = 0;
 };
 
+class AccessTable {
+  private:
+    RegIndex reg;
+    int size;
+    TLB *tlb;
+  public:
+    AccessTable(RegIndex _reg, TLB *_tlb);
+    AccessEntry get(int idx);
+};
+
 class TLB : public BaseTLB
 {
   protected:
     TlbEntry* table;
-    AccessEntry* accessTable;
+    AccessTable accessTable;
 
     /** TLB Size */
     int size;
@@ -185,8 +195,6 @@ class TLB : public BaseTLB
     void takeOverFrom(BaseTLB *otlb) override;
 
     void setTableWalker(TableWalker *table_walker);
-
-    AccessEntry *getAccessEntry(int idx) { return (idx >= 0 && idx < size) ? &accessTable[idx] : nullptr; }
 
     TableWalker *getTableWalker() { return tableWalker; }
 
