@@ -44,6 +44,7 @@
 #include <string>
 #include <vector>
 
+#include "arch/arm/regs/metal.hh"
 #include "arch/arm/table_walker.hh"
 #include "arch/arm/tlbi_op.hh"
 #include "arch/arm/utility.hh"
@@ -58,9 +59,21 @@ namespace gem5
 
 using namespace ArmISA;
 
+AccessTable::AccessTable(RegIndex _reg, TLB *_tlb) : reg{_reg}, tlb{_tlb}, size{16} {}
+
+AccessEntry AccessTable::get(int idx) {
+    assert(idx >= 0 && idx < size);
+    // XXX fix register read
+    RegVal v = this->tlb->getTableWalker()->currState->tc->readMetalReg(this->reg);
+    uint8_t ap = (v >> (idx*4)) & 0b111;
+    bool nx = (v >> (idx*4+3)) & 0b1;
+    AccessEntry ae{ap, 0, nx, false};
+    return ae;
+}
+
 TLB::TLB(const ArmTLBParams &p)
     : BaseTLB(p), table(new TlbEntry[p.size]),
-      accessTable(new AccessEntry[p.size]), size(p.size),
+      accessTable(metal_reg::MTP, this), size(p.size),
       isStage2(p.is_stage2),
       _walkCache(false),
       tableWalker(nullptr),
@@ -138,8 +151,11 @@ TLB::getEntry(Addr vaddr)
         }
 
         // sync access permissions
-        const AccessEntry& ae = accessTable[table[idx].access];
-        table[idx].syncAP(ae);
+        if (table[idx].attrOverride) {
+            const AccessEntry& ae = accessTable.get(table[idx].access);
+            table[idx].syncAP(ae);
+        }
+
         return &table[idx];
     }
 
@@ -190,13 +206,17 @@ TLB::match(const Lookup &lookup_data)
             table[0] = tmp_entry;
 
             // sync access permissions
-            const AccessEntry& ae = accessTable[table[0].access];
-            table[0].syncAP(ae);
+            if (table[0].attrOverride) {
+                const AccessEntry& ae = accessTable.get(table[0].access);
+                table[0].syncAP(ae);
+            }
             return &table[0];
         } else {
             // sync access permissions
-            const AccessEntry& ae = accessTable[table[idx].access];
-            table[idx].syncAP(ae);
+            if (table[idx].attrOverride) {
+                const AccessEntry& ae = accessTable.get(table[idx].access);
+                table[idx].syncAP(ae);
+            }
             return &table[idx];
         }
     }
@@ -304,19 +324,15 @@ TLB::insert(TlbEntry &entry)
                 "size: %#x ap:%d ns:%d nstid:%d g:%d isHyp:%d el: %d\n",
                 table[size-1].vpn << table[size-1].N, table[size-1].asid,
                 table[size-1].vmid, table[size-1].pfn << table[size-1].N,
-                table[size-1].size, accessTable[table[size-1].access].ap, table[size-1].ns,
+                table[size-1].size, accessTable.get(table[size-1].access).ap, table[size-1].ns,
                 table[size-1].nstid, table[size-1].global, table[size-1].isHyp,
                 table[size-1].el);
 
     // inserting to MRU position and evicting the LRU one
     for (int i = size - 1; i > 0; --i) {
         table[i] = table[i-1];
-        accessTable[i] = accessTable[i-1];
-        table[i].access++;
     }
     table[0] = entry;
-    accessTable[0] = AccessEntry{entry.ap, entry.hap, entry.xn, entry.pxn};
-    table[0].access = 0;
 
     stats.inserts++;
     ppRefills->notify(1);

@@ -85,8 +85,22 @@ namespace gem5
                 bool itb() {
                     return bits(data, 15);
                 }
-                void set_itb(bool nc) {
-                    data = insertBits(data, 15, nc);
+                void set_itb(bool itb) {
+                    data = insertBits(data, 15, itb);
+                }
+
+                bool ao() {
+                    return bits(data, 14);
+                }
+                void set_ao(bool ao) {
+                    data = insertBits(data, 14, ao);
+                }
+
+                bool ai() {
+                    return bits(data, 13, 10);
+                }
+                void set_ai(bool ai) {
+                    data = insertBits(data, 13, 10, ai);
                 }
         };
 
@@ -421,7 +435,7 @@ namespace gem5
         class MetalPMemRegOp : public MetalRegOp3
         {
         public:
-            MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) : 
+            MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
                 MetalRegOp3(mnem, _machInst, __opClass, _dReg, _bReg, _oReg)
             {
             }
@@ -442,7 +456,7 @@ namespace gem5
             int32_t imm;
             Mode mode;
         public:
-            MetalPMemRegImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg, int32_t _imm, Mode _mode) : 
+            MetalPMemRegImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg, int32_t _imm, Mode _mode) :
                 MetalRegOp2(mnem, _machInst, __opClass, _mReg, _gReg), imm(_imm), mode(_mode)
             {
             }

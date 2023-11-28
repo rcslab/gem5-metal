@@ -340,7 +340,7 @@ namespace gem5
             // decrease Metal level
             msr.lv = msr.lv - 1;
             xc->setMetalReg(metal_reg::MSR, msr);
-    
+
 
             return NoFault;
         }
@@ -481,9 +481,9 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, RPR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) 
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg)
                 || !metal_reg::canReadMetalReg(msr, this->mReg)
-                || idx >= int_reg::NumArchRegs 
+                || idx >= int_reg::NumArchRegs
                 || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) ) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
@@ -513,9 +513,9 @@ namespace gem5
 
             METAL_DBGPRINT(INSTS, WPR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
-            if (!metal_reg::canWriteMetalReg(msr, this->gReg) 
+            if (!metal_reg::canWriteMetalReg(msr, this->gReg)
                 || !metal_reg::canReadMetalReg(msr, this->mReg)
-                || idx >= int_reg::NumArchRegs 
+                || idx >= int_reg::NumArchRegs
                 || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr))) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
@@ -631,6 +631,8 @@ namespace gem5
             // ld.sh()
             ld.data = insertBits(ld.data, 9, 8, (te->attributes >> 7) & 0b11);
 
+            tei.set_ao(te->attrOverride);
+            tei.set_ai(te->access);
 
             xc->setMetalReg(rl, (RegVal)ld.data);
             xc->setMetalReg(rm, (RegVal)tei.data);
@@ -707,6 +709,9 @@ namespace gem5
                 (1 << 11) |     // LPAE bit
                 (te.ns << 9) |  // NS bit
                 (ld.sh() << 7);
+
+            te.attrOverride = tei.ao();
+            te.access       = tei.ai();
 
             if (tei.itb())
                 dynamic_cast<ArmISA::TLB *>(xc->tcBase()->getMMUPtr()->itb)
@@ -819,7 +824,7 @@ namespace gem5
         }
 
         // Mleit64_u
-        Mleit64_u::Mleit64_u(ExtMachInst _machInst, OpClass __opClass, uint32_t _offset, uint32_t _size) : 
+        Mleit64_u::Mleit64_u(ExtMachInst _machInst, OpClass __opClass, uint32_t _offset, uint32_t _size) :
             MetalNakedOp("mleit_u", _machInst, __opClass), offset(_offset), size(_size)
         {
             this->flags[IsMicroop] = true;
@@ -853,7 +858,7 @@ namespace gem5
             if (pkt->isError()) {
                 panic("Data fetch failed.");
             }
-            
+
             static char buf[ISA::ExcInterceptTableLoadSize];
             assert(this->size <= ISA::ExcInterceptTableLoadSize);
             getMemRawPtr(pkt, buf, this->size, traceData);
@@ -876,7 +881,7 @@ namespace gem5
             ccprintf(ss, "0x%x, 0x%x", this->offset, this->size);
             return ss.str();
         }
-        
+
         // Wmr64_u
         Wmr64_u::Wmr64_u(ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) :
             MetalRegOp2("wmr64_u", _machInst, __opClass, _mReg, _gReg)
@@ -957,9 +962,9 @@ namespace gem5
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
             Addr base = xc->getRegOperand(this, 0);
 
-            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n", 
-                    mReg, gReg, imm, 
-                    static_cast<int>(mode) , 
+            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n",
+                    mReg, gReg, imm,
+                    static_cast<int>(mode) ,
                     sizeof(T));
 
             if (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) {
@@ -989,9 +994,9 @@ namespace gem5
         template <typename T>
         Fault Pldri<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
         {
-            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) 
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR))
                     || metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
-            
+
             if (pkt->isError()) {
                 panic("Data fetch failed.");
             }
@@ -1004,7 +1009,7 @@ namespace gem5
             }
 
             xc->setRegOperand(this, 0, static_cast<RegVal>(mem));
-            
+
             if (mode == Mode::POSTINDEX) {
                 xc->setRegOperand(this, 1, xc->getRegOperand(this, 0) + imm);
             }
@@ -1015,7 +1020,7 @@ namespace gem5
         template <typename T>
         Fault Pldri<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            panic("unimplemented.");   
+            panic("unimplemented.");
         }
 
         // pstri
@@ -1037,16 +1042,16 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            METAL_DBGPRINT(INSTS, PSTRI, "sReg = %u, aReg = %u, imm = %d, mode = %#x, size = %u.\n", 
-                    mReg, gReg, imm, 
-                    static_cast<int>(mode) , 
+            METAL_DBGPRINT(INSTS, PSTRI, "sReg = %u, aReg = %u, imm = %d, mode = %#x, size = %u.\n",
+                    mReg, gReg, imm,
+                    static_cast<int>(mode) ,
                     sizeof(T));
 
             if (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)) {
                 // only available in Metal mode
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
-            
+
             Addr base = xc->getRegOperand(this, 1);
 
             switch (mode) {
@@ -1077,9 +1082,9 @@ namespace gem5
         template <typename T>
         Fault Pstri<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
         {
-            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) 
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR))
                 || metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
-            
+
             if (pkt->isError()) {
                 panic("Data write failed.");
             }
@@ -1090,7 +1095,7 @@ namespace gem5
         template <typename T>
         Fault Pstri<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            panic("unimplemented.");   
+            panic("unimplemented.");
         }
 
 
@@ -1114,7 +1119,7 @@ namespace gem5
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
             const Addr addr = xc->getRegOperand(this, 0) + xc->getRegOperand(this, 1);
 
-            METAL_DBGPRINT(INSTS, PLDRR, "dReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n", 
+            METAL_DBGPRINT(INSTS, PLDRR, "dReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",
                     rl, rm, rn, addr,
                     sizeof(T));
 
@@ -1132,9 +1137,9 @@ namespace gem5
         template <typename T>
         Fault Pldrr<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
         {
-            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) || 
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) ||
                 metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
-            
+
             if (pkt->isError()) {
                 panic("Data fetch failed.");
             }
@@ -1154,7 +1159,7 @@ namespace gem5
         template <typename T>
         Fault Pldrr<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            panic("unimplemented.");   
+            panic("unimplemented.");
         }
 
 
@@ -1177,7 +1182,7 @@ namespace gem5
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
             const Addr addr = xc->getRegOperand(this, 1) + xc->getRegOperand(this, 2);
 
-            METAL_DBGPRINT(INSTS, PSTRR, "sReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n", 
+            METAL_DBGPRINT(INSTS, PSTRR, "sReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",
                     rl, rm, rn, addr,
                     sizeof(T));
 
@@ -1202,9 +1207,9 @@ namespace gem5
         template <typename T>
         Fault Pstrr<T>::completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const
         {
-            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) || 
+            assert(metal_reg::isPrivilegeCheckDisabled(xc->readMetalReg(metal_reg::MSR)) ||
                     metal_reg::isInMetalMode(xc->readMetalReg(metal_reg::MSR)));
-            
+
             if (pkt->isError()) {
                 panic("Data fetch failed.");
             }
@@ -1215,7 +1220,7 @@ namespace gem5
         template <typename T>
         Fault Pstrr<T>::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            panic("unimplemented.");   
+            panic("unimplemented.");
         }
     } // namespace ArmISA
 } // namespace gem5
