@@ -1185,6 +1185,8 @@ class TableWalker : public ClockedObject
 
     Fault testWalk(Addr pa, Addr size, TlbEntry::DomainType domain,
                    LookupLevel lookup_level, bool stage2);
+
+    friend class AccessTable;
 };
 
 } // namespace ArmISA

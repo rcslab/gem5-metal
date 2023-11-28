@@ -26,7 +26,7 @@ namespace metal_reg
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
-    enum : RegIndex 
+    enum : RegIndex
     {
         /* All the unique register indices. */
         MR0 = 0,
@@ -67,7 +67,7 @@ namespace metal_reg
         MBR, // Metal Base Register
         MIB, // Metal Instruction Base Register
         MEB, // Metal Exception Base Register
-        MG4,
+        MTP, // Metal TLB Permissions Register
         MG5,
         MG6,
         MG7,
@@ -192,7 +192,7 @@ namespace metal_reg
             return true;
         }
 
-        
+
         // the rest of metal regs can only be accessed in metal mode
         return isInMetalMode(msr);
     }
