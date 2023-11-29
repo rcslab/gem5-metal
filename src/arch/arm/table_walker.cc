@@ -1571,42 +1571,87 @@ TableWalker::memAttrsLPAE(ThreadContext *tc, TlbEntry &te,
     te.attributes |= (uint64_t) attr << 56;
 }
 
+void 
+TableWalker::memAttrsAArch64Stage1(TlbEntry &te, uint8_t sh, uint8_t mairAttrs)
+{
+    // Select attributes
+    uint8_t attr_lo = bits(mairAttrs, 3, 0);
+    uint8_t attr_hi = bits(mairAttrs, 7, 4);
+
+    // Memory type
+    te.mtype = attr_hi == 0 ? TlbEntry::MemoryType::Device : TlbEntry::MemoryType::Normal;
+
+    // Cacheability
+    te.nonCacheable = false;
+    if (te.mtype == TlbEntry::MemoryType::Device) {  // Device memory
+        te.nonCacheable = true;
+    }
+    // Treat write-through memory as uncacheable, this is safe
+    // but for performance reasons not optimal.
+    switch (attr_hi) {
+        case 0x1 ... 0x3: // Normal Memory, Outer Write-through transient
+        case 0x4:         // Normal memory, Outer Non-cacheable
+        case 0x8 ... 0xb: // Normal Memory, Outer Write-through non-transient
+        te.nonCacheable = true;
+    }
+    switch (attr_lo) {
+        case 0x1 ... 0x3: // Normal Memory, Inner Write-through transient
+        case 0x9 ... 0xb: // Normal Memory, Inner Write-through non-transient
+        warn_if(!attr_hi, "Unpredictable behavior");
+        [[fallthrough]];
+        case 0x4:         // Device-nGnRE memory or
+                        // Normal memory, Inner Non-cacheable
+        case 0x8:         // Device-nGRE memory or
+                        // Normal memory, Inner Write-through non-transient
+        te.nonCacheable = true;
+    }
+
+    te.shareable       = sh == 2;
+    te.outerShareable = (sh & 0x2) ? true : false;
+    // Attributes formatted according to the 64-bit PAR
+    te.attributes = ((uint64_t) mairAttrs << 56) |
+        (1 << 11) |     // LPAE bit
+        (te.ns << 9) |  // NS bit
+        (sh << 7);
+}
+
+void 
+TableWalker::memAttrsAArch64Stage2(TlbEntry &te, uint8_t memAttr)
+{
+    uint8_t attr_hi = (memAttr >> 2) & 0x3;
+    uint8_t attr_lo =  memAttr       & 0x3;
+
+    if (attr_hi == 0) {
+        te.mtype        = attr_lo == 0 ? TlbEntry::MemoryType::StronglyOrdered
+                                        : TlbEntry::MemoryType::Device;
+        te.outerAttrs   = 0;
+        te.innerAttrs   = attr_lo == 0 ? 1 : 3;
+        te.nonCacheable = true;
+    } else {
+        te.mtype        = TlbEntry::MemoryType::Normal;
+        te.outerAttrs   = attr_hi == 1 ? 0 :
+                            attr_hi == 2 ? 2 : 1;
+        te.innerAttrs   = attr_lo == 1 ? 0 :
+                            attr_lo == 2 ? 6 : 5;
+        // Treat write-through memory as uncacheable, this is safe
+        // but for performance reasons not optimal.
+        te.nonCacheable = (attr_hi == 1) || (attr_hi == 2) ||
+            (attr_lo == 1) || (attr_lo == 2);
+    }
+}
+
 void
 TableWalker::memAttrsAArch64(ThreadContext *tc, TlbEntry &te,
                              LongDescriptor &l_descriptor)
 {
-    uint8_t attr;
-    uint8_t attr_hi;
-    uint8_t attr_lo;
     uint8_t sh = l_descriptor.sh();
 
     if (isStage2) {
-        attr = l_descriptor.memAttr();
-        uint8_t attr_hi = (attr >> 2) & 0x3;
-        uint8_t attr_lo =  attr       & 0x3;
-
+        uint8_t attr = l_descriptor.memAttr();
         DPRINTF(TLBVerbose, "memAttrsAArch64 MemAttr:%#x sh:%#x\n", attr, sh);
-
-        if (attr_hi == 0) {
-            te.mtype        = attr_lo == 0 ? TlbEntry::MemoryType::StronglyOrdered
-                                            : TlbEntry::MemoryType::Device;
-            te.outerAttrs   = 0;
-            te.innerAttrs   = attr_lo == 0 ? 1 : 3;
-            te.nonCacheable = true;
-        } else {
-            te.mtype        = TlbEntry::MemoryType::Normal;
-            te.outerAttrs   = attr_hi == 1 ? 0 :
-                              attr_hi == 2 ? 2 : 1;
-            te.innerAttrs   = attr_lo == 1 ? 0 :
-                              attr_lo == 2 ? 6 : 5;
-            // Treat write-through memory as uncacheable, this is safe
-            // but for performance reasons not optimal.
-            te.nonCacheable = (attr_hi == 1) || (attr_hi == 2) ||
-                (attr_lo == 1) || (attr_lo == 2);
-        }
+        memAttrsAArch64Stage2(te, attr);
     } else {
         uint8_t attrIndx = l_descriptor.attrIndx();
-
         DPRINTF(TLBVerbose, "memAttrsAArch64 AttrIndx:%#x sh:%#x\n", attrIndx, sh);
         ExceptionLevel regime =  s1TranslationRegime(tc, currState->el);
 
@@ -1629,45 +1674,8 @@ TableWalker::memAttrsAArch64(ThreadContext *tc, TlbEntry &te,
         }
 
         // Select attributes
-        attr = bits(mair, 8 * attrIndx + 7, 8 * attrIndx);
-        attr_lo = bits(attr, 3, 0);
-        attr_hi = bits(attr, 7, 4);
-
-        // Memory type
-        te.mtype = attr_hi == 0 ? TlbEntry::MemoryType::Device : TlbEntry::MemoryType::Normal;
-
-        // Cacheability
-        te.nonCacheable = false;
-        if (te.mtype == TlbEntry::MemoryType::Device) {  // Device memory
-            te.nonCacheable = true;
-        }
-        // Treat write-through memory as uncacheable, this is safe
-        // but for performance reasons not optimal.
-        switch (attr_hi) {
-          case 0x1 ... 0x3: // Normal Memory, Outer Write-through transient
-          case 0x4:         // Normal memory, Outer Non-cacheable
-          case 0x8 ... 0xb: // Normal Memory, Outer Write-through non-transient
-            te.nonCacheable = true;
-        }
-        switch (attr_lo) {
-          case 0x1 ... 0x3: // Normal Memory, Inner Write-through transient
-          case 0x9 ... 0xb: // Normal Memory, Inner Write-through non-transient
-            warn_if(!attr_hi, "Unpredictable behavior");
-            [[fallthrough]];
-          case 0x4:         // Device-nGnRE memory or
-                            // Normal memory, Inner Non-cacheable
-          case 0x8:         // Device-nGRE memory or
-                            // Normal memory, Inner Write-through non-transient
-            te.nonCacheable = true;
-        }
-
-        te.shareable       = sh == 2;
-        te.outerShareable = (sh & 0x2) ? true : false;
-        // Attributes formatted according to the 64-bit PAR
-        te.attributes = ((uint64_t) attr << 56) |
-            (1 << 11) |     // LPAE bit
-            (te.ns << 9) |  // NS bit
-            (sh << 7);
+        uint8_t attr = bits(mair, 8 * attrIndx + 7, 8 * attrIndx);
+        memAttrsAArch64Stage1(te, sh, attr);
     }
 }
 

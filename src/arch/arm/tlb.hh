@@ -99,21 +99,10 @@ class TlbTestInterface
                             enums::ArmLookupLevel lookup_level) = 0;
 };
 
-class AccessTable {
-  private:
-    RegIndex reg;
-    int size;
-    TLB *tlb;
-  public:
-    AccessTable(RegIndex _reg, TLB *_tlb);
-    AccessEntry get(int idx);
-};
-
 class TLB : public BaseTLB
 {
   protected:
     TlbEntry* table;
-    AccessTable accessTable;
 
     /** TLB Size */
     int size;
@@ -178,7 +167,7 @@ class TLB : public BaseTLB
     /** Lookup an entry in the TLB
      * @return pointer to TLB entry if it exists
      */
-    TlbEntry *lookup(const Lookup &lookup_data);
+    TlbEntry *lookup(const Lookup &lookup_data) const;
 
     /** Lookup an entry in the TLB and in the next levels by
      * following the nextLevel pointer
@@ -187,8 +176,6 @@ class TLB : public BaseTLB
      * @return pointer to TLB entry if it exists
      */
     TlbEntry *multiLookup(const Lookup &lookup_data);
-
-    TlbEntry *getEntry(Addr vaddr);
 
     virtual ~TLB();
 
@@ -299,7 +286,7 @@ class TLB : public BaseTLB
 
     /** Helper function looking up for a matching TLB entry
      * Does not update stats; see lookup method instead */
-    TlbEntry *match(const Lookup &lookup_data);
+    TlbEntry *match(const Lookup &lookup_data) const;
 };
 
 } // namespace ArmISA

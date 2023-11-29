@@ -74,7 +74,9 @@ class MMU : public BaseMMU
         return static_cast<ArmISA::TLB *>(itb);
     }
 
+  public:
     TLB * getTlb(BaseMMU::Mode mode, bool stage2) const;
+  protected:
     TableWalker * getTableWalker(BaseMMU::Mode mode, bool stage2) const;
 
   protected:
@@ -159,6 +161,7 @@ class MMU : public BaseMMU
             nmrr = rhs.nmrr;
             hcr = rhs.hcr;
             dacr = rhs.dacr;
+            mtp = rhs.mtp;
             miscRegValid = rhs.miscRegValid;
             curTranType = rhs.curTranType;
             stage2Req = rhs.stage2Req;
@@ -180,6 +183,7 @@ class MMU : public BaseMMU
         MMU *mmu;
         bool isStage2 = false;
         CPSR cpsr = 0;
+        RegVal mtp = 0;
         bool aarch64 = false;
         ExceptionLevel aarch64EL = EL0;
         SCTLR sctlr = 0;

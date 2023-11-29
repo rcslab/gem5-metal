@@ -13,96 +13,43 @@ namespace gem5
         static constexpr size_t MAX_METAL_OPERANDS = 4;
         static constexpr std::string_view MetalDisasmPrefix = "";
 
-        class TLBEntryInfo {
-            public:
-                uint64_t data;
+        BitUnion64(TlbExtAttr)
+            Bitfield<0> itlb; // 1 = inst tlb, 0 = data tlb
+            Bitfield<2, 1> el; // el = 0-3
+            Bitfield<4, 3> translv; // 0 - 3
+            Bitfield<6, 5> pgsz; // 0: 4k 1: 16k 2: 64k
+            Bitfield<22, 7> asid; // 8 bit asid
+            Bitfield<23> hyp; // whether this is for hypervisor
+            Bitfield<39, 24> vmid; // 16 bit vmid
+            Bitfield<40> ao; // access override
+            Bitfield<42, 41> aoid; // access override index
+            Bitfield<50, 43> mair; // mair fields for stage 1
+             // True if the entry targets the non-secure physical address space
+            Bitfield<51> ns;
+            // True if the entry was brought in from a non-secure page table
+            Bitfield<52> nstid;
+        EndBitUnion(TlbExtAttr)
 
-                TLBEntryInfo() : data(0) {}
+        static inline std::string printTlbExtAttr(const TlbExtAttr attr)
+        {
+            return csprintf("itlb: %d, el: %d, translv: %d, pgsz: %d, asid: %d, hyp: %d, vmid: %d, ao: %d, aoid: %d, mair: %#x, ns: %#x, nstid: %#x",
+                    attr.itlb, attr.el, attr.translv,
+                    attr.pgsz, attr.asid, attr.hyp,
+                    attr.vmid, attr.ao, attr.aoid, 
+                    attr.mair, attr.ns, attr.nstid);
+        }
 
-                uint16_t asid() {
-                    return bits(data, 63, 48);
-                }
-                void set_asid(uint16_t asid) {
-                    data = insertBits(data, 63, 48, asid);
-                }
+        static inline GrainSize tlbExtAttrToGrainSize(const TlbExtAttr attr)
+        {
+            static std::array<GrainSize, 4> lookup {
+                Grain4KB,
+                Grain16KB,
+                Grain64KB,
+                ReservedGrain
+            };
 
-                uint16_t vmid() {
-                    return bits(data, 47, 32);
-                }
-                void set_vmid(uint16_t vmid) {
-                    data = insertBits(data, 47, 32, vmid);
-                }
-
-                uint8_t attr() {
-                    return bits(data, 31, 24);
-                }
-                void set_attr(uint8_t attr) {
-                    data = insertBits(data, 31, 24, attr);
-                }
-
-                ExceptionLevel el() {
-                    return (ExceptionLevel)bits(data, 23, 22);
-                }
-                void set_el(ExceptionLevel el) {
-                    data = insertBits(data, 23, 22, el);
-                }
-
-                TlbEntry::MemoryType mtype() {
-                    return (TlbEntry::MemoryType)bits(data, 21, 20);
-                }
-                void set_mtype(TlbEntry::MemoryType mtype) {
-                    data = insertBits(data, 21, 20, mtype);
-                }
-
-                bool isHyp() {
-                    return bits(data, 19);
-                }
-                void set_isHyp(bool isHyp) {
-                    data = insertBits(data, 19, isHyp);
-                }
-
-                bool isSecure() {
-                    return bits(data, 18);
-                }
-                void set_isSecure(bool isSecure) {
-                    data = insertBits(data, 18, isSecure);
-                }
-
-                bool type() {
-                    return bits(data, 17);
-                }
-                void set_type(bool type) {
-                    data = insertBits(data, 17, type);
-                }
-
-                bool nc() {
-                    return bits(data, 16);
-                }
-                void set_nc(bool nc) {
-                    data = insertBits(data, 16, nc);
-                }
-
-                bool itb() {
-                    return bits(data, 15);
-                }
-                void set_itb(bool itb) {
-                    data = insertBits(data, 15, itb);
-                }
-
-                bool ao() {
-                    return bits(data, 14);
-                }
-                void set_ao(bool ao) {
-                    data = insertBits(data, 14, ao);
-                }
-
-                bool ai() {
-                    return bits(data, 13, 10);
-                }
-                void set_ai(bool ai) {
-                    data = insertBits(data, 13, 10, ai);
-                }
-        };
+            return lookup.at(attr.pgsz); 
+        }
 
         // a Metal instruction that can be either a regular op, a micro op or a macro op
         class MetalStaticInst : public PredOp
@@ -374,6 +321,9 @@ namespace gem5
                    RegIndex _rn);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
         // msti
