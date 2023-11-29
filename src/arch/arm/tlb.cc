@@ -59,21 +59,9 @@ namespace gem5
 
 using namespace ArmISA;
 
-AccessTable::AccessTable(RegIndex _reg, TLB *_tlb) : reg{_reg}, tlb{_tlb}, size{16} {}
-
-AccessEntry AccessTable::get(int idx) {
-    assert(idx >= 0 && idx < size);
-    // XXX fix register read
-    RegVal v = this->tlb->getTableWalker()->currState->tc->readMetalReg(this->reg);
-    uint8_t ap = (v >> (idx*4)) & 0b111;
-    bool nx = (v >> (idx*4+3)) & 0b1;
-    AccessEntry ae{ap, 0, nx, false};
-    return ae;
-}
-
 TLB::TLB(const ArmTLBParams &p)
     : BaseTLB(p), table(new TlbEntry[p.size]),
-      accessTable(metal_reg::MTP, this), size(p.size),
+      size(p.size),
       isStage2(p.is_stage2),
       _walkCache(false),
       tableWalker(nullptr),
@@ -116,54 +104,47 @@ TLB::setTableWalker(TableWalker *table_walker)
     tableWalker->setTlb(this);
 }
 
-TlbEntry*
-TLB::getEntry(Addr vaddr)
-{
-    // Vector of TLB entry candidates.
-    // Only one of them will be assigned to retval and will
-    // be returned to the MMU (in case of a hit)
-    // The vector has one entry per lookup level as it stores
-    // both complete and partial matches
-    std::vector<std::pair<int, const TlbEntry*>> hits{
-        LookupLevel::Num_ArmLookupLevel, {0, nullptr}};
+// TlbEntry*
+// TLB::getEntry(Addr vaddr) const
+// {
+//     // Vector of TLB entry candidates.
+//     // Only one of them will be assigned to retval and will
+//     // be returned to the MMU (in case of a hit)
+//     // The vector has one entry per lookup level as it stores
+//     // both complete and partial matches
+//     std::vector<std::pair<int, const TlbEntry*>> hits{
+//         LookupLevel::Num_ArmLookupLevel, {0, nullptr}};
 
-    int x = 0;
-    while (x < size) {
-        if (table[x].vaddrMatch(vaddr)) {
-            const TlbEntry &entry = table[x];
-            hits[entry.lookupLevel] = std::make_pair(x, &entry);
+//     int x = 0;
+//     while (x < size) {
+//         if (table[x].vaddrMatch(vaddr)) {
+//             const TlbEntry &entry = table[x];
+//             hits[entry.lookupLevel] = std::make_pair(x, &entry);
 
-            // This is a complete translation, no need to loop further
-            if (!entry.partial)
-                break;
-        }
-        ++x;
-    }
+//             // This is a complete translation, no need to loop further
+//             if (!entry.partial)
+//                 break;
+//         }
+//         ++x;
+//     }
 
-    // Loop over the list of TLB entries matching our translation
-    // request, starting from the highest lookup level (complete
-    // translation) and iterating backwards (using reverse iterators)
-    for (auto it = hits.rbegin(); it != hits.rend(); it++) {
-        const auto& [idx, entry] = *it;
-        if (!entry) {
-            // No match for the current LookupLevel
-            continue;
-        }
+//     // Loop over the list of TLB entries matching our translation
+//     // request, starting from the highest lookup level (complete
+//     // translation) and iterating backwards (using reverse iterators)
+//     for (auto it = hits.rbegin(); it != hits.rend(); it++) {
+//         const auto& [idx, entry] = *it;
+//         if (!entry) {
+//             // No match for the current LookupLevel
+//             continue;
+//         }
+//         return &table[idx];
+//     }
 
-        // sync access permissions
-        if (table[idx].attrOverride) {
-            const AccessEntry& ae = accessTable.get(table[idx].access);
-            table[idx].syncAP(ae);
-        }
-
-        return &table[idx];
-    }
-
-    return nullptr;
-}
+//     return nullptr;
+// }
 
 TlbEntry*
-TLB::match(const Lookup &lookup_data)
+TLB::match(const Lookup &lookup_data) const
 {
     // Vector of TLB entry candidates.
     // Only one of them will be assigned to retval and will
@@ -204,19 +185,8 @@ TLB::match(const Lookup &lookup_data)
             for (int i = idx; i > 0; i--)
                 table[i] = table[i - 1];
             table[0] = tmp_entry;
-
-            // sync access permissions
-            if (table[0].attrOverride) {
-                const AccessEntry& ae = accessTable.get(table[0].access);
-                table[0].syncAP(ae);
-            }
             return &table[0];
         } else {
-            // sync access permissions
-            if (table[idx].attrOverride) {
-                const AccessEntry& ae = accessTable.get(table[idx].access);
-                table[idx].syncAP(ae);
-            }
             return &table[idx];
         }
     }
@@ -225,23 +195,16 @@ TLB::match(const Lookup &lookup_data)
 }
 
 TlbEntry*
-TLB::lookup(const Lookup &lookup_data)
+TLB::lookup(const Lookup &lookup_data) const
 {
     const auto mode = lookup_data.mode;
 
     TlbEntry *retval = match(lookup_data);
 
-    DPRINTF(TLBVerbose, "Lookup %#x, asn %#x -> %s vmn 0x%x hyp %d secure %d "
-            "ppn %#x size: %#x pa: %#x ap:%d ns:%d nstid:%d g:%d asid: %d "
-            "el: %d\n",
-            lookup_data.va, lookup_data.asn, retval ? "hit" : "miss",
-            lookup_data.vmid, lookup_data.hyp, lookup_data.secure,
-            retval ? retval->pfn       : 0, retval ? retval->size  : 0,
-            retval ? retval->pAddr(lookup_data.va) : 0,
-            retval ? retval->ap        : 0,
-            retval ? retval->ns        : 0, retval ? retval->nstid : 0,
-            retval ? retval->global    : 0, retval ? retval->asid  : 0,
-            retval ? retval->el        : 0);
+    DPRINTF(TLBVerbose, "Lookup %#x, asn %#x, ignore asn %d, secure %d, el %d, hyp %d -> *%s*: [%s].\n",
+            lookup_data.va, lookup_data.asn, lookup_data.ignoreAsn, 
+            lookup_data.secure, lookup_data.targetEL, lookup_data.hyp,
+            retval ? "hit" : "miss", retval ? retval->print().c_str() : "");
 
     // Updating stats if this was not a functional lookup
     if (!lookup_data.functional) {
@@ -311,22 +274,10 @@ TLB::checkPromotion(TlbEntry *entry, BaseMMU::Mode mode)
 void
 TLB::insert(TlbEntry &entry)
 {
-    DPRINTF(TLB, "Inserting entry into TLB with pfn:%#x size:%#x vpn: %#x"
-            " asid:%d vmid:%d N:%d global:%d valid:%d nc:%d xn:%d"
-            " ap:%#x domain:%#x ns:%d nstid:%d isHyp:%d\n", entry.pfn,
-            entry.size, entry.vpn, entry.asid, entry.vmid, entry.N,
-            entry.global, entry.valid, entry.nonCacheable, entry.xn,
-            entry.ap, static_cast<uint8_t>(entry.domain), entry.ns, entry.nstid,
-            entry.isHyp);
+    DPRINTF(TLB, "Inserting entry into TLB: %s.\n", entry.print().c_str());
 
     if (table[size - 1].valid)
-        DPRINTF(TLB, " - Replacing Valid entry %#x, asn %d vmn %d ppn %#x "
-                "size: %#x ap:%d ns:%d nstid:%d g:%d isHyp:%d el: %d\n",
-                table[size-1].vpn << table[size-1].N, table[size-1].asid,
-                table[size-1].vmid, table[size-1].pfn << table[size-1].N,
-                table[size-1].size, accessTable.get(table[size-1].access).ap, table[size-1].ns,
-                table[size-1].nstid, table[size-1].global, table[size-1].isHyp,
-                table[size-1].el);
+        DPRINTF(TLB, "Replacing valid entry %s.\n", table[size-1].print().c_str());
 
     // inserting to MRU position and evicting the LRU one
     for (int i = size - 1; i > 0; --i) {

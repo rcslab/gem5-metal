@@ -601,7 +601,7 @@ namespace Aarch64
                 switch (opc) {
                   case 0x0:
                     if ((op3 >> 5) == 1) {
-                      return new Rtlb64(machInst, rl, rn, rm);
+                      return new Rtlb64(machInst, rl, rm, rn);
                     } else if ((op3 >> 3) == 0b001) {
                       uint8_t opm = bits(machInst, 12, 10);
                       switch (opm) {
@@ -670,7 +670,7 @@ namespace Aarch64
                         return new Brabz(machInst, rn);
                   case 0x1:
                     if ((op3 >> 5) == 1) {
-                      return new Wtlb64(machInst, rl, rn, rm);
+                      return new Wtlb64(machInst, rl, rm, rn);
                     }
                     if (bits(machInst, 11) == 0)
                         return new Blr64(machInst, rn);

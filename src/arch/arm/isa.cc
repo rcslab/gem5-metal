@@ -1799,6 +1799,10 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             }
             break;
         }
+        case metal_reg::MTP: {
+            static_cast<MMU *>(tc->getMMUPtr())->invalidateMiscReg();
+            break;
+        }
     }
 
     METAL_DBGPRINT(ISA, REGS, "Setting %s to 0x%lx.\n", ArmStaticInst::printMetalReg(idx), val);

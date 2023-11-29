@@ -26,6 +26,12 @@ namespace metal_reg
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
+    BitUnion8(MTPField)
+        Bitfield<1, 0> ap;
+        Bitfield<3> xn;
+        Bitfield<4> pxn;
+    EndBitUnion(MTPField)
+
     enum : RegIndex
     {
         /* All the unique register indices. */
@@ -134,6 +140,16 @@ namespace metal_reg
     static inline bool isMetalInitialized(MSR_t msr)
     {
         return static_cast<bool>(msr.init);
+    }
+
+    static inline MTPField getMTPField(RegVal mtp, unsigned int idx)
+    {
+        assert(idx < 16);
+
+        mtp = mtp >> (idx * 4);
+        mtp = mtp & 0b1111;
+
+        return static_cast<MTPField>(mtp);
     }
 
     static inline bool isInstInterceptEnabled(MSR_t msr)

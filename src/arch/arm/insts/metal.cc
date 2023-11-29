@@ -539,8 +539,12 @@ namespace gem5
             const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal vaReg = xc->readMetalReg(rn);
 
-            METAL_DBGPRINT(INSTS, RTLB, "RTLB: rl = %s, rm = %s, rn = %s\n", printMetalReg(rl), printMetalReg(rm), printMetalReg(rn));
+            METAL_DBGPRINT(INSTS, RTLB, "RTLB: vaReg = %s, rm = %s, rn = %s (%#lx).\n", 
+                                                    printMetalReg(rl), 
+                                                    printMetalReg(rm), 
+                                                    printMetalReg(rn), vaReg);
 
             if (!metal_reg::canWriteMetalReg(msr, rl)
                 || !metal_reg::canWriteMetalReg(msr, rm)
@@ -550,94 +554,97 @@ namespace gem5
                 return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
 
-            TableWalker::LongDescriptor ld;
-            ld.aarch64 = true;
+            return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+            // this needs more thinking but we don't need this feature for now
 
-            TLBEntryInfo tei;
+            // TableWalker::LongDescriptor ld;
+            // ld.aarch64 = true;
 
-            RegVal vaddr = xc->readMetalReg(rn);
-            Addr va = vaddr;
+            // TlbEntry::Lookup lookup;
+            // lookup.va = vaReg;
+            // lookup.ignoreAsn = true;
+            // lookup.targetEL = currEL(xc->tcBase());
 
-            ArmISA::TlbEntry *te =
-                dynamic_cast<ArmISA::TLB *>(
-                    xc->tcBase()->getMMUPtr()->dtb)
-                    ->getEntry(va);
+            // ArmISA::MMU * mmu = dynamic_cast<ArmISA::MMU *>(xc->tcBase()->getMMUPtr());
+            // assert(mmu);
 
-            assert(te);
+            // vaReg = purifyTaggedAddr(vaReg, xc->tcBase(), currEL(xc->tcBase()), false);
 
-            // Create and fill a new page table entry
+            // // read dtb by default
+            // // METAL_XXX: support more flags
+            // auto te = mmu->lookup(vaReg, 0, 0, false, false, false, true, currEL(xc->tcBase()), false, false, BaseMMU::Mode::Read);
+            // if (!te) {
+            //     panic("tlb entry does not exist.\n");
+            // }
 
-            tei.set_isHyp(te->isHyp);
-            tei.set_asid(te->asid);
-            tei.set_vmid(te->vmid);
-            // ld.data = insertBits(ld.data, )
-            switch (te->N) {
-                // type == Page
-                case Grain4KB:
-                case Grain16KB:
-                case Grain64KB:
-                    ld.data = insertBits(ld.data, 1, 0, 0x3);
-                    ld.grainSize = (GrainSize)te->N;
-                    break;
+            // // Create and fill a new page table entry
+            // tei.set_isHyp(te->isHyp);
+            // tei.set_asid(te->asid);
+            // tei.set_vmid(te->vmid);
+            // // ld.data = insertBits(ld.data, )
+            // switch (te->N) {
+            //     // type == Page
+            //     case Grain4KB:
+            //     case Grain16KB:
+            //     case Grain64KB:
+            //         ld.data = insertBits(ld.data, 1, 0, 0x3);
+            //         ld.grainSize = (GrainSize)te->N;
+            //         break;
 
-                // type == Block
-                case 21:    // 2 MiB
-                case 30:    // 1 GiB
-                    ld.data = insertBits(ld.data, 1, 0, 0x1);
-                    ld.grainSize = Grain4KB;
-                    break;
-                case 25:    // 32 MiB
-                    ld.data = insertBits(ld.data, 1, 0, 0x1);
-                    ld.grainSize = Grain16KB;
-                    break;
-                case 29:    // 256 MiB
-                case 42:    // 4 TiB
-                    ld.data = insertBits(ld.data, 1, 0, 0x1);
-                    ld.grainSize = Grain64KB;
-                    break;
-                default:
-                    // panix - bad descriptor?
-                    break;
-            }
+            //     // type == Block
+            //     case 21:    // 2 MiB
+            //     case 30:    // 1 GiB
+            //         ld.data = insertBits(ld.data, 1, 0, 0x1);
+            //         ld.grainSize = Grain4KB;
+            //         break;
+            //     case 25:    // 32 MiB
+            //         ld.data = insertBits(ld.data, 1, 0, 0x1);
+            //         ld.grainSize = Grain16KB;
+            //         break;
+            //     case 29:    // 256 MiB
+            //     case 42:    // 4 TiB
+            //         ld.data = insertBits(ld.data, 1, 0, 0x1);
+            //         ld.grainSize = Grain64KB;
+            //         break;
+            //     default:
+            //         panic("Unknown page size: %d.", te->N);
+            //         break;
+            // }
 
-            // assert(ld.offsetBits() == te->N);
+            // // pfn
+            // ld.data = insertBits(ld.data, 47, te->N, bits(te->pfn << te->N, 47,
+            //                      te->N));
+            // if (te->N == 16)
+            //     ld.data = insertBits(ld.data, 15, 12, bits(te->pfn << te->N,
+            //                          51, 48)); // 64k pages
+            // // domain always TlbEntry::DomainType::Client for LongDescriptor
+            // // te.domain         = ld.domain();
+            // ld.lookupLevel  = te->lookupLevel;
+            // ld.data = insertBits(ld.data, 5, te->ns);
+            // tei.set_isSecure(!te->nstid);
+            // // xn
+            // ld.data = insertBits(ld.data, 54, te->xn);
+            // tei.set_type(te->type == TypeTLB::instruction ? true : false);
+            // tei.set_el(te->el);
+            // // ld.global()
+            // ld.data = insertBits(ld.data, 11, !te->global);
+            // // ld.pxn()
+            // ld.data = insertBits(ld.data, 53, te->pxn);
+            // // ld.ap()
+            // ld.data = insertBits(ld.data, 7, 6, te->ap);
+            // tei.set_mtype(te->mtype);
+            // tei.set_nc(te->nonCacheable);
+            // // Attributes formatted according to the 64-bit PAR
+            // tei.set_attr(te->attributes >> 56);
+            // // ld.sh()
+            // ld.data = insertBits(ld.data, 9, 8, (te->attributes >> 7) & 0b11);
 
-            va              = te->vpn << te->N;
-            // pfn
-            ld.data = insertBits(ld.data, 47, te->N, bits(te->pfn << te->N, 47,
-                                 te->N));
-            if (te->N == 16)
-                ld.data = insertBits(ld.data, 15, 12, bits(te->pfn << te->N,
-                                     51, 48)); // 64k pages
-            // domain always TlbEntry::DomainType::Client for LongDescriptor
-            // te.domain         = ld.domain();
-            ld.lookupLevel  = te->lookupLevel;
-            ld.data = insertBits(ld.data, 5, te->ns);
-            tei.set_isSecure(!te->nstid);
-            // xn
-            ld.data = insertBits(ld.data, 54, te->xn);
-            tei.set_type(te->type == TypeTLB::instruction ? true : false);
-            tei.set_el(te->el);
-            // ld.global()
-            ld.data = insertBits(ld.data, 11, !te->global);
-            // ld.pxn()
-            ld.data = insertBits(ld.data, 53, te->pxn);
-            // ld.ap()
-            ld.data = insertBits(ld.data, 7, 6, te->ap);
-            tei.set_mtype(te->mtype);
-            tei.set_nc(te->nonCacheable);
-            // Attributes formatted according to the 64-bit PAR
-            tei.set_attr(te->attributes >> 56);
-            // ld.sh()
-            ld.data = insertBits(ld.data, 9, 8, (te->attributes >> 7) & 0b11);
+            // tei.set_ao(te->ao);
+            // tei.set_ai(te->aoid);
 
-            tei.set_ao(te->attrOverride);
-            tei.set_ai(te->access);
-
-            xc->setMetalReg(rl, (RegVal)ld.data);
-            xc->setMetalReg(rm, (RegVal)tei.data);
-
-            return NoFault;
+            // xc->setMetalReg(rl, (RegVal)ld.data);
+            // xc->setMetalReg(rm, (RegVal)tei.data);
+            //return NoFault;
         }
 
         // wtlb
@@ -652,8 +659,15 @@ namespace gem5
             const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
+            RegVal desc = xc->readMetalReg(rl);
+            RegVal info = xc->readMetalReg(rm);
+            RegVal vaddr = xc->readMetalReg(rn);
 
-            METAL_DBGPRINT(INSTS, WTLB, "WTLB: rl = %s, rm = %s, rn = %s\n", printMetalReg(rl), printMetalReg(rm), printMetalReg(rn));
+            METAL_DBGPRINT(INSTS, WTLB, "WTLB: descReg = %s (%#lx), extReg = %s (%#lx), vaReg = %s (%#lx). ExtAttrs = %s\n", 
+                                            printMetalReg(rl), desc,
+                                            printMetalReg(rm), info,
+                                            printMetalReg(rn), vaddr,
+                                            printTlbExtAttr(info));
 
             if (!metal_reg::canReadMetalReg(msr, rl)
                 || !metal_reg::canReadMetalReg(msr, rm)
@@ -663,65 +677,87 @@ namespace gem5
                 return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
             }
 
-            RegVal desc = xc->readMetalReg(rl);
-            RegVal info = xc->readMetalReg(rm);
-            RegVal vaddr = xc->readMetalReg(rn);
-
+            const auto ea = static_cast<TlbExtAttr>(info);
+            TlbEntry te;
             TableWalker::LongDescriptor ld;
+
             ld.data = desc;
             ld.aarch64 = true;
-            ld.lookupLevel = enums::ArmLookupLevel::L3;
+            // lookup level is used with granule to collectively determine the size of the entry
+            ld.lookupLevel = static_cast<TlbEntry::LookupLevel>(static_cast<int>(ea.translv));
+            ld.grainSize = tlbExtAttrToGrainSize(ea);
 
-            TLBEntryInfo tei;
-            tei.data = info;
+            if (ld.grainSize == ReservedGrain || 
+                (ld.type() != TableWalker::LongDescriptor::EntryType::Block &&
+                ld.type() != TableWalker::LongDescriptor::EntryType::Page)) {
+                // must have a supported page size and be a block/page descriptor
+                return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
+            }
 
-            Addr va = vaddr;
-
-            TlbEntry te;
-
-            // Create and fill a new page table entry
-            te.valid          = true;
+            // fixed attributes
+            te.valid = true;
             te.longDescFormat = true;
-            te.isHyp          = tei.isHyp();
-            te.asid           = tei.asid();
-            te.vmid           = tei.vmid();
-            te.N              = ld.offsetBits();
-            te.vpn            = va >> te.N;
-            te.size           = (1<<te.N) - 1;
-            te.pfn            = ld.pfn();
-            te.domain         = ld.domain();
-            te.lookupLevel    = ld.lookupLevel;
-            te.ns             = bits(ld.data, 5);
-            te.nstid          = !tei.isSecure();
-            te.xn             = ld.xn();
-            te.type           = tei.type() ?
-                TypeTLB::instruction : TypeTLB::data;
-            te.el             = tei.el();
-            te.global         = !bits(ld.data, 11);
+            te.partial = false;
+            
+            // attributes are split into 2 parts
+            // ARM page table descriptor (long format) bits    
+            // and extraAttr that come from the third Reg
+
+            // long descriptor bits
+            te.lookupLevel = ld.lookupLevel;
+            te.N = ld.offsetBits(); // offsetBits only make sense after setting grainSize and lookupLevel
+            te.vpn = vaddr >> te.N;
+            te.size = (1 << te.N) - 1;
+            te.pfn = ld.pfn();
+            te.domain = ld.domain();
+            te.xn = ld.xn();
             te.pxn = ld.pxn();
             te.ap = ld.ap();
-            te.mtype = tei.mtype();
-            te.nonCacheable = tei.nc();
-            te.shareable       = ld.sh() == 2;
-            te.outerShareable = (ld.sh() & 0x2) ? true : false;
-            // Attributes formatted according to the 64-bit PAR
-            te.attributes = ((uint64_t)tei.attr() << 56) |
-                (1 << 11) |     // LPAE bit
-                (te.ns << 9) |  // NS bit
-                (ld.sh() << 7);
+            te.hap = ld.ap();
+            te.global = !ld.ng();
 
-            te.attrOverride = tei.ao();
-            te.access       = tei.ai();
+            // extra attributes
+            te.el = static_cast<ExceptionLevel>(static_cast<int>(ea.el));
+            te.asid = ea.asid;
+            te.isHyp = ea.hyp;
+            te.vmid = ea.vmid;
+            te.type = ea.itlb ? TypeTLB::instruction : TypeTLB::data;
+            te.ao = ea.ao;
+            te.asid = ea.asid;
+            // METAL_XXX: wtf do these fields mean?
+            te.nstid = ea.nstid;
+            te.ns = ea.ns;
 
-            if (tei.itb())
-                dynamic_cast<ArmISA::TLB *>(xc->tcBase()->getMMUPtr()->itb)
-                    ->insert(te);
-            else
-                dynamic_cast<ArmISA::TLB *>(xc->tcBase()->getMMUPtr()->dtb)
-                    ->insert(te);
+            // set memory type and cacheability/shareability
+            if (ea.hyp) {
+                TableWalker::memAttrsAArch64Stage2(te, ld.memAttr());
+            } else {
+                TableWalker::memAttrsAArch64Stage1(te, ld.sh(), ea.mair);
+            }
+
+            MMU * mmu = dynamic_cast<MMU *>(xc->tcBase()->getMMUPtr());
+            assert(mmu);
+            
+            TLB * tlb = mmu->getTlb(ea.itlb ? BaseMMU::Execute : BaseMMU::Read, te.isHyp);
+            tlb->insert(te);
 
             return NoFault;
         }
+
+        std::string Wtlb64::generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printMetalReg(ss, rl);
+            ccprintf(ss, ", ");
+            printMetalReg(ss, rm);
+            ccprintf(ss, ", ");
+            printMetalReg(ss, rn);
+            return ss.str();
+        }
+
         // mcli
         Mcli64::Mcli64(ExtMachInst _machInst) : MetalNakedOp("mcli", _machInst, IntAluOp)
         {

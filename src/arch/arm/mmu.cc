@@ -621,12 +621,24 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
 {
     bool grant = false, grant_read = true, grant_write = true, grant_exec = true;
 
-    const uint8_t ap  = te->ap & 0b11;  // 2-bit access protection field
+    uint8_t ap, xn, pxn;
+    if (te->ao) {
+        metal_reg::MTPField mtp = metal_reg::getMTPField(state.mtp, te->aoid);
+        xn = mtp.xn;
+        ap = mtp.ap;
+        pxn = mtp.pxn;
+        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s -> MTP = %#lx, override ap = %#x, xn = %#x, pxn = %#x.\n", 
+                                            te->print().c_str(), 
+                                            state.mtp, ap, xn, pxn);
+    } else {
+        ap = te->ap & 0b11;  // 2-bit access protection field
+        xn = te->xn;
+        pxn = te->pxn;
+    }
+
     const bool is_priv = state.isPriv && !(req->getFlags() & UserMode);
 
     bool wxn = state.sctlr.wxn;
-    uint8_t xn =  te->xn;
-    uint8_t pxn = te->pxn;
 
     DPRINTF(TLBVerbose, "Checking S1 permissions: ap:%d, xn:%d, pxn:%d, r:%d, "
                         "w:%d, x:%d, is_priv: %d, wxn: %d\n", ap, xn,
@@ -1211,7 +1223,8 @@ MMU::CachedState::updateMiscReg(ThreadContext *tc,
     aarch64 = isStage2 ?
         ELIs64(tc, EL2) :
         ELIs64(tc, aarch64EL == EL0 ? EL1 : aarch64EL);
-
+    
+    mtp = tc->readMetalReg(metal_reg::MTP);
     hcr = tc->readMiscReg(MISCREG_HCR_EL2);
     if (aarch64) {  // AArch64
         // determine EL we need to translate in

@@ -656,7 +656,13 @@ class TableWalker : public ClockedObject
                     return false;
                 }
             }
-            return !bits(data, 11);
+            return !ng();
+        }
+
+        bool
+        ng() const
+        {
+            return bits(data, 11);
         }
 
         /** Returns true if the access flag (AF) is set. */
@@ -1119,7 +1125,8 @@ class TableWalker : public ClockedObject
                       LongDescriptor &lDescriptor);
     void memAttrsAArch64(ThreadContext *tc, TlbEntry &te,
                          LongDescriptor &lDescriptor);
-
+    static void memAttrsAArch64Stage2(TlbEntry &te, uint8_t memAttrs);
+    static void memAttrsAArch64Stage1(TlbEntry &te, uint8_t sh, uint8_t mairAttrs);
     static LookupLevel toLookupLevel(uint8_t lookup_level_as_int);
 
   private:
