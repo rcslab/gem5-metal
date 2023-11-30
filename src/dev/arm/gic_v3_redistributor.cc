@@ -386,6 +386,8 @@ void
 Gicv3Redistributor::write(Addr addr, uint64_t data, size_t size,
                           bool is_secure_access)
 {
+    DPRINTF(GIC, "Gicv3Redistributor::write(): "
+                    "addr %#lx data %#lx size %#lx\n", addr, data, size);
     if (GICR_IPRIORITYR.contains(addr)) { // Interrupt Priority Registers
         int first_intid = addr - GICR_IPRIORITYR.start();
 
@@ -807,7 +809,7 @@ Gicv3Redistributor::update()
     for (int int_id = 0; int_id < Gicv3::SGI_MAX + Gicv3::PPI_MAX; int_id++) {
         Gicv3::GroupId int_group = getIntGroup(int_id);
         bool group_enabled = distributor->groupEnabled(int_group);
-
+        DPRINTF(GIC, "update for int %d: pending %d, enabled %d, active %d, group %d, group enabled %d\n", int_id, irqPending[int_id], irqEnabled[int_id], irqActive[int_id], int_group, group_enabled);
         if (irqPending[int_id] && irqEnabled[int_id] &&
                 !irqActive[int_id] && group_enabled) {
             if ((irqPriority[int_id] < cpuInterface->hppi.prio) ||
