@@ -514,6 +514,8 @@ void
 Gicv3Distributor::write(Addr addr, uint64_t data, size_t size,
                         bool is_secure_access)
 {
+    DPRINTF(GIC, "Gicv3Distributor::write(): "
+                    "addr %#lx data %#lx size %#lx\n", addr, data, size);
     if (GICD_IGROUPR.contains(addr)) { // Interrupt Group Registers
         if (!DS && !is_secure_access) {
             // RAZ/WI for non-secure accesses
