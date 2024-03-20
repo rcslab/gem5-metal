@@ -733,8 +733,10 @@ ArmFault::invoke64(ThreadContext *tc, const StaticInstPtr &inst)
     tc->pcState(pc);
 
     // Save exception syndrome
-    if ((nextMode() != MODE_IRQ) && (nextMode() != MODE_FIQ))
+    if ((nextMode() != MODE_IRQ) && (nextMode() != MODE_FIQ)) {
         setSyndrome(tc, getSyndromeReg64());
+        DPRINTF(Faults, "ESR: %#x\n", tc->readMiscRegNoEffect(getSyndromeReg64()));
+    }
 }
 
 ArmStaticInst *

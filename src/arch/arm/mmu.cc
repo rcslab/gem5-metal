@@ -624,20 +624,21 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
 {
     bool grant = false, grant_read = true, grant_write = true, grant_exec = true;
 
-    uint8_t ap, xn, pxn;
+    uint8_t ap, xn, pxn, rn;
     if (te->ao) {
         metal_reg::MTPField mtp = metal_reg::getMTPField(state.mtp, te->aoid);
         xn = mtp.xn;
         ap = mtp.ap;
-        pxn = mtp.pxn;
-        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s -> MTP = %#lx, override ap = %#x, xn = %#x, pxn = %#x.\n", 
+        rn = mtp.rn;
+        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s -> MTP = %#lx, override ap = %#x, xn = %#x, rn = %#x.\n", 
                                             te->print().c_str(), 
-                                            state.mtp, ap, xn, pxn);
+                                            state.mtp, ap, xn, rn);
     } else {
         ap = te->ap & 0b11;  // 2-bit access protection field
         xn = te->xn;
-        pxn = te->pxn;
+        rn = 0;
     }
+    pxn = te->pxn;
 
     const bool is_priv = state.isPriv && !(req->getFlags() & UserMode);
 
@@ -677,16 +678,16 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
         const bool px = !(pxn || uw);
         const bool ux = !xn;
 
-        grant_read = is_priv ? pr : ur;
+        grant_read = (is_priv ? pr : ur) && !rn;
         grant_write = is_priv ? pw : uw;
         grant_exec = is_priv ? px : ux;
     } else {
         switch (bits(ap, 1)) {
           case 0b0: // No effect
-            grant_read = 1; grant_write = 1;
+            grant_read = !rn; grant_write = 1;
             break;
           case 0b1: // Read-Only
-            grant_read = 1; grant_write = 0;
+            grant_read = !rn; grant_write = 0;
             break;
         }
         grant_exec = !xn;
