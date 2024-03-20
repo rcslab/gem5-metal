@@ -28,8 +28,8 @@ namespace metal_reg
 
     BitUnion8(MTPField)
         Bitfield<1, 0> ap;
-        Bitfield<3> xn;
-        Bitfield<4> pxn;
+        Bitfield<2> xn;
+        Bitfield<3> rn;
     EndBitUnion(MTPField)
 
     enum : RegIndex
