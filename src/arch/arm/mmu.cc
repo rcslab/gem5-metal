@@ -964,6 +964,13 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
     } else {
         vaddr = vaddr_tainted;
     }
+    
+    // XXX: hardcode Metal mem to be @ 0xC000000 + 1GB
+    if (vaddr >= 0xc0000000ull && vaddr < (0xc0000000ull + 0x40000000ull)) {
+        req->setFlags(BypassMMU);
+        DPRINTF(TLB, "translate Metal RAM addr %#x\n", vaddr);
+    }
+    
     Request::Flags flags = req->getFlags();
 
     bool is_fetch  = (mode == Execute);
@@ -977,8 +984,8 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
             state.isPriv, flags & UserMode, state.isSecure,
             tran_type & S1S2NsTran);
 
-    DPRINTF(TLB, "translateFs addr %#x, mode %d, st2 %d, scr %#x sctlr %#x "
-                 "flags %#lx tranType 0x%x\n", vaddr_tainted, mode,
+    DPRINTF(TLB, "translateFs tained addr %#x, untained %#x, mode %d, st2 %d, scr %#x sctlr %#x "
+                 "flags %#lx tranType 0x%x\n", vaddr_tainted, vaddr, mode,
                  state.isStage2, state.scr, state.sctlr, flags, tran_type);
 
     if (!state.isStage2) {

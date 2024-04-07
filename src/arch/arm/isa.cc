@@ -1376,7 +1376,7 @@ ISA::loadExcInterceptTable(void * rawMem, Addr memAddr, size_t size)
 
     auto ents = static_cast<ExcInterceptTableEntry *>(rawMem);
 
-    for (int i = 0; i < size / sizeof(InstInterceptTableEntry); i++) {
+    for (int i = 0; i < size / sizeof(ExcInterceptTableEntry); i++) {
         auto ent = ents[i];
         ent.ctrl = gtoh(ent.ctrl, byteOrder(this->tc));
         ent.esrMask = gtoh(ent.esrMask, byteOrder(this->tc));

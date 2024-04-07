@@ -230,7 +230,7 @@ class ArmFault : public FaultBase
                   nullStaticInstPtr);
     void invoke64(ThreadContext *tc, const StaticInstPtr &inst =
                   nullStaticInstPtr);
-    void update(ThreadContext *tc);
+    virtual void update(ThreadContext *tc);
     bool isResetSPSR() const { return bStep; }
     bool isUpdated() const { return faultUpdated; }
     bool isFrom64() const { return from64; }
@@ -516,7 +516,7 @@ class AbortFault : public ArmFaultVals<T>
     bool abortDisable(ThreadContext *tc) override;
     bool isStage2() const override { return stage2; }
     void annotate(ArmFault::AnnotationIDs id, uint64_t val) override;
-    void setSyndrome(ThreadContext *tc, MiscRegIndex syndrome_reg) override;
+    void update(ThreadContext *tc) override;
     bool isMMUFault() const;
 };
 
