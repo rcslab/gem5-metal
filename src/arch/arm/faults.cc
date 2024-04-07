@@ -1143,13 +1143,13 @@ AbortFault<T>::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 
 template<class T>
 void
-AbortFault<T>::setSyndrome(ThreadContext *tc, MiscRegIndex syndrome_reg)
+AbortFault<T>::update(ThreadContext *tc)
 {
+    ArmFault::update(tc);
     srcEncoded = getFaultStatusCode(tc);
     if (srcEncoded == ArmFault::FaultSourceInvalid) {
         panic("Invalid fault source\n");
     }
-    ArmFault::setSyndrome(tc, syndrome_reg);
 }
 
 template<class T>
