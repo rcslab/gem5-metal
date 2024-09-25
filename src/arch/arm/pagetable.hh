@@ -336,7 +336,6 @@ struct TlbEntry : public Serializable
     bool
     match(const Lookup &lookup) const
     {
-        DPRINTF(TLBVerbose, "Matching: %s\n", this->print().c_str());
         bool match = false;
         if (valid && matchAddress(lookup) &&
             (lookup.secure == !nstid) && (lookup.hyp == isHyp))
@@ -429,8 +428,8 @@ struct TlbEntry : public Serializable
     std::string
     print() const
     {
-        return csprintf("vaddr: %#x, asid: %d, vmid: %d, hyp: %d, paddr: %#x, size: %#x, ap: %d, xn: %d, pxn: %d, "
-                        "ns: %d, nstid: %d, g: %d, el: %d, ao: %d, aoid: %d", vpn << N, asid, vmid,
+        return csprintf("vaddr: %#x, mtype: %d, asid: %d, vmid: %d, hyp: %d, paddr: %#x, size: %#x, ap: %d, xn: %d, pxn: %d, "
+                        "ns: %d, nstid: %d, g: %d, el: %d, ao: %d, aoid: %d", vpn << N, static_cast<int>(mtype), asid, vmid,
                         isHyp, pfn << N, size, ap, xn, pxn, ns, nstid, global, el, ao, aoid);
     }
 

@@ -392,15 +392,15 @@ const EILBEntry & EILB::get(const EILBEntry & ent) const
     unsigned int modeVal = static_cast<unsigned int>(ent.getMode());
     assert(modeVal < static_cast<unsigned int>(EILBMode::NumMode));
 
+    METAL_DBGPRINT(EILB, GET, "matching [esr = 0x%x, mode = 0x%x]...\n", ent.getEsrBits(), static_cast<int>(ent.getMode()));
+
     auto &vec = map.at(modeVal);
     auto it = vec.begin();
     while (it != vec.end()) {
         const auto each = it->get();
         assert(each->getMode() == ent.getMode());
         if (each->match(ent)) {
-            METAL_DBGPRINT(EILB, GET, "*matched* [esr = 0x%x, mode = 0x%x] with EILB entry [esr = 0x%lx, esrMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
-                                                        ent.getEsrBits(),
-                                                        static_cast<int>(ent.getMode()),
+            METAL_DBGPRINT(EILB, GET, "*matched* EILB entry [esr = 0x%lx, esrMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
                                                         each->getEsrBits(),
                                                         each->getEsrMask(),
                                                         static_cast<int>(each->getMode()),

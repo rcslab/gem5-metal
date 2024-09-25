@@ -565,8 +565,8 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
                 state.isStage2, ArmFault::LpaeTran);
         } else {
             stats.permsFaults++;
-            DPRINTF(TLB, "TLB Fault: Data abort on permission check."
-                    "ns:%d", te->ns);
+            DPRINTF(TLB, "TLB Fault: Data abort on permission check. "
+                    "ns:%d\n", te->ns);
             return std::make_shared<DataAbort>(
                 vaddr_tainted, te->domain,
                 (is_atomic && !grant_read) ? false : is_write,

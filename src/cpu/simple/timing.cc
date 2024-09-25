@@ -763,6 +763,9 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
         if (thread->checkExcIntercept(fault, curStaticInst)) {
             thread->doExcIntercept(fault, curStaticInst);
             overrideFault = NoFault;
+            thread->decoder->reset();
+            // terminate the current microop
+            curStaticInst->setLastMicroop();
             goto end;
         }
 

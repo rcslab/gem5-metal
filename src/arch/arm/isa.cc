@@ -1587,7 +1587,9 @@ ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
     }
 
     auto armFault = dynamic_cast<ArmFault *>(fault.get());
-    assert(armFault);
+    if (!armFault) {
+        return false;
+    }
 
     if (!armFault->isUpdated()) {
         armFault->update(tc);
