@@ -723,7 +723,7 @@ namespace gem5
             te.vmid = ea.vmid;
             te.type = ea.itlb ? TypeTLB::instruction : TypeTLB::data;
             te.ao = ea.ao;
-            te.asid = ea.asid;
+            te.aoid = ea.aoid;
             // METAL_XXX: wtf do these fields mean?
             te.nstid = ea.nstid;
             te.ns = ea.ns;
