@@ -295,6 +295,10 @@ BaseSimpleCPU::checkForInterrupts()
             t_info.fetchOffset = 0;
             if (tc->checkExcIntercept(interrupt, nullStaticInstPtr)) {
                 tc->doExcIntercept(interrupt, nullStaticInstPtr);
+                // terminate the current microop
+                if (curStaticInst) {
+                    curStaticInst->setLastMicroop();
+                }
                 advancePC(NoFault);
             } else {
                 interrupts[curThread]->updateIntrInfo();

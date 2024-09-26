@@ -43,6 +43,7 @@
 
 #include "arch/arm/faults.hh"
 #include "arch/arm/regs/misc.hh"
+#include "arch/arm/regs/metal.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/interrupts.hh"
 #include "cpu/thread_context.hh"
@@ -144,6 +145,11 @@ class Interrupts : public BaseInterrupts
     checkInterrupts() const override
     {
         HCR  hcr  = tc->readMiscReg(MISCREG_HCR_EL2);
+        bool metal_mode = metal_reg::isInMetalMode(tc->readMetalRegNoEffect(metal_reg::MSR));
+
+        if (metal_mode) {
+            return false;
+        }
 
         if (!(intStatus || hcr.va || hcr.vi || hcr.vf))
             return false;
