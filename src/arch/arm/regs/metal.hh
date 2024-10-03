@@ -22,7 +22,9 @@ namespace metal_reg
         Bitfield<62> ii; // instruction intercept enable
         Bitfield<61> im; // instruction intercept mask
         Bitfield<60> ei; // exc intercept enable
-        Bitfield<59> pd; // privilege check disable
+        Bitfield<59> em; // exc intercept mask
+        Bitfield<58> pd; // privilege check disable
+        Bitfield<57> id; // temporary interrupt disable
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
 
@@ -118,11 +120,11 @@ namespace metal_reg
         "mg8",
         "mg9",
         "mg10",
-        "mg11",        
+        "mg11",
         "mg12",
         "mg13",
         "mg14",
-        "mg15",   
+        "mg15",
     };
     static_assert((sizeof(regNames) / sizeof(regNames[0])) == NumRegs);
 
@@ -169,6 +171,16 @@ namespace metal_reg
     static inline bool isExcInterceptEnabled(MSR_t msr)
     {
         return static_cast<bool>(msr.ei);
+    }
+
+    static inline bool isExcInterceptMasked(MSR_t msr)
+    {
+        return static_cast<bool>(msr.em);
+    }
+
+    static inline bool isInterruptDisabled(MSR_t msr)
+    {
+        return static_cast<bool>(msr.id);
     }
 
     static inline bool isPrivilegeCheckDisabled(MSR_t msr)

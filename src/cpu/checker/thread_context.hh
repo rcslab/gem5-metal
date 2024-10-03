@@ -382,6 +382,38 @@ class CheckerThreadContext : public ThreadContext
     void doneInstInterceptMasked(void) override {
         panic("unimplemented!");
     }
+
+    bool checkExcInterceptMasked(void) const override {
+        panic("unimplemented!");
+    }
+
+    void doneExcInterceptMasked(void) override {
+        panic("unimplemented!");
+    }
+
+    bool checkInterruptDisabled(void) const override {
+        panic("unimplemented!");
+    }
+
+    void doneInterruptDisabled(void) override {
+        panic("unimplemented!");
+    }
+
+    bool getExcInterceptMaskFlag(void) const override {
+        panic("unimplemented!");
+    }
+
+    void setExcInterceptMaskFlag(bool) override {
+        panic("unimplemented!");
+    }
+
+    bool getInterruptDisabledFlag(void) const override {
+        panic("unimplemented!");
+    }
+
+    void setInterruptDisabledFlag(bool) override {
+        panic("unimplemented!");
+    }
 };
 
 } // namespace gem5

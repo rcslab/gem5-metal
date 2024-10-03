@@ -259,6 +259,10 @@ struct StringWrap
     } while (0),                                           \
     "Use DPRINTFN or DPRINTF with a debug flag instead.")
 
+#define METAL_STR(x) #x
+#define METAL_STR2(x) METAL_STR(x)
+#define METAL_DBGPRINT(subsys, subsys2, format, ...) DPRINTF(Metal, "Metal." METAL_STR2(subsys) "." METAL_STR2(subsys2) ": " format, ##__VA_ARGS__)
+
 /** @} */ // end of api_trace
 
 } // namespace gem5

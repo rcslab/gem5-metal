@@ -35,7 +35,7 @@ namespace gem5
             return csprintf("itlb: %d, el: %d, translv: %d, pgsz: %d, asid: %d, hyp: %d, vmid: %d, ao: %d, aoid: %d, mair: %#x, ns: %#x, nstid: %#x",
                     attr.itlb, attr.el, attr.translv,
                     attr.pgsz, attr.asid, attr.hyp,
-                    attr.vmid, attr.ao, attr.aoid, 
+                    attr.vmid, attr.ao, attr.aoid,
                     attr.mair, attr.ns, attr.nstid);
         }
 
@@ -48,7 +48,7 @@ namespace gem5
                 ReservedGrain
             };
 
-            return lookup.at(attr.pgsz); 
+            return lookup.at(attr.pgsz);
         }
 
         // a Metal instruction that can be either a regular op, a micro op or a macro op
@@ -235,16 +235,18 @@ namespace gem5
         };
 
         // mexit
-        class Mexit64 : public MetalImmOp8
+        class Mexit64 : public MetalRegOp
         {
         private:
             BitUnion8(MexitFlags)
-            Bitfield<1> iim; // mask instruction intercept for the next inst
-            Bitfield<0> rfi; // this is a return from intercept (Inst & Exc) mroutine (restore CPSR from MSPSR)
+            Bitfield<3> eim; // mask exception intercept for the next inst
+            Bitfield<2> iim; // mask instruction intercept for the next inst
+            Bitfield<1> rfi; // this is a return from intercept (Inst & Exc) mroutine (restore CPSR from MSPSR)
+            Bitfield<0> id; // disable interrupt for the next inst
             EndBitUnion(MexitFlags)
 
         public:
-            Mexit64(ExtMachInst _machInst, uint8_t _imm);
+            Mexit64(ExtMachInst _machInst, RegIndex _mreg);
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };

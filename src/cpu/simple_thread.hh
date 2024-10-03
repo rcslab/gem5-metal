@@ -421,8 +421,20 @@ class SimpleThread : public ThreadState, public ThreadContext
     void doInstIntercept(const StaticInstPtr &inst, bool post) override;
     bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const override;
     void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) override;
+
     bool checkInstInterceptMasked(void) const override;
     void doneInstInterceptMasked(void) override;
+
+    bool checkExcInterceptMasked(void) const override;
+    void doneExcInterceptMasked(void) override;
+    bool getExcInterceptMaskFlag(void) const override;
+    void setExcInterceptMaskFlag(bool) override;
+
+
+    bool checkInterruptDisabled(void) const override;
+    void doneInterruptDisabled(void) override;
+    void setInterruptDisabledFlag(bool) override;
+    bool getInterruptDisabledFlag(void) const override;
 };
 
 } // namespace gem5

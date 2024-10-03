@@ -48,6 +48,7 @@
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
 #include "debug/HtmCpu.hh"
+#include "debug/Metal.hh"
 #include "debug/Mwait.hh"
 #include "debug/SimpleCPU.hh"
 #include "mem/packet.hh"
@@ -684,8 +685,21 @@ TimingSimpleCPU::fetch()
 
     DPRINTF(SimpleCPU, "Fetch\n");
 
+    // set proper flags for the new fetch cycle
+    thread->setInterruptDisabledFlag(thread->checkInterruptDisabled());
+    if (thread->getInterruptDisabledFlag()) {
+        METAL_DBGPRINT(EXEC, EXCINTR, "Temporarily masking exception intercept...\n");
+    }
+
+    thread->setExcInterceptMaskFlag(thread->checkExcInterceptMasked());
+    if (thread->getExcInterceptMaskFlag()){
+        METAL_DBGPRINT(EXEC, INSTINTR, "Temporarily masking interrupts...\n");
+    }
+
     if (!curStaticInst || !curStaticInst->isDelayedCommit()) {
-        checkForInterrupts();
+        if (!thread->getInterruptDisabledFlag()) {
+            checkForInterrupts();
+        }
         checkPcEventQueue();
     }
 
@@ -759,12 +773,28 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
         return;
 
     Fault overrideFault = fault;
+
+    // use separate mask flags to make sure we don't clear the MSR flags for the current cycle
+    // the next fetch cycle sets the separate mask flags
+    if (thread->getExcInterceptMaskFlag()) {
+        if (!curMacroStaticInst || curStaticInst->isLastMicroop()) {
+            // mask exc intercept for all microops of the current macroop
+            thread->doneExcInterceptMasked();
+        }
+    }
+
+    if (thread->getInterruptDisabledFlag()) {
+        if (fault != NoFault || !curMacroStaticInst || curStaticInst->isLastMicroop()) {
+            thread->doneInterruptDisabled();
+        }
+    }
+
     if (fault != NoFault) {
-        if (thread->checkExcIntercept(fault, curStaticInst)) {
+        if (!thread->getExcInterceptMaskFlag() && thread->checkExcIntercept(fault, curStaticInst)) {
             thread->doExcIntercept(fault, curStaticInst);
             overrideFault = NoFault;
             thread->decoder->reset();
-            // terminate the current microop
+            // terminate the current macroop
             curStaticInst->setLastMicroop();
             goto end;
         }
@@ -809,16 +839,14 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
         return;
     } else {
         // check intercept when we don't have a sync exception
-        if (curStaticInst) {
-            bool checkIntercept = true;
-            if (curMacroStaticInst) {
-                // skip microops
-                checkIntercept = curStaticInst->isLastMicroop();
-            }
+        bool checkIntercept = true;
+        if (curMacroStaticInst) {
+            // skip microops
+            checkIntercept = curStaticInst->isLastMicroop();
+        }
 
-            if (checkIntercept && thread->checkInstIntercept(curStaticInst, true)) {
-                thread->doInstIntercept(curStaticInst, true);
-            }
+        if (checkIntercept && thread->checkInstIntercept(curStaticInst, true)) {
+            thread->doInstIntercept(curStaticInst, true);
         }
     }
 
@@ -863,12 +891,12 @@ TimingSimpleCPU::completeIfetch(PacketPtr pkt)
     if (pkt)
         pkt->req->setAccessLatency();
 
-
     preExecute();
 
     if (curStaticInst) {
         if (thread->checkInstInterceptMasked()) {
             thread->doneInstInterceptMasked();
+            METAL_DBGPRINT(Exec, INSTINTR, "Temporarily masking instruction intercept...\n");
         } else {
             bool checkInstIntercept = true;
             const StaticInstPtr * ptr = &curStaticInst;

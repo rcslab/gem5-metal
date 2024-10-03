@@ -70,9 +70,6 @@ class EventManager;
 
 namespace ArmISA
 {
-    #define METAL_STR(x) #x
-    #define METAL_STR2(x) METAL_STR(x)
-    #define METAL_DBGPRINT(subsys, subsys2, format, ...) DPRINTF(Metal, "Metal." METAL_STR2(subsys) "." METAL_STR2(subsys2) ": " format, ##__VA_ARGS__)
     class ISA : public BaseISA
     {
       protected:
@@ -98,6 +95,8 @@ namespace ArmISA
         bool highestELIs64;
         bool haveLargeAsid64;
         uint8_t physAddrRange;
+        bool excInterceptMask;
+        bool interruptMask;
 
         /** SVE vector length in quadwords */
         unsigned sveVL;
@@ -243,9 +242,9 @@ private:
 
       public:
         const RegId &mapIntRegId(RegIndex idx) const { return intRegMap[idx]; }
-        const RegId &mapPrevIntRegMap(RegIndex idx) const { 
+        const RegId &mapPrevIntRegMap(RegIndex idx) const {
           assert(prevIntRegMap != nullptr && idx < int_reg::NumArchRegs);
-          return prevIntRegMap[idx]; 
+          return prevIntRegMap[idx];
         }
 
       public:
@@ -314,6 +313,14 @@ public:
         void doInstIntercept(const StaticInstPtr &inst, bool post) override;
         bool checkInstInterceptMasked(void) const override;
         void doneInstInterceptMasked(void) override;
+        bool checkExcInterceptMasked(void) const override;
+        void doneExcInterceptMasked(void) override;
+        bool checkInterruptDisabled(void) const override;
+        void doneInterruptDisabled(void) override;
+        void setExcInterceptMaskFlag(bool) override;
+        bool getExcInterceptMaskFlag(void) const override;
+        void setInterruptDisabledFlag(bool) override;
+        bool getInterruptDisabledFlag(void) const override;
 
         int
         flattenMiscIndex(int reg) const

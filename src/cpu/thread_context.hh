@@ -249,8 +249,19 @@ class ThreadContext : public PCEventScope
     virtual void doInstIntercept(const StaticInstPtr &inst, bool post) = 0;
     virtual bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const = 0;
     virtual void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) = 0;
+
     virtual bool checkInstInterceptMasked(void) const = 0;
     virtual void doneInstInterceptMasked(void) = 0;
+
+    virtual bool checkExcInterceptMasked(void) const = 0;
+    virtual void doneExcInterceptMasked(void) = 0;
+    virtual bool getExcInterceptMaskFlag(void) const = 0;
+    virtual void setExcInterceptMaskFlag(bool) = 0;
+
+    virtual bool checkInterruptDisabled(void) const = 0;
+    virtual void doneInterruptDisabled(void) = 0;
+    virtual void setInterruptDisabledFlag(bool) = 0;
+    virtual bool getInterruptDisabledFlag(void) const = 0;
 };
 
 /** @{ */

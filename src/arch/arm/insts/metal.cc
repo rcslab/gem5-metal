@@ -290,7 +290,7 @@ namespace gem5
         }
 
         // mexit
-        Mexit64::Mexit64(ExtMachInst _machInst, uint8_t _imm) : MetalImmOp8("mexit", _machInst, IntAluOp, _imm)
+        Mexit64::Mexit64(ExtMachInst _machInst, RegIndex _mreg) : MetalRegOp("mexit", _machInst, IntAluOp, _mreg)
         {
             this->flags[IsControl] = true;
             this->flags[IsIndirectControl] = true;
@@ -304,7 +304,8 @@ namespace gem5
             // get mroutine table's base address
             const RegVal ret = xc->readMetalReg(metal_reg::MLR);
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-            const MexitFlags flags = static_cast<MexitFlags>(this->imm);
+            const RegVal reg = xc->readMetalReg(mReg);
+            const MexitFlags flags = static_cast<MexitFlags>(reg);
 
             // must be in Metal mode to mexit
             if (!metal_reg::isInMetalMode(msr)) {
@@ -331,10 +332,17 @@ namespace gem5
                 xc->setMiscReg(MISCREG_CPSR, newCpsr);
             }
 
-            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode: MLR = 0x%lx, flags = [rfi = %d (MSPSR = 0x%lx, NCPSR = 0x%lx), iim = %d]\n", ret, flags.rfi, mspsr, newCpsr, flags.iim);
+            METAL_DBGPRINT(INSTS, MEXIT, "exiting Metal mode: MLR = 0x%lx, flags = 0x%lx [id = %d, rfi = %d (MSPSR = 0x%lx, NCPSR = 0x%lx), iim = %d, eim = %d]\n",
+                                                ret, reg, flags.id, flags.rfi, mspsr, newCpsr, flags.iim, flags.eim);
 
             if (flags.iim) {
                 msr.im = 1;
+            }
+            if (flags.eim) {
+                msr.em = 1;
+            }
+            if (flags.id) {
+                msr.id = 1;
             }
 
             // decrease Metal level
@@ -541,9 +549,9 @@ namespace gem5
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
             RegVal vaReg = xc->readMetalReg(rn);
 
-            METAL_DBGPRINT(INSTS, RTLB, "RTLB: vaReg = %s, rm = %s, rn = %s (%#lx).\n", 
-                                                    printMetalReg(rl), 
-                                                    printMetalReg(rm), 
+            METAL_DBGPRINT(INSTS, RTLB, "RTLB: vaReg = %s, rm = %s, rn = %s (%#lx).\n",
+                                                    printMetalReg(rl),
+                                                    printMetalReg(rm),
                                                     printMetalReg(rn), vaReg);
 
             if (!metal_reg::canWriteMetalReg(msr, rl)
@@ -663,7 +671,7 @@ namespace gem5
             RegVal info = xc->readMetalReg(rm);
             RegVal vaddr = xc->readMetalReg(rn);
 
-            METAL_DBGPRINT(INSTS, WTLB, "WTLB: descReg = %s (%#lx), extReg = %s (%#lx), vaReg = %s (%#lx). ExtAttrs = %s\n", 
+            METAL_DBGPRINT(INSTS, WTLB, "WTLB: descReg = %s (%#lx), extReg = %s (%#lx), vaReg = %s (%#lx). ExtAttrs = %s\n",
                                             printMetalReg(rl), desc,
                                             printMetalReg(rm), info,
                                             printMetalReg(rn), vaddr,
@@ -687,7 +695,7 @@ namespace gem5
             ld.lookupLevel = static_cast<TlbEntry::LookupLevel>(static_cast<int>(ea.translv));
             ld.grainSize = tlbExtAttrToGrainSize(ea);
 
-            if (ld.grainSize == ReservedGrain || 
+            if (ld.grainSize == ReservedGrain ||
                 (ld.type() != TableWalker::LongDescriptor::EntryType::Block &&
                 ld.type() != TableWalker::LongDescriptor::EntryType::Page)) {
                 // must have a supported page size and be a block/page descriptor
@@ -698,9 +706,9 @@ namespace gem5
             te.valid = true;
             te.longDescFormat = true;
             te.partial = false;
-            
+
             // attributes are split into 2 parts
-            // ARM page table descriptor (long format) bits    
+            // ARM page table descriptor (long format) bits
             // and extraAttr that come from the third Reg
 
             // long descriptor bits
@@ -737,7 +745,7 @@ namespace gem5
 
             MMU * mmu = dynamic_cast<MMU *>(xc->tcBase()->getMMUPtr());
             assert(mmu);
-            
+
             TLB * tlb = mmu->getTlb(ea.itlb ? BaseMMU::Execute : BaseMMU::Read, te.isHyp);
             tlb->insert(te);
 
@@ -768,8 +776,6 @@ namespace gem5
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
 
-            METAL_DBGPRINT(INSTS, MCLI, "Masking instruction intercept.\n");
-
             if (!metal_reg::canWriteMetalReg(msr, metal_reg::MSR)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
             }
@@ -788,8 +794,6 @@ namespace gem5
         Fault Msti64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-
-            METAL_DBGPRINT(INSTS, MSTI, "Setting instruction intercept.\n");
 
             if (!metal_reg::canWriteMetalReg(msr, metal_reg::MSR)) {
                 return std::make_shared<UndefinedInstruction>(machInst, true, mnemonic);
