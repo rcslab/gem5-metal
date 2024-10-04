@@ -39,24 +39,29 @@ Research Starter Kit on System Modeling. More information can be found
 at: http://www.arm.com/ResearchEnablement/SystemModeling
 """
 
+import argparse
 import os
+
 import m5
-from m5.util import addToPath
 from m5.objects import *
 from m5.options import *
+from m5.util import addToPath
+
 from gem5.simulate.exit_event import ExitEvent
-import argparse
 
 m5.util.addToPath("../..")
 
-from common import SysPaths
-from common import MemConfig
-from common import ObjectList
-from common.cores.arm import HPI
-from common.cores.arm import O3_ARM_v7a
-
 import devices
 import workloads
+from common import (
+    MemConfig,
+    ObjectList,
+    SysPaths,
+)
+from common.cores.arm import (
+    HPI,
+    O3_ARM_v7a,
+)
 
 
 class L1Cache(Cache):
@@ -158,7 +163,7 @@ def create(args):
         args.mem_size,
         platform=platform(),
         mem_mode=mem_mode,
-        readfile=args.readfile
+        readfile=args.readfile,
     )
 
     MemConfig.config_mem(args, system)
@@ -214,13 +219,19 @@ def create(args):
     workload_class = workloads.workload_list.get(args.workload)
     system.workload = workload_class(object_file, system)
 
+    if args.gdb:
+        system.workload.wait_for_remote_gdb = True
+
     if args.bootloader != "":
-        system.realview.setupBootLoader(system, SysPaths.binary, args.bootloader)
+        system.realview.setupBootLoader(
+            system, SysPaths.binary, args.bootloader
+        )
 
     if args.with_pmu:
-        enabled_pmu_events = set(
-            (*args.pmu_dump_stats_on, *args.pmu_reset_stats_on)
-        )
+        enabled_pmu_events = {
+            *args.pmu_dump_stats_on,
+            *args.pmu_reset_stats_on,
+        }
         exit_sim_on_control = bool(
             enabled_pmu_events & set(pmu_control_events.keys())
         )
@@ -369,6 +380,11 @@ def main():
         "--with-pmu",
         action="store_true",
         help="Add a PMU to each core in the cluster.",
+    )
+    parser.add_argument(
+        "--gdb",
+        action="store_true",
+        help="Wait for GDB connection.",
     )
     parser.add_argument(
         "--pmu-ppi-number",

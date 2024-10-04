@@ -138,7 +138,7 @@ class BaseSimpleCPU : public BaseCPU
     void serviceInstCountEvents();
     void preExecute();
     void postExecute();
-    void advancePC(const Fault &fault);
+    void advancePC(const Fault &fault, bool skipCurMacroOp = false);
 
     void haltContext(ThreadID thread_num) override;
 

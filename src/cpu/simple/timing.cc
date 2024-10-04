@@ -773,6 +773,7 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
         return;
 
     Fault overrideFault = fault;
+    bool skipCurMacroOp = false;
 
     // use separate mask flags to make sure we don't clear the MSR flags for the current cycle
     // the next fetch cycle sets the separate mask flags
@@ -792,10 +793,9 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
     if (fault != NoFault) {
         if (!thread->getExcInterceptMaskFlag() && thread->checkExcIntercept(fault, curStaticInst)) {
             thread->doExcIntercept(fault, curStaticInst);
+            // force control change (in case in the middle of a macroop)
             overrideFault = NoFault;
-            thread->decoder->reset();
-            // terminate the current macroop
-            curStaticInst->setLastMicroop();
+            skipCurMacroOp = true;
             goto end;
         }
 
@@ -852,7 +852,7 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
 
 end:
     if (!t_info.stayAtPC)
-        advancePC(overrideFault);
+        advancePC(overrideFault, skipCurMacroOp);
 
     if (tryCompleteDrain())
         return;

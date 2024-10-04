@@ -295,11 +295,8 @@ BaseSimpleCPU::checkForInterrupts()
             t_info.fetchOffset = 0;
             if (tc->checkExcIntercept(interrupt, nullStaticInstPtr)) {
                 tc->doExcIntercept(interrupt, nullStaticInstPtr);
-                // terminate the current microop
-                if (curStaticInst) {
-                    curStaticInst->setLastMicroop();
-                }
-                advancePC(NoFault);
+                // force control change (in case in the middle of a macroop)
+                advancePC(NoFault, true);
             } else {
                 interrupts[curThread]->updateIntrInfo();
                 interrupt->invoke(tc);
@@ -505,7 +502,7 @@ BaseSimpleCPU::postExecute()
 }
 
 void
-BaseSimpleCPU::advancePC(const Fault &fault)
+BaseSimpleCPU::advancePC(const Fault &fault, bool skipCurMacroOp)
 {
     SimpleExecContext &t_info = *threadInfo[curThread];
     SimpleThread* thread = t_info.thread;
@@ -520,9 +517,14 @@ BaseSimpleCPU::advancePC(const Fault &fault)
         thread->decoder->reset();
     } else {
         if (curStaticInst) {
-            if (curStaticInst->isLastMicroop())
+            if (curMacroStaticInst && skipCurMacroOp) {
+                curMacroStaticInst->advancePC(thread);
+            } else {
+                curStaticInst->advancePC(thread);
+            }
+
+            if (curStaticInst->isLastMicroop() || skipCurMacroOp)
                 curMacroStaticInst = nullStaticInstPtr;
-            curStaticInst->advancePC(thread);
         }
     }
 
