@@ -519,6 +519,7 @@ BaseSimpleCPU::advancePC(const Fault &fault, bool skipCurMacroOp)
         if (curStaticInst) {
             if (curMacroStaticInst && skipCurMacroOp) {
                 curMacroStaticInst->advancePC(thread);
+                thread->decoder->reset();
             } else {
                 curStaticInst->advancePC(thread);
             }
