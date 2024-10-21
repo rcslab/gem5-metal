@@ -102,3 +102,9 @@ class ArmFsFreebsd(ArmFsWorkload):
     type = "ArmFsFreebsd"
     cxx_header = "arch/arm/freebsd/fs_workload.hh"
     cxx_class = "gem5::ArmISA::FsFreebsd"
+
+
+class ArmFsCastor(ArmFsWorkload):
+    type = "ArmFsCastor"
+    cxx_header = "arch/arm/castor/fs_workload.hh"
+    cxx_class = "gem5::ArmISA::FsCastor"

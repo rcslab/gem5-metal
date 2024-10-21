@@ -52,7 +52,6 @@ from gem5.simulate.exit_event import ExitEvent
 m5.util.addToPath("../..")
 
 import devices
-import workloads
 from common import (
     MemConfig,
     ObjectList,
@@ -216,11 +215,21 @@ def create(args):
 
     system.highest_el_is_64 = True
 
-    workload_class = workloads.workload_list.get(args.workload)
-    system.workload = workload_class(object_file, system)
+    system.workload = ArmFsCastor()
+    system.workload.object_file = object_file
+    system.workload.dtb_addr = args.dtbaddr
 
     if args.gdb:
         system.workload.wait_for_remote_gdb = True
+
+    if args.dtb:
+        system.workload.dtb_filename = args.dtb
+    else:
+        # No DTB specified: autogenerate DTB
+        system.workload.dtb_filename = os.path.join(
+            m5.options.outdir, "system.dtb"
+        )
+        system.generateDtb(system.workload.dtb_filename)
 
     if args.bootloader != "":
         system.realview.setupBootLoader(
@@ -306,13 +315,6 @@ def main():
 
     parser.add_argument(
         "--kernel", type=str, default=None, help="Binary to run"
-    )
-    parser.add_argument(
-        "--workload",
-        type=str,
-        default="ArmBaremetal",
-        choices=workloads.workload_list.get_names(),
-        help="Workload type",
     )
     parser.add_argument(
         "--disk-image", type=str, default=None, help="Disk to instantiate"
@@ -475,6 +477,18 @@ def main():
         type=str,
         default="",
         help="Bootloader the system uses.",
+    )
+    parser.add_argument(
+        "--dtb",
+        type=str,
+        default="",
+        help="DTB file the system uses.",
+    )
+    parser.add_argument(
+        "--dtbaddr",
+        type=int,
+        default=0x200000,  # 2MB
+        help="DTB load addr.",
     )
 
     args = parser.parse_args()

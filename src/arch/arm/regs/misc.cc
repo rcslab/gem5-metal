@@ -729,6 +729,10 @@ Fault
 checkFaultAccessAArch64SysReg(MiscRegIndex reg, CPSR cpsr,
                               ThreadContext *tc, const MiscRegOp64 &inst)
 {
+    if (metal_reg::isInMetalMode(tc->readMetalRegNoEffect(metal_reg::MSR))) {
+      // allow access to privileged system regs in Metal mode
+      return NoFault;
+    }
     return lookUpMiscReg[reg].checkFault(tc, inst, currEL(cpsr));
 }
 
