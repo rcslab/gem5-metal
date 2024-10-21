@@ -86,6 +86,11 @@ class DtbFile : public ImageFile
     Addr findReleaseAddr();
 
     MemoryImage buildImage() const override;
+
+    inline size_t
+    getLength() {
+        return length;
+    }
 };
 
 } // namespace loader

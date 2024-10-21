@@ -38,14 +38,17 @@ FsCastor::initState()
     dtb_file->buildImage().
         offset(params().dtb_addr).
         write(system->physProxy);
-    delete dtb_file;
 
     for (auto *tc: system->threads) {
         tc->setReg(int_reg::R0, (RegVal)0x10CA5201); // magic number
         inform("Setting R0 to magic number 0x10CA5201.\n");
         tc->setReg(int_reg::R1, params().dtb_addr);
         inform("Setting R1 to DTB load address %#x.\n", params().dtb_addr);
+        tc->setReg(int_reg::R2, dtb_file->getLength());
+        inform("Setting R2 to DTB size %#x.\n", dtb_file->getLength());
     }
+
+    delete dtb_file;
 }
 
 } // namespace ArmISA
