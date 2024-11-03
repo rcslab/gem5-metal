@@ -302,18 +302,6 @@ class ExecContext : public gem5::ExecContext
         return thread.setMiscReg(reg.index(), val);
     }
 
-    RegVal
-    readMetalReg(int metal_reg) override
-    {
-        return thread.readMetalReg(metal_reg);
-    }
-
-    void
-    setMetalReg(int metal_reg, RegVal val) override
-    {
-        thread.setMetalReg(metal_reg, val);
-    }
-
     ThreadContext *tcBase() const override { return thread.getTC(); }
 
     /* @todo, should make stCondFailures persistent somewhere */

@@ -303,30 +303,32 @@ class CheckerThreadContext : public ThreadContext
     }
 
     RegVal
-    readMetalReg(RegIndex metal_reg) override
-    {
-        return actualTC->readMetalReg(metal_reg);
+    readMetalReg(RegIndex metal_reg) override  {
+        panic("unimplemented");
+    }
+
+    void
+    setMetalReg(RegIndex metal_reg, RegVal val) override {
+        panic("unimplemented");
+    }
+
+    void
+    setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
+        panic("unimplemented");
     }
 
     RegVal
-    readMetalRegNoEffect(RegIndex metal_reg) const override
-    {
-        return actualTC->readMetalRegNoEffect(metal_reg);
+    readMetalMiscReg(RegIndex metal_reg) const override {
+        panic("unimplemented");
     }
 
-    void
-    setMetalRegNoEffect(RegIndex metal_reg, RegVal val) override
-    {
-        checkerTC->setMetalRegNoEffect(metal_reg, val);
-        actualTC->setMetalRegNoEffect(metal_reg, val);
-    }
+    RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const override {
+        panic("unimplemented");
+    };
 
-    void
-    setMetalReg(RegIndex metal_reg, RegVal val) override
-    {
-        checkerTC->setMetalReg(metal_reg, val);
-        actualTC->setMetalReg(metal_reg, val);
-    }
+    void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) override {
+        panic("unimplemented");
+    };
 
     unsigned
     readStCondFailures() const override

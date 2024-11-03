@@ -937,10 +937,6 @@ ExecuteCPUStats::ExecuteCPUStats(statistics::Group *parent, int thread_id)
              "Number of times the Misc registers were read"),
     ADD_STAT(numMiscRegWrites, statistics::units::Count::get(),
              "Number of times the Misc registers were written"),
-    ADD_STAT(numMetalRegReads, statistics::units::Count::get(),
-             "Number of times the Metal registers were read"),
-    ADD_STAT(numMetalRegWrites, statistics::units::Count::get(),
-             "Number of times the Metal registers were written"),
     ADD_STAT(numVecAluAccesses, statistics::units::Count::get(),
              "Number of vector alu accesses"),
     ADD_STAT(numVecPredRegReads, statistics::units::Count::get(),
@@ -979,10 +975,6 @@ ExecuteCPUStats::ExecuteCPUStats(statistics::Group *parent, int thread_id)
         .prereq(numMiscRegReads);
     numMiscRegWrites
         .prereq(numMiscRegWrites);
-    numMetalRegWrites
-        .prereq(numMetalRegWrites);
-    numMetalRegReads
-        .prereq(numMetalRegReads);
     numVecPredRegReads
         .prereq(numVecPredRegReads);
     numVecPredRegWrites

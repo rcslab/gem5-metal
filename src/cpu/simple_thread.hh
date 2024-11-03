@@ -289,29 +289,29 @@ class SimpleThread : public ThreadState, public ThreadContext
     {
         return isa->setMiscReg(misc_reg, val);
     }
-
-    RegVal
-    readMetalRegNoEffect(RegIndex metal_reg) const override
-    {
-        return isa->readMetalRegNoEffect(metal_reg);
-    }
-
-    RegVal
-    readMetalReg(RegIndex metal_reg) override
-    {
+    
+    virtual RegVal readMetalReg(RegIndex metal_reg) override {
         return isa->readMetalReg(metal_reg);
     }
 
-    void
-    setMetalRegNoEffect(RegIndex metal_reg, RegVal val) override
-    {
-        return isa->setMetalRegNoEffect(metal_reg, val);
+    virtual void setMetalReg(RegIndex metal_reg, RegVal val) override {
+        isa->setMetalReg(metal_reg, val);
     }
 
-    void
-    setMetalReg(RegIndex metal_reg, RegVal val) override
-    {
-        return isa->setMetalReg(metal_reg, val);
+    virtual RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const override {
+        return isa->readMetalMiscRegNoEffect(metal_reg);
+    }
+
+    virtual void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) override {
+        isa->setMetalMiscRegNoEffect(metal_reg, val);
+    }
+    
+    virtual RegVal readMetalMiscReg(RegIndex metal_reg) const override {
+        return isa->readMetalMiscReg(metal_reg);
+    }
+    
+    virtual void setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
+        isa->setMetalMiscReg(metal_reg, val);
     }
 
     unsigned readStCondFailures() const override { return storeCondFailures; }

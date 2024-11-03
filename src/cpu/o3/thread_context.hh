@@ -211,26 +211,33 @@ class ThreadContext : public gem5::ThreadContext
 
 
     RegVal
-    readMetalRegNoEffect(RegIndex metal_reg) const override
-    {
-        panic("unimplemented!");
+    readMetalReg(RegIndex metal_reg) override  {
+        panic("unimplemented");
+    }
+
+    void
+    setMetalReg(RegIndex metal_reg, RegVal val) override {
+        panic("unimplemented");
+    }
+
+    void
+    setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
+        panic("unimplemented");
     }
 
     RegVal
-    readMetalReg(RegIndex metal_reg) override
-    {
-        panic("unimplemented!");
+    readMetalMiscReg(RegIndex metal_reg) const override {
+        panic("unimplemented");
     }
 
-    void setMetalRegNoEffect(RegIndex misc_reg, RegVal val) override
-    {
-        panic("unimplemented!");
-    }
+    RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const override {
+        panic("unimplemented");
+    };
 
-    void setMetalReg(RegIndex misc_reg, RegVal val) override
-    {
-        panic("unimplemented!");
-    }
+    void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) override {
+        panic("unimplemented");
+    };
+
 
     /** Returns the number of consecutive store conditional failures. */
     // @todo: Figure out where these store cond failures should go.

@@ -78,11 +78,17 @@ class BaseISA : public SimObject
     virtual void setMiscRegNoEffect(RegIndex idx, RegVal val) = 0;
     virtual void setMiscReg(RegIndex idx, RegVal val) = 0;
 
-    virtual RegVal readMetalRegNoEffect(RegIndex idx) const = 0;
-    virtual RegVal readMetalReg(RegIndex idx) = 0;
+    virtual RegVal readMetalReg(RegIndex idx) const = 0;
 
-    virtual void setMetalRegNoEffect(RegIndex idx, RegVal val) = 0;
     virtual void setMetalReg(RegIndex idx, RegVal val) = 0;
+
+    virtual RegVal readMetalMiscRegNoEffect(RegIndex idx) const = 0;
+
+    virtual void setMetalMiscRegNoEffect(RegIndex idx, RegVal val) = 0;
+
+    virtual RegVal readMetalMiscReg(RegIndex idx) const = 0;
+
+    virtual void setMetalMiscReg(RegIndex idx, RegVal val) = 0;
 
     // instruction interception
     // check* functions only checks if an instruction should be intercepted

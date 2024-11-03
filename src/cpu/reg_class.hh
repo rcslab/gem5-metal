@@ -66,8 +66,9 @@ enum RegClassType
     VecPredRegClass,
     MatRegClass,        ///< Matrix Register
     CCRegClass,         ///< Condition-code register
-    MetalRegClass,      ///< Metal Registers>
+    MetalRegClass,      ///< Metal Registers
     MiscRegClass,       ///< Control (misc) register
+    MetalMiscRegClass,  ///< Metal Misc register
     InvalidRegClass = -1
 };
 
@@ -81,6 +82,7 @@ inline constexpr char MatRegClassName[] = "matrix";
 inline constexpr char CCRegClassName[] = "condition_code";
 inline constexpr char MiscRegClassName[] = "miscellaneous";
 inline constexpr char MetalRegClassName[] = "metal";
+inline constexpr char MetalMiscRegClassName[] = "metalmisc";
 
 class RegClass;
 class RegClassIterator;

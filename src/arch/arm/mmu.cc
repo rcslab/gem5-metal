@@ -1235,7 +1235,7 @@ MMU::CachedState::updateMiscReg(ThreadContext *tc,
         ELIs64(tc, EL2) :
         ELIs64(tc, aarch64EL == EL0 ? EL1 : aarch64EL);
     
-    mtp = tc->readMetalReg(metal_reg::MTP);
+    mtp = tc->readMetalMiscReg(metal_reg::MTP);
     hcr = tc->readMiscReg(MISCREG_HCR_EL2);
     if (aarch64) {  // AArch64
         // determine EL we need to translate in

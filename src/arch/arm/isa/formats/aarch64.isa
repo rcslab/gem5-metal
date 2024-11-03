@@ -664,10 +664,14 @@ namespace Aarch64
                           return new War64(machInst, mreg, greg);
                         }
                         case 0b110 : {
-                          return new Mcli64(machInst);
+                          RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                          RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                          return new Rmcr64(machInst, mreg, greg);
                         }
                         case 0b111 : {
-                          return new Msti64(machInst);
+                          RegIndex greg = (RegIndex)(uint8_t)bits(machInst, 4, 0);
+                          RegIndex mreg = (RegIndex)(uint8_t)bits(machInst, 9, 5);
+                          return new Wmcr64(machInst, mreg, greg);
                         }
                         default:
                           return new Unknown64(machInst);

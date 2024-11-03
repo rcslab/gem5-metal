@@ -350,6 +350,7 @@ namespace ArmISA
         SOFTWARE_BREAKPOINT     = 0x38,
         VECTOR_CATCH            = 0x3A,
         SOFTWARE_BREAKPOINT_64  = 0x3C,
+        TRAPPED_METAL_ACCESS    = 0x3D
     };
 
     /**

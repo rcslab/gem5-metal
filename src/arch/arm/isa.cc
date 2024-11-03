@@ -152,8 +152,7 @@ ISA::clear()
     this->excInterceptMask = false;
     this->interruptMask = false;
 
-    updateRegMap(miscRegs[MISCREG_CPSR], this->readMetalRegNoEffect(metal_reg::MSR));
-    this->prevIntRegMap = nullptr;
+    updateRegMap(miscRegs[MISCREG_CPSR], this->readMetalMiscRegNoEffect(metal_reg::MSR));
 }
 
 void
@@ -207,12 +206,12 @@ ISA::copyRegsFrom(ThreadContext *src)
         tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
 
     // copy window
-    for (int i = 0; i < metal_reg::NumGenRegs; i++)
-        // need to copy window
+    for (int i = 0; i < metal_reg::NumRegs; i++)
+        // need to copy full window
         panic("unimplemented");
 
-    for (int i = metal_reg::NumGenRegs; i < metal_reg::NumRegs; i++)
-        tc->setMetalRegNoEffect(i, src->readMetalRegNoEffect(i));
+    for (int i = 0; i < metal_reg::NumMiscRegs; i++)
+        tc->setMetalMiscRegNoEffect(i, src->readMetalMiscRegNoEffect(i));
 
     ArmISA::VecRegContainer vc;
     for (auto &id: vecRegClass) {
@@ -683,7 +682,7 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
     SCR scr;
 
     if (idx == MISCREG_CPSR) {
-        updateRegMap(val, this->readMetalRegNoEffect(metal_reg::MSR));
+        updateRegMap(val, this->readMetalMiscRegNoEffect(metal_reg::MSR));
 
 
         CPSR old_cpsr = miscRegs[MISCREG_CPSR];
@@ -1486,16 +1485,16 @@ ISA::loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int 
 bool
 ISA::checkInstInterceptMasked(void) const
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     return metal_reg::isInstInterceptMasked(msr);
 }
 
 void
 ISA::doneInstInterceptMasked(void)
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     msr.im = 0;
-    this->setMetalReg(metal_reg::MSR, msr);
+    this->setMetalMiscReg(metal_reg::MSR, msr);
 }
 
 void ISA::setExcInterceptMaskFlag(bool val)
@@ -1511,31 +1510,31 @@ bool ISA::getExcInterceptMaskFlag(void) const
 bool
 ISA::checkExcInterceptMasked(void) const
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     return metal_reg::isExcInterceptMasked(msr);
 }
 
 void
 ISA::doneExcInterceptMasked(void)
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     msr.em = 0;
-    this->setMetalReg(metal_reg::MSR, msr);
+    this->setMetalMiscReg(metal_reg::MSR, msr);
 }
 
 bool
 ISA::checkInterruptDisabled(void) const
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     return metal_reg::isInterruptDisabled(msr);
 }
 
 void
 ISA::doneInterruptDisabled(void)
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     msr.id = 0;
-    this->setMetalReg(metal_reg::MSR, msr);
+    this->setMetalMiscReg(metal_reg::MSR, msr);
 }
 
 void ISA::setInterruptDisabledFlag(bool val)
@@ -1551,7 +1550,7 @@ bool ISA::getInterruptDisabledFlag(void) const
 bool
 ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
 {
-    metal_reg::MSR_t msr = readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = readMetalMiscRegNoEffect(metal_reg::MSR);
 
     if (!metal_reg::isInstInterceptEnabled(msr)) {
         // ic flag is currently disabled or metal mode is disabled
@@ -1632,7 +1631,7 @@ ISA::getEILBEntryFromFault(const ArmFault * armFault) const
 bool
 ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
 {
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
 
     if (!metal_reg::isExcInterceptEnabled(msr)) {
         return false;
@@ -1750,40 +1749,17 @@ ISA::setMiscRegReset(RegIndex idx, RegVal val)
     InitReg(flat_idx).reset(val);
 }
 
-RegVal
-ISA::readMetalReg(RegIndex idx)
-{
-    return readMetalRegNoEffect(idx);
-}
-
-RegVal
-ISA::readMetalRegNoEffect(RegIndex idx) const
+RegIndex
+ISA::flattenMetalReg(RegIndex idx) const
 {
     assert(idx < metal_reg::NumRegs);
-    if (metal_reg::isGeneralReg(idx)) {
-        return this->metalRegs.at(flattenMetalGReg(idx));
-    } else {
-        return this->metalMiscRegs.at(flattenMetalMReg(idx));
-    }
-}
-
-RegIndex
-ISA::flattenMetalMReg(RegIndex idx) const
-{
-    assert(!metal_reg::isGeneralReg(idx) && idx < metal_reg::NumRegs);
-    return idx - metal_reg::NumGenRegs;
-}
-
-RegIndex
-ISA::flattenMetalGReg(RegIndex idx) const
-{
-    assert(metal_reg::isGeneralReg(idx));
-    metal_reg::MSR_t msr = this->readMetalRegNoEffect(metal_reg::MSR);
+    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
     unsigned int level = msr.lv;
-    if (level >= metal_reg::NumWindow) {
-        panic("Metal GReg window overflow.");
+    if (level >= metal_reg::NumWindow - 1) {
+        panic("Metal register window overflow.");
     }
-    const size_t window = metal_reg::TotalGRegs - metal_reg::WindowOverlap - (level + 1) * (metal_reg::WindowSize - metal_reg::WindowOverlap);
+
+    const size_t window = metal_reg::TotalGRegs - (level + 1) * (metal_reg::NumRegs - metal_reg::NumIORegs);
     const RegIndex fidx = window + idx;
     METAL_DBGPRINT(ISA, REGS, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
     return fidx;
@@ -1800,24 +1776,46 @@ ISA::resetMetalRegs(void)
     }
 }
 
-void
-ISA::setMetalRegNoEffect(RegIndex idx, RegVal val)
+RegVal
+ISA::readMetalReg(RegIndex idx) const
 {
     assert(idx < metal_reg::NumRegs);
-    METAL_DBGPRINT(ISA, REGS, "Setting %s to 0x%lx.\n", ArmStaticInst::printMetalReg(idx), val);
-    if (metal_reg::isGeneralReg(idx)) {
-        this->metalRegs.at(flattenMetalGReg(idx)) = val;
-    } else {
-        this->metalMiscRegs.at(flattenMetalMReg(idx)) = val;
-    }
+    return this->metalRegs.at(flattenMetalReg(idx));
 }
 
 void
 ISA::setMetalReg(RegIndex idx, RegVal val)
 {
-    if (idx >= metal_reg::NumRegs) {
-        panic("Setting unknown Metal reg %d.", idx);
-    }
+    assert(idx < metal_reg::NumRegs);
+    this->metalRegs.at(flattenMetalReg(idx)) = val;
+}
+
+RegVal
+ISA::readMetalMiscReg(RegIndex idx) const
+{
+    assert(idx < metal_reg::NumMiscRegs);
+    return readMetalMiscRegNoEffect(idx);
+}
+
+RegVal
+ISA::readMetalMiscRegNoEffect(RegIndex idx) const
+{
+    assert(idx < metal_reg::NumMiscRegs);
+    return this->metalMiscRegs.at(idx);
+}
+
+void
+ISA::setMetalMiscRegNoEffect(RegIndex idx, RegVal val)
+{
+    assert(idx < metal_reg::NumMiscRegs);
+    METAL_DBGPRINT(ISA, REGS, "Setting Metal Misc Reg %s to 0x%lx.\n", ArmStaticInst::printMetalMiscReg(idx), val);
+    this->metalMiscRegs.at(idx) = val;
+}
+
+void
+ISA::setMetalMiscReg(RegIndex idx, RegVal val)
+{
+    assert(idx < metal_reg::NumMiscRegs);
 
     switch (idx) {
         case metal_reg::MIB : {
@@ -1835,9 +1833,9 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
         }
         case metal_reg::MSR : {
             metal_reg::MSR_t new_val = val;
-            metal_reg::MSR_t msr = readMetalRegNoEffect(idx);
-            if (msr.init != new_val.init) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[init]: %d -> %d.\n", msr.init, new_val.init);
+            metal_reg::MSR_t msr = readMetalMiscRegNoEffect(idx);
+            if (msr.pd != new_val.pd) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[pd]: %d -> %d.\n", msr.pd, new_val.pd);
             }
             if (msr.lv != new_val.lv) {
                 METAL_DBGPRINT(ISA, REGS, "Setting MSR.[level]: %d -> %d.\n", msr.lv, new_val.lv);
@@ -1857,9 +1855,6 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
             if (msr.ei != new_val.ei) {
                 METAL_DBGPRINT(ISA, REGS, "Setting MSR.[exception intercept]:  %d -> %d.\n", msr.ei, new_val.ei);
             }
-            if (msr.pd != new_val.pd) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[privilege disable]:  %d -> %d.\n", msr.pd, new_val.pd);
-            }
             break;
         }
         case metal_reg::MTP: {
@@ -1868,22 +1863,24 @@ ISA::setMetalReg(RegIndex idx, RegVal val)
         }
     }
 
-    setMetalRegNoEffect(idx, val);
-    updateRegMap(this->miscRegs[MISCREG_CPSR], readMetalRegNoEffect(metal_reg::MSR));
+    setMetalMiscRegNoEffect(idx, val);
+    updateRegMap(this->miscRegs[MISCREG_CPSR], readMetalMiscRegNoEffect(metal_reg::MSR));
 }
 
-void ISA::setPrevIntReg(RegIndex idx, RegVal val)
+void ISA::setIntRegAtLevel(RegIndex idx, RegVal val, unsigned int mlvl)
 {
+    assert(idx < int_reg::NumArchRegs);
     // manually flatten
-    const RegId & id = mapPrevIntRegMap(idx);
-    this->tc->setReg(flatIntRegClass[id.index()], val);
+    const RegId * map = int_reg::aarch64GetMetalRegMap(mlvl);
+    this->tc->setReg({flatIntRegClass, map[idx]}, val);
 }
 
-RegVal ISA::readPrevIntReg(RegIndex idx) const
+RegVal ISA::readIntRegAtLevel(RegIndex idx, unsigned int mlvl) const
 {
+    assert(idx < int_reg::NumArchRegs);
     // manually flatten
-    const RegId & id = mapPrevIntRegMap(idx);
-    return this->tc->getReg(flatIntRegClass[id.index()]);
+    const RegId * map = int_reg::aarch64GetMetalRegMap(mlvl);
+    return this->tc->getReg({flatIntRegClass, map[idx]});
 }
 
 BaseISADevice &
@@ -2090,7 +2087,7 @@ ISA::unserialize(CheckpointIn &cp)
     }
 
     CPSR tmp_cpsr = miscRegs[MISCREG_CPSR];
-    updateRegMap(tmp_cpsr, this->readMetalRegNoEffect(metal_reg::MSR));
+    updateRegMap(tmp_cpsr, this->readMetalMiscRegNoEffect(metal_reg::MSR));
 }
 
 void

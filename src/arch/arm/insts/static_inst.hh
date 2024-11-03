@@ -178,8 +178,10 @@ class ArmStaticInst : public StaticInst
                        bool withCond64 = false,
                        ConditionCode cond64 = COND_UC) const;
     void printMetalReg(std::ostream &os, RegIndex reg_index) const;
+    void printMetalMiscReg(std::ostream &os, RegIndex reg_index) const;
 public:
     static const char * printMetalReg(RegIndex reg_idx);
+    static const char * printMetalMiscReg(RegIndex reg_idx);
 protected:
     void printTarget(std::ostream &os, Addr target,
                      const loader::SymbolTable *symtab) const;

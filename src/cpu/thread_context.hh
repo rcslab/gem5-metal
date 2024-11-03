@@ -216,11 +216,15 @@ class ThreadContext : public PCEventScope
 
     virtual RegVal readMetalReg(RegIndex metal_reg) = 0;
 
-    virtual RegVal readMetalRegNoEffect(RegIndex metal_reg) const = 0;
-
-    virtual void setMetalRegNoEffect(RegIndex metal_reg, RegVal val) = 0;
-
     virtual void setMetalReg(RegIndex metal_reg, RegVal val) = 0;
+
+    virtual RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const = 0;
+
+    virtual void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) = 0;
+    
+    virtual RegVal readMetalMiscReg(RegIndex metal_reg) const = 0;
+
+    virtual void setMetalMiscReg(RegIndex metal_reg, RegVal val) = 0;
 
     // Also not necessarily the best location for these two.  Hopefully will go
     // away once we decide upon where st cond failures goes.

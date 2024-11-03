@@ -48,6 +48,7 @@
 #include "arch/arm/regs/mat.hh"
 #include "arch/arm/regs/misc.hh"
 #include "arch/arm/regs/metal.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "arch/arm/regs/vec.hh"
 #include "arch/arm/self_debug.hh"
 #include "arch/arm/system.hh"
@@ -132,7 +133,6 @@ namespace ArmISA
         std::array<RegVal, metal_reg::TotalGRegs> metalRegs;
         std::array<RegVal, metal_reg::NumMiscRegs> metalMiscRegs;
         const RegId *intRegMap;
-        const RegId *prevIntRegMap;
 
         MRLB mrlb;
         IILB iilb;
@@ -192,11 +192,9 @@ private:
         void
         updateRegMap(CPSR cpsr, metal_reg::MSR_t msr)
         {
-            const RegId * tmpRegMap = intRegMap;
-            if (metal_reg::isInMetalMode(msr)) {
-                intRegMap = int_reg::Reg64MetalMap;
-            } else if (cpsr.width == 0) {
-                intRegMap = int_reg::Reg64Map;
+            if (cpsr.width == 0) {
+                intRegMap = int_reg::aarch64GetMetalRegMap(metal_reg::getMetalLevel(msr));
+                METAL_DBGPRINT(ISA, REGS, "Updated general regs window r0 = %d, metal level = %d.\n", intRegMap[0].index(), metal_reg::getMetalLevel(msr));
             } else {
                 switch (cpsr.mode) {
                   case MODE_USER:
@@ -228,24 +226,10 @@ private:
                     panic("Unrecognized mode setting in CPSR.\n");
                 }
             }
-
-            if (intRegMap != tmpRegMap) {
-                prevIntRegMap = tmpRegMap;
-
-                if (prevIntRegMap == int_reg::Reg64MetalMap) {
-                    METAL_DBGPRINT(ISA, REGS, "Switching to regular reg banks.\n");
-                } else if (intRegMap == int_reg::Reg64MetalMap) {
-                    METAL_DBGPRINT(ISA, REGS, "Switching to Metal reg bank.\n");
-                }
-            }
         }
 
       public:
         const RegId &mapIntRegId(RegIndex idx) const { return intRegMap[idx]; }
-        const RegId &mapPrevIntRegMap(RegIndex idx) const {
-          assert(prevIntRegMap != nullptr && idx < int_reg::NumArchRegs);
-          return prevIntRegMap[idx];
-        }
 
       public:
         void clear() override;
@@ -279,17 +263,19 @@ private:
         RegVal readMiscRegReset(RegIndex) const;
         void setMiscRegReset(RegIndex, RegVal val);
 
-        RegVal readMetalRegNoEffect(RegIndex idx) const override;
-        RegVal readMetalReg(RegIndex idx) override;
-        void setMetalRegNoEffect(RegIndex idx, RegVal val) override;
+        RegVal readMetalReg(RegIndex idx) const override;
         void setMetalReg(RegIndex, RegVal val) override;
 
-        void setPrevIntReg(RegIndex idx, RegVal reg);
-        RegVal readPrevIntReg(RegIndex idx) const;
+        RegVal readMetalMiscReg(RegIndex idx) const override;
+        void setMetalMiscReg(RegIndex idx, RegVal val) override;
+        RegVal readMetalMiscRegNoEffect(RegIndex idx) const override;
+        void setMetalMiscRegNoEffect(RegIndex idx, RegVal val) override;
+
+        void setIntRegAtLevel(RegIndex idx, RegVal reg, unsigned int mlvl);
+        RegVal readIntRegAtLevel(RegIndex idx, unsigned int mlvl) const;
 private:
         void resetMetalRegs(void);
-        RegIndex flattenMetalGReg(RegIndex idx) const;
-        RegIndex flattenMetalMReg(RegIndex idx) const;
+        RegIndex flattenMetalReg(RegIndex idx) const;
         void registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent);
         static MachInst shiftInstMask(MachInst encoding, MachInst mask)
         {

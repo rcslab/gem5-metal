@@ -1,0 +1,14 @@
+#pragma once
+#include "arch/arm/insts/metal/common.hh"
+
+namespace gem5 {
+    namespace ArmISA {
+        class War64 : public MetalRegOp2
+        {
+        public:
+            War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+
+            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+        };
+    }
+}

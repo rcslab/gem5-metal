@@ -388,6 +388,20 @@ ArmStaticInst::printMetalReg(RegIndex reg_idx)
 }
 
 void
+ArmStaticInst::printMetalMiscReg(std::ostream &os, RegIndex reg_idx) const
+{
+    assert(reg_idx < metal_reg::NumMiscRegs);
+    ccprintf(os, "%s", printMetalMiscReg(reg_idx));
+}
+
+const char *
+ArmStaticInst::printMetalMiscReg(RegIndex reg_idx)
+{
+    assert(reg_idx < metal_reg::NumMiscRegs);
+    return ArmISA::metal_reg::miscRegNames[reg_idx];
+}
+
+void
 ArmStaticInst::printMnemonic(std::ostream &os,
                              const std::string &suffix,
                              bool withPred,

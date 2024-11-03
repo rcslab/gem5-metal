@@ -291,21 +291,6 @@ class SimpleExecContext : public ExecContext
         thread->setMiscReg(misc_reg, val);
     }
 
-    void
-    setMetalReg(int metal_reg, RegVal val) override
-    {
-        cpu->executeStats[thread->threadId()]->numMetalRegWrites++;
-        thread->setMetalReg(metal_reg, val);
-    }
-
-    RegVal
-    readMetalReg(int metal_reg) override
-    {
-        cpu->executeStats[thread->threadId()]->numMetalRegReads++;
-        return thread->readMetalReg(metal_reg);
-    }
-
-
     const PCStateBase &
     pcState() const override
     {

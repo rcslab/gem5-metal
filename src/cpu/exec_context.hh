@@ -91,13 +91,6 @@ class ExecContext
                                    int idx, RegVal val) = 0;
 
     /**
-     * @{
-     * @name Metal Register Interfaces
-     */
-    virtual RegVal readMetalReg(int metal_reg) = 0;
-    virtual void setMetalReg(int metal_reg, RegVal val) = 0;
-
-    /**
      * Reads a miscellaneous register, handling any architectural
      * side effects due to reading that register.
      */

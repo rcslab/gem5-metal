@@ -132,10 +132,18 @@ ThreadContext::compare(ThreadContext *one, ThreadContext *two)
     }
 
     for (int i = 0; i < regClasses.at(MetalRegClass)->numRegs(); ++i) {
-        RegVal t1 = one->readMetalRegNoEffect(i);
-        RegVal t2 = two->readMetalRegNoEffect(i);
+        RegVal t1 = one->readMetalReg(i);
+        RegVal t2 = two->readMetalReg(i);
         if (t1 != t2)
             panic("Metal reg idx %d doesn't match, one: %#x, two: %#x",
+                  i, t1, t2);
+    }
+
+    for (int i = 0; i < regClasses.at(MetalMiscRegClass)->numRegs(); ++i) {
+        RegVal t1 = one->readMetalMiscRegNoEffect(i);
+        RegVal t2 = two->readMetalMiscRegNoEffect(i);
+        if (t1 != t2)
+            panic("Metal misc reg idx %d doesn't match, one: %#x, two: %#x",
                   i, t1, t2);
     }
 
