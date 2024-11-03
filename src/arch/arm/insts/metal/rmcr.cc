@@ -31,5 +31,17 @@ namespace gem5 {
             
             return NoFault;
         }
+
+        std::string Rmcr64::generateDisassembly(
+            Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printMetalMiscReg(ss, mReg);
+            ccprintf(ss, ", ");
+            printIntReg(ss, gReg);
+            return ss.str();
+        }
     }
 }
