@@ -1,5 +1,6 @@
 #include "arch/arm/insts/metal/pldr.hh"
 #include "arch/generic/memhelpers.hh"
+#include "mem/packet_access.hh"
 
 namespace gem5 {
     namespace ArmISA {
