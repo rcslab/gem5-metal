@@ -1759,7 +1759,7 @@ ISA::flattenMetalReg(RegIndex idx) const
         panic("Metal register window overflow.");
     }
 
-    const size_t window = metal_reg::TotalGRegs - (level + 1) * (metal_reg::NumRegs - metal_reg::NumIORegs);
+    const size_t window = (metal_reg::TotalGRegs - metal_reg::NumRegs) - level * (metal_reg::NumRegs - metal_reg::NumIORegs);
     const RegIndex fidx = window + idx;
     METAL_DBGPRINT(ISA, REGS, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
     return fidx;
