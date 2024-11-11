@@ -60,6 +60,7 @@
 #include "params/PciMemBar.hh"
 #include "params/PciMemUpperBar.hh"
 #include "sim/byteswap.hh"
+#include "debug/PciHost.hh"
 
 #define BAR_NUMBER(x) (((x) - PCI0_BASE_ADDR0) >> 0x2);
 

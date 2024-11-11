@@ -46,6 +46,8 @@ import m5
 from m5.objects import *
 from m5.options import *
 from m5.util import addToPath
+import pdb;
+from m5.objects.Ide import *
 
 from gem5.simulate.exit_event import ExitEvent
 
@@ -134,15 +136,14 @@ pmu_interrupt_events = {
 pmu_stats_events = dict(**pmu_control_events, **pmu_interrupt_events)
 
 
-def create_cow_image(name):
-    """Helper function to create a Copy-on-Write disk image"""
-    image = CowDiskImage()
-    image.child.image_file = name
-    return image
+class CowIdeDisk(IdeDisk):
+    image = CowDiskImage(child=RawDiskImage(read_only=True), read_only=False)
 
+    def childImage(self, ci):
+        self.image.child.image_file = ci
 
 def create(args):
-    """Create and configure the system object."""
+    """Create and configure the syste   m object."""
 
     if args.readfile and not os.path.isfile(args.readfile):
         print(f"Error: Bootscript {args.readfile} does not exist")
@@ -152,6 +153,7 @@ def create(args):
 
     cpu_class = cpu_types[args.cpu][0]
     mem_mode = cpu_class.memory_mode()
+    pci_devices = []
     # Only simulate caches when using a timing CPU (e.g., the HPI model)
     want_caches = True if mem_mode == "timing" else False
 
@@ -176,14 +178,25 @@ def create(args):
             cmd_line=" ".join([object_file] + args.args),
         )
 
+    system.realview.ethernet = IGbE_e1000(
+            # pci_bus=0, pci_dev=0, pci_func=0, 
+            InterruptLine=1, InterruptPin=1
+    )
+    pci_devices.append(system.realview.ethernet)
+    system.realview.ide = IdeController(
+            disks=[],
+            # pci_func=1,
+            # pci_dev=1,
+            # pci_bus=1,
+            InterruptLine=2, InterruptPin=2
+    )
+
     if args.disk_image:
-        # Create a VirtIO block device for the system's boot
-        # disk. Attach the disk image using gem5's Copy-on-Write
-        # functionality to avoid writing changes to the stored copy of
-        # the disk image.
-        system.realview.vio[0].vio = VirtIOBlock(
-            image=create_cow_image(args.disk_image)
-        )
+        disk = CowIdeDisk(driveID='device0')
+        disk.childImage(args.disk_image)
+        system.realview.ide.disks.append(disk)
+
+    pci_devices.append(system.realview.ide)
 
     # Wire up the system's memory system
     system.connect()
@@ -219,6 +232,12 @@ def create(args):
     system.workload.object_file = object_file
     system.workload.dtb_addr = args.dtbaddr
 
+    # pci devices
+    for dev in pci_devices:
+        system.realview.attachPciDevice(
+            dev, system.iobus
+        )
+ 
     if args.gdb:
         system.workload.wait_for_remote_gdb = True
 

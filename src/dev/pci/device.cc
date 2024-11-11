@@ -239,22 +239,22 @@ PciDevice::readConfig(PacketPtr pkt)
       case sizeof(uint8_t):
         pkt->setLE<uint8_t>(config.data[offset]);
         DPRINTF(PciDevice,
-            "readConfig:  dev %#x func %#x reg %#x 1 bytes: data = %#x\n",
-            _busAddr.dev, _busAddr.func, offset,
+            "readConfig: bus %#x dev %#x func %#x offset %#x 1 bytes: data = %#x\n",
+            _busAddr.bus, _busAddr.dev, _busAddr.func, offset,
             (uint32_t)pkt->getLE<uint8_t>());
         break;
       case sizeof(uint16_t):
         pkt->setLE<uint16_t>(*(uint16_t*)&config.data[offset]);
         DPRINTF(PciDevice,
-            "readConfig:  dev %#x func %#x reg %#x 2 bytes: data = %#x\n",
-            _busAddr.dev, _busAddr.func, offset,
+            "readConfig: bus %#x dev %#x func %#x offset %#x 2 bytes: data = %#x\n",
+            _busAddr.bus, _busAddr.dev, _busAddr.func, offset,
             (uint32_t)pkt->getLE<uint16_t>());
         break;
       case sizeof(uint32_t):
         pkt->setLE<uint32_t>(*(uint32_t*)&config.data[offset]);
         DPRINTF(PciDevice,
-            "readConfig:  dev %#x func %#x reg %#x 4 bytes: data = %#x\n",
-            _busAddr.dev, _busAddr.func, offset,
+            "readConfig: bus %#x dev %#x func %#x offset %#x 4 bytes: data = %#x\n",
+            _busAddr.bus, _busAddr.dev, _busAddr.func, offset,
             (uint32_t)pkt->getLE<uint32_t>());
         break;
       default:
