@@ -75,7 +75,8 @@ namespace metal_reg
         MIB = MG2, // Metal Instruction Base Register
         MEB = MG3, // Metal Exception Base Register
         MTP = MG4, // Metal TLB Permissions Register
-        MAR = MG5 // Metal Access Register
+        MAR = MG5, // Metal Access Register
+        MSTK = MG6 // Metal Stack Register
     };
     static_assert(NumMiscRegs == 32);
     static_assert(NumMiscRegs <= (1 << 5));
@@ -87,7 +88,7 @@ namespace metal_reg
         "meb",
         "mtp",
         "mar",
-        "mg6",
+        "mstk",
         "mg7",
         "mg8",
         "mg9",
@@ -124,6 +125,16 @@ namespace metal_reg
     static inline bool isInMetalMode(MSR_t msr)
     {
         return getMetalLevel(msr) > 0;
+    }
+
+    static inline bool isInitReg(RegIndex idx)
+    {
+        return idx == MBR || idx == MSTK;
+    }
+
+    static inline bool isSetInit(RegIndex idx)
+    {
+        return idx == MBR;
     }
 
     static inline MTPField getMTPField(RegVal mtp, unsigned int idx)

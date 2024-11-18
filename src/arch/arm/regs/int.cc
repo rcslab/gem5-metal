@@ -65,10 +65,14 @@ IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const
     } else if (reg_idx == int_reg::Spx) {
         auto &arm_isa = static_cast<const ArmISA::ISA &>(isa);
         CPSR cpsr = arm_isa.readMiscRegNoEffect(MISCREG_CPSR);
+        metal_reg::MSR_t msr = arm_isa.readMetalMiscRegNoEffect(metal_reg::MSR);
+        if (metal_reg::isInMetalMode(msr)) {
+            return {flatIntRegClass, int_reg::Spm};
+        }
         ExceptionLevel el = opModeToEL((OperatingMode)(uint8_t)cpsr.mode);
 
         if (!cpsr.sp && el != EL0)
-            return {flatIntRegClass, int_reg::Sp0};
+            return {flatIntRegClass, int_reg::Spm};
 
         switch (el) {
           case EL3:

@@ -27,13 +27,14 @@ namespace gem5 {
                 RegVal v = xc->getRegOperand(this, 0);
 
                 bool allowWrite = false;
-                if (!msr.init && mReg == metal_reg::MBR) {
+                if (!msr.init && metal_reg::isInitReg(mReg)) {
                     // allow Metal initialization
                     allowWrite = true;
-                    msr.init = 1;
-                    tc->setMetalMiscReg(metal_reg::MSR, msr);
+                    if (metal_reg::isSetInit(mReg)) {
+                        msr.init = 1;
+                        tc->setMetalMiscReg(metal_reg::MSR, msr);
+                    }
                 } else {
-
                     allowWrite = metal_reg::getWritePerm(mar, mReg) && metal_reg::isInMetalMode(msr);
                 }
 

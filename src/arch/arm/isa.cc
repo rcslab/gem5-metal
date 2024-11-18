@@ -1801,7 +1801,15 @@ RegVal
 ISA::readMetalMiscRegNoEffect(RegIndex idx) const
 {
     assert(idx < metal_reg::NumMiscRegs);
-    return this->metalMiscRegs.at(idx);
+    RegVal ret;
+    switch (idx)
+    {
+        case metal_reg::MSTK:
+          ret = this->tc->getReg({flatIntRegClass, int_reg::Spm});
+        default:
+          ret = this->metalMiscRegs.at(idx);
+    }
+    return ret;
 }
 
 void
@@ -1809,7 +1817,14 @@ ISA::setMetalMiscRegNoEffect(RegIndex idx, RegVal val)
 {
     assert(idx < metal_reg::NumMiscRegs);
     METAL_DBGPRINT(ISA, REGS, "Setting Metal Misc Reg %s to 0x%lx.\n", ArmStaticInst::printMetalMiscReg(idx), val);
-    this->metalMiscRegs.at(idx) = val;
+
+    switch (idx)
+    {
+        case metal_reg::MSTK:
+          this->tc->setReg({flatIntRegClass, int_reg::Spm}, val);
+        default:
+          this->metalMiscRegs.at(idx) = val;
+    }
 }
 
 void

@@ -122,6 +122,7 @@ enum : RegIndex
     _Sp1Idx,
     _Sp2Idx,
     _Sp3Idx,
+    _SpmIdx,
     NumRegsOneWindow,
 
     // constants
@@ -236,6 +237,7 @@ inline constexpr RegId
     Sp1 = intRegClass[_Sp1Idx],
     Sp2 = intRegClass[_Sp2Idx],
     Sp3 = intRegClass[_Sp3Idx],
+    Spm = intRegClass[_SpmIdx],
 
     Spx = intRegClass[_SpxIdx],
 
