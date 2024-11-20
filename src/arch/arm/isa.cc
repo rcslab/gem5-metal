@@ -1717,7 +1717,7 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
         this->setMetalReg(metal_reg::MER2, fvaddr);
     }
 
-    // write MSPSR
+    // rewrite MSPSR using fault
     CPSR spsr = ArmFault::dumpPState64(tc, armFault->isFrom64(), armFault->isResetSPSR());
     this->setMetalReg(metal_reg::MSPSR, spsr);
 

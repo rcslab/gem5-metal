@@ -28,8 +28,12 @@ namespace gem5 {
 
             // save link address
             tc->setMetalReg(metal_reg::MLR, lpc);
+            
+            // write MSPSR
+            CPSR spsr = ArmFault::dumpPState64(tc, inAArch64(tc), false);
+            tc->setMetalReg(metal_reg::MSPSR, spsr);
 
-            METAL_DBGPRINT(INSTS, MENTER, "Entering Metal mode: MBR = 0x%lx, npc = 0x%lx, MLR = 0x%lx.\n", tc->readMetalMiscRegNoEffect(metal_reg::MBR), npc, lpc);
+            METAL_DBGPRINT(INSTS, MENTER, "Entering Metal mode: MBR = 0x%lx, NPC = 0x%lx, MLR = 0x%lx, MSPSR = 0x%lx.\n", tc->readMetalMiscRegNoEffect(metal_reg::MBR), npc, lpc, spsr);
         }
 
         void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst)
