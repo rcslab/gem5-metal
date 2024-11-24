@@ -12,12 +12,12 @@ namespace gem5 {
             Bitfield<23> hyp; // whether this is for hypervisor
             Bitfield<39, 24> vmid; // 16 bit vmid
             Bitfield<40> ao; // access override
-            Bitfield<42, 41> aoid; // access override index
-            Bitfield<50, 43> mair; // mair fields for stage 1
+            Bitfield<44, 41> aoid; // access override index
+            Bitfield<52, 45> mair; // mair fields for stage 1
              // True if the entry targets the non-secure physical address space
-            Bitfield<51> ns;
+            Bitfield<53> ns;
             // True if the entry was brought in from a non-secure page table
-            Bitfield<52> nstid;
+            Bitfield<54> nstid;
         EndBitUnion(TlbExtAttr)
 
         static inline std::string printTlbExtAttr(const TlbExtAttr attr)

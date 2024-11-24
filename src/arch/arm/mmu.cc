@@ -555,8 +555,8 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
         if (is_fetch) {
             stats.permsFaults++;
             DPRINTF(TLB, "TLB Fault: Prefetch abort on permission check. "
-                    "ns:%d scr.sif:%d sctlr.afe: %d\n",
-                    te->ns, state.scr.sif, state.sctlr.afe);
+                    "ns:%d scr.sif:%d sctlr.afe: %d ao: %d aoid: %d MTP: 0x%lx.\n",
+                    te->ns, state.scr.sif, state.sctlr.afe, te->ao, te->aoid, state.mtp);
             // Use PC value instead of vaddr because vaddr might be aligned to
             // cache line and should not be the address reported in FAR
             return std::make_shared<PrefetchAbort>(
@@ -566,7 +566,8 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
         } else {
             stats.permsFaults++;
             DPRINTF(TLB, "TLB Fault: Data abort on permission check. "
-                    "ns:%d\n", te->ns);
+                    "ns:%d ao: %d aoid: %d MTP: 0x%lx.\n", 
+                    te->ns, te->ao, te->aoid, state.mtp);
             return std::make_shared<DataAbort>(
                 vaddr_tainted, te->domain,
                 (is_atomic && !grant_read) ? false : is_write,
@@ -624,81 +625,81 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
 {
     bool grant = false, grant_read = true, grant_write = true, grant_exec = true;
 
-    uint8_t ap, xn, pxn, rn;
+    uint8_t ap, xn, pxn;
     if (te->ao) {
         metal_reg::MTPField mtp = metal_reg::getMTPField(state.mtp, te->aoid);
-        xn = mtp.xn;
-        ap = mtp.ap;
-        rn = mtp.rn;
-        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s -> MTP = %#lx, override ap = %#x, xn = %#x, rn = %#x.\n", 
+        grant_read = mtp.read;
+        grant_write = mtp.write;
+        grant_exec = mtp.execute;
+        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s -> MTP = %#lx (r = %d, w = %d, x = %d).\n", 
                                             te->print().c_str(), 
-                                            state.mtp, ap, xn, rn);
+                                            state.mtp, grant_read, grant_write, grant_exec);
     } else {
         ap = te->ap & 0b11;  // 2-bit access protection field
         xn = te->xn;
-        rn = 0;
-    }
-    pxn = te->pxn;
+    
+        pxn = te->pxn;
 
-    const bool is_priv = state.isPriv && !(req->getFlags() & UserMode);
+        const bool is_priv = state.isPriv && !(req->getFlags() & UserMode);
 
-    bool wxn = state.sctlr.wxn;
+        bool wxn = state.sctlr.wxn;
 
-    DPRINTF(TLBVerbose, "Checking S1 permissions: ap:%d, xn:%d, pxn:%d, r:%d, "
-                        "w:%d, x:%d, is_priv: %d, wxn: %d\n", ap, xn,
-                        pxn, r, w, x, is_priv, wxn);
+        DPRINTF(TLBVerbose, "Checking S1 permissions: ap:%d, xn:%d, pxn:%d, r:%d, "
+                            "w:%d, x:%d, is_priv: %d, wxn: %d\n", ap, xn,
+                            pxn, r, w, x, is_priv, wxn);
 
-    if (faultPAN(tc, ap, req, mode, is_priv, state)) {
-        return std::make_pair(false, false);
-    }
-
-    ExceptionLevel regime = !is_priv ? EL0 : state.aarch64EL;
-    if (hasUnprivRegime(regime, state)) {
-        bool pr = false;
-        bool pw = false;
-        bool ur = false;
-        bool uw = false;
-        // Apply leaf permissions
-        switch (ap) {
-          case 0b00: // Privileged access
-            pr = 1; pw = 1; ur = 0; uw = 0;
-            break;
-          case 0b01: // No effect
-            pr = 1; pw = 1; ur = 1; uw = 1;
-            break;
-          case 0b10: // Read-only, privileged access
-            pr = 1; pw = 0; ur = 0; uw = 0;
-            break;
-          case 0b11: // Read-only
-            pr = 1; pw = 0; ur = 1; uw = 0;
-            break;
+        if (faultPAN(tc, ap, req, mode, is_priv, state)) {
+            return std::make_pair(false, false);
         }
 
-        // Locations writable by unprivileged cannot be executed by privileged
-        const bool px = !(pxn || uw);
-        const bool ux = !xn;
+        ExceptionLevel regime = !is_priv ? EL0 : state.aarch64EL;
+        if (hasUnprivRegime(regime, state)) {
+            bool pr = false;
+            bool pw = false;
+            bool ur = false;
+            bool uw = false;
+            // Apply leaf permissions
+            switch (ap) {
+            case 0b00: // Privileged access
+                pr = 1; pw = 1; ur = 0; uw = 0;
+                break;
+            case 0b01: // No effect
+                pr = 1; pw = 1; ur = 1; uw = 1;
+                break;
+            case 0b10: // Read-only, privileged access
+                pr = 1; pw = 0; ur = 0; uw = 0;
+                break;
+            case 0b11: // Read-only
+                pr = 1; pw = 0; ur = 1; uw = 0;
+                break;
+            }
 
-        grant_read = (is_priv ? pr : ur) && !rn;
-        grant_write = is_priv ? pw : uw;
-        grant_exec = is_priv ? px : ux;
-    } else {
-        switch (bits(ap, 1)) {
-          case 0b0: // No effect
-            grant_read = !rn; grant_write = 1;
-            break;
-          case 0b1: // Read-Only
-            grant_read = !rn; grant_write = 0;
-            break;
+            // Locations writable by unprivileged cannot be executed by privileged
+            const bool px = !(pxn || uw);
+            const bool ux = !xn;
+
+            grant_read = (is_priv ? pr : ur);
+            grant_write = is_priv ? pw : uw;
+            grant_exec = is_priv ? px : ux;
+        } else {
+            switch (bits(ap, 1)) {
+            case 0b0: // No effect
+                grant_read = 1; grant_write = 1;
+                break;
+            case 0b1: // Read-Only
+                grant_read = 1; grant_write = 0;
+                break;
+            }
+            grant_exec = !xn;
         }
-        grant_exec = !xn;
-    }
 
-    // Do not allow execution from writable location
-    // if wxn is set
-    grant_exec = grant_exec && !(wxn && grant_write);
+        // Do not allow execution from writable location
+        // if wxn is set
+        grant_exec = grant_exec && !(wxn && grant_write);
 
-    if (ArmSystem::haveEL(tc, EL3) && state.isSecure && te->ns) {
-        grant_exec = grant_exec && !state.scr.sif;
+        if (ArmSystem::haveEL(tc, EL3) && state.isSecure && te->ns) {
+            grant_exec = grant_exec && !state.scr.sif;
+        }
     }
 
     if (x) {

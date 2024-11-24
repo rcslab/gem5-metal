@@ -28,9 +28,9 @@ namespace metal_reg
     EndBitUnion(MSR_t)
 
     BitUnion8(MTPField)
-        Bitfield<1, 0> ap;
-        Bitfield<2> xn;
-        Bitfield<3> rn;
+        Bitfield<0> read;
+        Bitfield<1> write;
+        Bitfield<2> execute;
     EndBitUnion(MTPField)
 
     enum : RegIndex
