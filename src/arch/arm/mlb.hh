@@ -2,6 +2,7 @@
 #define __ARCH_ARM_MLB_HH__
 
 #include <vector>
+#include "arch/arm/faults.hh"
 #include "arch/arm/system.hh"
 #include "arch/arm/types.hh"
 #include "arch/arm/regs/misc_types.hh"
@@ -113,27 +114,26 @@ enum class EILBMode {
     MODE_SYNC = 0,
     MODE_IRQ = 1,
     MODE_FIQ = 2,
-    MODE_SERROR = 3,
     NumMode
 };
 
 class EILBEntry
 {
 private:
-    const ESR esrBits;
-    const ESR esrMask;
+    const int excBits;
+    const int excMask;
     const EILBMode mode;
     const unsigned int mroutine;
 public:
     EILBEntry(const EILBEntry & other) = default;
     EILBEntry(void) = delete;
-    EILBEntry(ESR _esrBits, ESR _esrMask, EILBMode _mode, unsigned int _mroutine);
-    EILBEntry(ESR _esrBits, EILBMode _mode);
-    ESR getEsrBits() const;
-    ESR getEsrMask() const;
+    EILBEntry(int _esrBits, int _esrMask, EILBMode _mode, unsigned int _mroutine);
+    EILBEntry(int _esrBits, EILBMode _mode);
+    int getExcBits() const;
+    int getExcMask() const;
     EILBMode getMode() const;
     unsigned int getMroutine() const;
-    static EILBMode vecOffsetToMode(Addr offset);    
+    static EILBMode armFaultToMode(const ArmFault& fault);
 
     bool match(const EILBEntry &other) const;
     bool operator==(const EILBEntry &other) const;

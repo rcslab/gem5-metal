@@ -1382,20 +1382,24 @@ ISA::loadExcInterceptTable(void * rawMem, Addr memAddr, size_t size)
     for (int i = 0; i < size / sizeof(ExcInterceptTableEntry); i++) {
         auto ent = ents[i];
         ent.ctrl = gtoh(ent.ctrl, byteOrder(this->tc));
-        ent.esrMask = gtoh(ent.esrMask, byteOrder(this->tc));
-        ent.esrBits = gtoh(ent.esrBits, byteOrder(this->tc));
-
         if (!ent.ctrl.valid) {
             continue;
         }
 
-        const EILBEntry newEnt(ent.esrBits, ent.esrMask, static_cast<EILBMode>(static_cast<int>(ent.ctrl.mode)), ent.ctrl.mroutine);
+        const int mask = gtoh(ent.excMask, byteOrder(this->tc));
+        const int bits = gtoh(ent.excBits, byteOrder(this->tc));
+
+        const EILBMode mode = static_cast<EILBMode>(static_cast<int>(ent.ctrl.mode));
+        panic_if(mode >= EILBMode::NumMode, "unknown exc intercept mode: %d.\n", ent.ctrl.mode);
+
+        const EILBEntry newEnt(bits, mask, mode, ent.ctrl.mroutine);
         this->eilb.add(newEnt);
-        METAL_DBGPRINT(ISA, EXCINTR, "Registered exc intercept [esr = 0x%lx, mask = 0x%lx, mode = 0x%x, mroutine = %d].\n",
-                                                                    newEnt.getEsrBits(),
-                                                                    newEnt.getEsrMask(),
-                                                                    static_cast<int>(newEnt.getMode()),
-                                                                    newEnt.getMroutine());
+
+        METAL_DBGPRINT(ISA, EXCINTR, "Registered exc intercept [excBits = 0x%lx, excMask = 0x%lx, mode = 0x%x, mroutine = %d].\n",
+                                                              newEnt.getExcBits(),
+                                                              newEnt.getExcMask(),
+                                                              static_cast<int>(newEnt.getMode()),
+                                                              newEnt.getMroutine());
     }
 }
 
@@ -1617,13 +1621,27 @@ ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
                                         post);
 }
 
-const EILBEntry &
-ISA::getEILBEntryFromFault(const ArmFault * armFault) const
+int
+ISA::armFaultToIntID(const ArmFault & fault) const
 {
-    ESR esr = armFault->getSyndrome(tc);
-    FaultOffset offset = armFault->offset64(tc);
-    const EILBEntry ent(esr, EILBEntry::vecOffsetToMode(offset));
+    auto gic = dynamic_cast<Gicv3CPUInterface*>(this->getGICv3CPUInterface(this->tc));
+    panic_if(!gic, "cannot obtain GICv3 interface.\n");
+    // XXX: only support group 1, non secure, non virtual interrupts now
+    return gic->getHPPIR1();
+}
 
+const EILBEntry &
+ISA::getEILBEntryFromFault(const ArmFault & armFault) const
+{
+    int exc;
+    const EILBMode mode = EILBEntry::armFaultToMode(armFault);
+    
+    if (mode == EILBMode::MODE_SYNC) {
+        exc = armFault.getSyndrome(tc);
+    } else {
+        exc = this->armFaultToIntID(armFault);
+    }
+    const EILBEntry ent(exc, mode);
     const EILBEntry & result = this->eilb.get(ent);
     return result;
 }
@@ -1658,7 +1676,7 @@ ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
         armInst->annotateFault(armFault);
     }
 
-    const EILBEntry & result = getEILBEntryFromFault(armFault);
+    const EILBEntry & result = getEILBEntryFromFault(*armFault);
     if (&result != &EILB::NullEntry) {
         return true;
     }
@@ -1684,7 +1702,7 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
         armInst->annotateFault(armFault);
     }
 
-    const EILBEntry & result = getEILBEntryFromFault(armFault);
+    const EILBEntry & result = getEILBEntryFromFault(*armFault);
     assert(&result != &EILB::NullEntry);
 
     const unsigned int mroutine = result.getMroutine();
@@ -1705,16 +1723,14 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
     Menter64::doMenter(tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), ret_addr);
 
     // set registers in the current window
-    // MER0 = Fault PC
-    this->setMetalReg(metal_reg::MER0, tc->pcState().instAddr());
-
-    // MER1 = ESR
-    this->setMetalReg(metal_reg::MER1, armFault->getSyndrome(tc));
-
-    // MER2 = Fault VADDR (if available)
+    // MER0 = ESR or intid
+    this->setMetalReg(metal_reg::MER0, result.getMode() == EILBMode::MODE_SYNC ? 
+        static_cast<int>(armFault->getSyndrome(tc)) : this->armFaultToIntID(*armFault));
+  
+    // MER1 = Fault VADDR (if available)
     Addr fvaddr;
     if (armFault->getFaultVAddr(fvaddr)) {
-        this->setMetalReg(metal_reg::MER2, fvaddr);
+        this->setMetalReg(metal_reg::MER1, fvaddr);
     }
 
     // rewrite MSPSR using fault
@@ -1730,9 +1746,13 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
     cpsr.uao = 0; // user access override
     tc->setMiscReg(MISCREG_CPSR, cpsr);
 
-    METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception esr = 0x%lx, mode = 0x%x at pc = 0x%lx, spsr = 0x%lx to mroutine %d.\n",
-                                        armFault->getSyndrome(tc), static_cast<int>(result.getMode()),
-                                        tc->pcState().instAddr(), spsr, result.getMroutine());
+    METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception: mode = 0x%x, MRT = %d, MER0 = 0x%lx, MER1 = 0x%lx, MLR = 0x%lx, MSPSR = 0x%lx.\n",
+                                        result.getMroutine(),
+                                        static_cast<int>(result.getMode()),
+                                        this->readMetalReg(metal_reg::MER0),
+                                        this->readMetalReg(metal_reg::MER1),
+                                        this->readMetalReg(metal_reg::MLR),
+                                        this->readMetalReg(metal_reg::MSPSR));
 }
 
 RegVal
@@ -1870,6 +1890,7 @@ ISA::setMetalMiscReg(RegIndex idx, RegVal val)
             if (msr.ei != new_val.ei) {
                 METAL_DBGPRINT(ISA, REGS, "Setting MSR.[exception intercept]:  %d -> %d.\n", msr.ei, new_val.ei);
             }
+            static_cast<MMU *>(tc->getMMUPtr())->invalidateMiscReg();
             break;
         }
         case metal_reg::MTP: {
@@ -1933,7 +1954,7 @@ ISA::getGICv3CPUInterface()
 }
 
 BaseISADevice*
-ISA::getGICv3CPUInterface(ThreadContext *tc)
+ISA::getGICv3CPUInterface(ThreadContext *tc) const
 {
     assert(system);
     Gicv3 *gicv3 = dynamic_cast<Gicv3 *>(system->getGIC());

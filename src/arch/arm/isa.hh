@@ -126,7 +126,8 @@ namespace ArmISA
 
         BaseISADevice &getGenericTimer();
         BaseISADevice &getGICv3CPUInterface();
-        BaseISADevice *getGICv3CPUInterface(ThreadContext *tc);
+        BaseISADevice *getGICv3CPUInterface(ThreadContext *tc) const;
+        int armFaultToIntID(const ArmFault & fault) const;
 
         RegVal miscRegs[NUM_MISCREGS];
 
@@ -178,8 +179,8 @@ public:
         EndBitUnion(ExcInterceptCtrl)
 
         struct ExcInterceptTableEntry {
-            ESR esrBits;
-            ESR esrMask;
+            uint32_t excBits;
+            uint32_t excMask;
             ExcInterceptCtrl ctrl;
         };
         static_assert(sizeof(ExcInterceptTableEntry) == sizeof(uint32_t) * 3);
@@ -284,7 +285,7 @@ private:
               int firstBit = ffs(mask);
               return (encoding & mask) >> (firstBit - 1);
         }
-        const EILBEntry & getEILBEntryFromFault(const ArmFault * fault) const;
+        const EILBEntry & getEILBEntryFromFault(const ArmFault & fault) const;
 public:
         MRLB & getMrlbPtr();
         IILB & getIilbPtr();

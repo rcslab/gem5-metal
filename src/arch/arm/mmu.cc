@@ -555,8 +555,8 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
         if (is_fetch) {
             stats.permsFaults++;
             DPRINTF(TLB, "TLB Fault: Prefetch abort on permission check. "
-                    "ns:%d scr.sif:%d sctlr.afe: %d ao: %d aoid: %d MTP: 0x%lx.\n",
-                    te->ns, state.scr.sif, state.sctlr.afe, te->ao, te->aoid, state.mtp);
+                    "ns:%d scr.sif:%d sctlr.afe: %d ao: %d aoid: %d MTP: 0x%lx MSR: 0x%lx.\n",
+                    te->ns, state.scr.sif, state.sctlr.afe, te->ao, te->aoid, state.mtp, state.msr);
             // Use PC value instead of vaddr because vaddr might be aligned to
             // cache line and should not be the address reported in FAR
             return std::make_shared<PrefetchAbort>(
@@ -566,8 +566,8 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
         } else {
             stats.permsFaults++;
             DPRINTF(TLB, "TLB Fault: Data abort on permission check. "
-                    "ns:%d ao: %d aoid: %d MTP: 0x%lx.\n", 
-                    te->ns, te->ao, te->aoid, state.mtp);
+                    "ns:%d ao: %d aoid: %d MTP: 0x%lx MSR: 0x%lx.\n", 
+                    te->ns, te->ao, te->aoid, state.mtp, state.msr);
             return std::make_shared<DataAbort>(
                 vaddr_tainted, te->domain,
                 (is_atomic && !grant_read) ? false : is_write,
@@ -628,12 +628,21 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
     uint8_t ap, xn, pxn;
     if (te->ao) {
         metal_reg::MTPField mtp = metal_reg::getMTPField(state.mtp, te->aoid);
-        grant_read = mtp.read;
-        grant_write = mtp.write;
-        grant_exec = mtp.execute;
-        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s -> MTP = %#lx (r = %d, w = %d, x = %d).\n", 
+        if (metal_reg::isInMetalMode(state.msr)) {
+            grant_read = true;
+            grant_write = true;
+            grant_exec = true;
+        } else {
+            grant_read = mtp.read;
+            grant_write = mtp.write;
+            grant_exec = mtp.execute;
+        }
+        DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s (r = %d, w = %d, x = %d) -> "
+                                            "MTP = %#lx, "
+                                            "MSR = %#lx\n", 
                                             te->print().c_str(), 
-                                            state.mtp, grant_read, grant_write, grant_exec);
+                                            grant_read, grant_write, grant_exec,
+                                            state.mtp, state.msr);
     } else {
         ap = te->ap & 0b11;  // 2-bit access protection field
         xn = te->xn;
@@ -1237,6 +1246,7 @@ MMU::CachedState::updateMiscReg(ThreadContext *tc,
         ELIs64(tc, aarch64EL == EL0 ? EL1 : aarch64EL);
     
     mtp = tc->readMetalMiscReg(metal_reg::MTP);
+    msr = tc->readMetalMiscReg(metal_reg::MSR);
     hcr = tc->readMiscReg(MISCREG_HCR_EL2);
     if (aarch64) {  // AArch64
         // determine EL we need to translate in

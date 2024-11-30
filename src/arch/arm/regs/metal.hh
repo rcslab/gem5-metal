@@ -62,7 +62,6 @@ namespace metal_reg
 
         MER0 = MI0,
         MER1 = MI1,
-        MER2 = MI2,
 
         MSPSR = MI8,
         MLR = MI9

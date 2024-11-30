@@ -1,6 +1,7 @@
 #include "arch/arm/mlb.hh"
 #include "arch/arm/insts/static_inst.hh"
 #include "arch/arm/insts/metal.hh"
+#include "arch/arm/faults.hh"
 
 namespace gem5
 {
@@ -284,24 +285,24 @@ const IILBEntry & IILB::get(const IILBEntry & ent) const
     return NullEntry;
 }
 
-EILBEntry::EILBEntry(ESR _esrBits, ESR _esrMask, EILBMode _mode, unsigned int _mroutine) :
-    esrBits(_esrBits), esrMask(_esrMask), mode(_mode), mroutine(_mroutine)
+EILBEntry::EILBEntry(int _excBits, int _excMask, EILBMode _mode, unsigned int _mroutine) :
+    excBits(_excBits), excMask(_excMask), mode(_mode), mroutine(_mroutine)
 {
 }
 
-EILBEntry::EILBEntry(ESR _esrBits, EILBMode _mode) :
-    esrBits(_esrBits), esrMask(0), mode(_mode), mroutine(0)
+EILBEntry::EILBEntry(int _excBits, EILBMode _mode) :
+    excBits(_excBits), excMask(0), mode(_mode), mroutine(0)
 {
 }
 
-ESR EILBEntry::getEsrBits() const
+int EILBEntry::getExcBits() const
 {
-    return this->esrBits;
+    return this->excBits;
 }
 
-ESR EILBEntry::getEsrMask() const
+int EILBEntry::getExcMask() const
 {
-    return this->esrMask;
+    return this->excMask;
 }
 
 unsigned int EILBEntry::getMroutine() const
@@ -314,42 +315,26 @@ EILBMode EILBEntry::getMode() const
     return this->mode;
 }
 
-EILBMode EILBEntry::vecOffsetToMode(Addr offset)
+EILBMode EILBEntry::armFaultToMode(const ArmFault & fault)
 {
-    switch(offset) {
-        case 0x0:
-        case 0x200:
-        case 0x400:
-        case 0x600:
-            return EILBMode::MODE_SYNC;
-        case 0x80:
-        case 0x280:
-        case 0x480:
-        case 0x680:
+    switch(fault.nextMode()) {
+        case OperatingMode::MODE_IRQ:
             return EILBMode::MODE_IRQ;
-        case 0x100:
-        case 0x300:
-        case 0x500:
-        case 0x700:
+        case OperatingMode::MODE_FIQ:
             return EILBMode::MODE_FIQ;
-        case 0x180:
-        case 0x380:
-        case 0x580:
-        case 0x780:
-            return EILBMode::MODE_SERROR;
         default:
-            panic("unknown vector offset: 0x%lx.", offset);
+            return EILBMode::MODE_SYNC;
     }
 }
 
 bool EILBEntry::match(const EILBEntry &other) const
 {
-    return ((other.esrBits & this->esrMask) == (this->esrBits & this->esrMask)) && (other.mode == this->mode);
+    return ((other.excBits & this->excMask) == (this->excBits & this->excMask)) && (other.mode == this->mode);
 }
 
 bool EILBEntry::operator==(const EILBEntry &other) const
 {
-    return (other.esrBits == this->esrBits) && (other.esrMask == this->esrMask) && (other.mode == this->mode);
+    return (other.excBits == this->excBits) && (other.excMask == this->excMask) && (other.mode == this->mode);
 }
 
 EILB::~EILB(void)
@@ -381,8 +366,8 @@ void EILB::add(const EILBEntry & _ent)
 
     vec.push_back(std::move(ptr));
     METAL_DBGPRINT(EILB, ADD, "*added* EILB entry [esr = 0x%lx, esrMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
-                                                            _ent.getEsrBits(),
-                                                            _ent.getEsrMask(),
+                                                            _ent.getExcBits(),
+                                                            _ent.getExcMask(),
                                                             static_cast<int>(_ent.getMode()),
                                                             _ent.getMroutine());
 }
@@ -392,17 +377,16 @@ const EILBEntry & EILB::get(const EILBEntry & ent) const
     unsigned int modeVal = static_cast<unsigned int>(ent.getMode());
     assert(modeVal < static_cast<unsigned int>(EILBMode::NumMode));
 
-    METAL_DBGPRINT(EILB, GET, "matching [esr = 0x%x, mode = 0x%x]...\n", ent.getEsrBits(), static_cast<int>(ent.getMode()));
+    METAL_DBGPRINT(EILB, GET, "matching [exc = 0x%x, mode = 0x%x]...\n", ent.getExcBits(), modeVal);
 
     auto &vec = map.at(modeVal);
     auto it = vec.begin();
     while (it != vec.end()) {
         const auto each = it->get();
-        assert(each->getMode() == ent.getMode());
         if (each->match(ent)) {
-            METAL_DBGPRINT(EILB, GET, "*matched* EILB entry [esr = 0x%lx, esrMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
-                                                        each->getEsrBits(),
-                                                        each->getEsrMask(),
+            METAL_DBGPRINT(EILB, GET, "*matched* EILB entry [excBits = 0x%lx, excMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
+                                                        each->getExcBits(),
+                                                        each->getExcMask(),
                                                         static_cast<int>(each->getMode()),
                                                         each->getMroutine());
             return *each;
