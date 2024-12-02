@@ -1556,7 +1556,7 @@ ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
 {
     metal_reg::MSR_t msr = readMetalMiscRegNoEffect(metal_reg::MSR);
 
-    if (!metal_reg::isInstInterceptEnabled(msr)) {
+    if (!metal_reg::isInstInterceptEnabled(msr) || metal_reg::isInMetalMode(msr)) {
         // ic flag is currently disabled or metal mode is disabled
         return false;
     }
@@ -1594,7 +1594,7 @@ ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
     tc->pcState(pc);
 
     Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true),
-                post ? this->tc->pcState().instAddr() + armInst->instSize() : this->tc->pcState().instAddr());
+                post ? pc.npc() : pc.pc());
 
     // set MIRs in the new reg window
     MachInst instBits = armInst->encoding();
