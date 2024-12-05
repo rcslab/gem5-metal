@@ -733,6 +733,12 @@ checkFaultAccessAArch64SysReg(MiscRegIndex reg, CPSR cpsr,
       // allow access to privileged system regs in Metal mode
       return NoFault;
     }
+    
+    if (!metal_reg::isPrivInstsEnabled(tc->readMetalMiscRegNoEffect(metal_reg::MFLAGS))) {
+      // if we disabled access to privileged system registers, simulate the read/write from el0 (user mode)
+      return lookUpMiscReg[reg].checkFault(tc, inst, EL0);
+    }
+
     return lookUpMiscReg[reg].checkFault(tc, inst, currEL(cpsr));
 }
 

@@ -30,10 +30,15 @@ namespace gem5 {
             tc->setMetalReg(metal_reg::MLR, lpc);
             
             // write MSPSR
-            CPSR spsr = ArmFault::dumpPState64(tc, inAArch64(tc), false);
+            const CPSR spsr = ArmFault::dumpPState64(tc, inAArch64(tc), false);
             tc->setMetalReg(metal_reg::MSPSR, spsr);
 
-            METAL_DBGPRINT(INSTS, MENTER, "Entering Metal mode: MBR = 0x%lx, NPC = 0x%lx, MLR = 0x%lx, MSPSR = 0x%lx.\n", tc->readMetalMiscRegNoEffect(metal_reg::MBR), npc, lpc, spsr);
+            // write MSFLAGS
+            const metal_reg::MFLAGS_t mflags = tc->readMetalMiscReg(metal_reg::MFLAGS);
+            tc->setMetalReg(metal_reg::MSFLAGS, mflags);
+
+            METAL_DBGPRINT(INSTS, MENTER, "Entering Metal mode: MBR = 0x%lx, NPC = 0x%lx, MLR = 0x%lx, MSPSR = 0x%lx, MSFLAGS = 0x%lx.\n", 
+                tc->readMetalMiscRegNoEffect(metal_reg::MBR), npc, lpc, spsr, mflags);
         }
 
         void Menter64::doMenter(ThreadContext * tc, Addr npc, const ArmStaticInst &inst)

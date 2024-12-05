@@ -11,7 +11,7 @@ namespace gem5 {
             BitUnion8(MexitFlags)
             Bitfield<3> eim; // mask exception intercept for the next inst
             Bitfield<2> iim; // mask instruction intercept for the next inst
-            Bitfield<1> rfi; // this is a return from intercept (Inst & Exc) mroutine (restore CPSR from MSPSR)
+            Bitfield<1> rfi; // this is a return from intercept (Inst & Exc) mroutine (restore CPSR from MSPSR and MFLAGS from MFLAGS)
             Bitfield<0> id; // disable interrupt for the next inst
             EndBitUnion(MexitFlags)
 

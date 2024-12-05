@@ -1554,9 +1554,9 @@ bool ISA::getInterruptDisabledFlag(void) const
 bool
 ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
 {
-    metal_reg::MSR_t msr = readMetalMiscRegNoEffect(metal_reg::MSR);
+    metal_reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(metal_reg::MFLAGS);
 
-    if (!metal_reg::isInstInterceptEnabled(msr) || metal_reg::isInMetalMode(msr)) {
+    if (!metal_reg::isInstInterceptEnabled(mflags)) {
         // ic flag is currently disabled or metal mode is disabled
         return false;
     }
@@ -1603,21 +1603,21 @@ ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
     this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent.getMask1()));
     this->setMetalReg(metal_reg::MIR2, shiftInstMask(instBits, ent.getMask2()));
 
-    // set MSPSR
-    CPSR spsr = ArmFault::dumpPState64(tc, true, false);
-    this->setMetalReg(metal_reg::MSPSR, spsr);
-
     // set CPSR
     CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
     cpsr.il = 0; // illegal execution
     cpsr.ss = 0; // single step
     tc->setMiscReg(MISCREG_CPSR, cpsr);
 
-    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%lx, spsr = 0x%lx, post = %d.\n",
+    // set MFLAGS to mask instruction intercept
+    metal_reg::MFLAGS_t mflags = this->readMetalMiscReg(metal_reg::MFLAGS);
+    mflags.ii = 0;
+    this->setMetalMiscReg(metal_reg::MFLAGS, mflags);
+
+    METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%lx, post = %d.\n",
                                         armInst->encoding(),
                                         inst->getName().c_str(),
                                         pc.instAddr(),
-                                        spsr,
                                         post);
 }
 
@@ -1649,9 +1649,9 @@ ISA::getEILBEntryFromFault(const ArmFault & armFault) const
 bool
 ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
 {
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
+    metal_reg::MFLAGS_t mflags = this->readMetalMiscRegNoEffect(metal_reg::MFLAGS);
 
-    if (!metal_reg::isExcInterceptEnabled(msr)) {
+    if (!metal_reg::isExcInterceptEnabled(mflags)) {
         return false;
     }
 
@@ -1746,13 +1746,11 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
     cpsr.uao = 0; // user access override
     tc->setMiscReg(MISCREG_CPSR, cpsr);
 
-    METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception: mode = 0x%x, MRT = %d, MER0 = 0x%lx, MER1 = 0x%lx, MLR = 0x%lx, MSPSR = 0x%lx.\n",
+    METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception: mode = 0x%x, MRT = %d, MER0 = 0x%lx, MER1 = 0x%lx.\n",
                                         result.getMroutine(),
                                         static_cast<int>(result.getMode()),
                                         this->readMetalReg(metal_reg::MER0),
-                                        this->readMetalReg(metal_reg::MER1),
-                                        this->readMetalReg(metal_reg::MLR),
-                                        this->readMetalReg(metal_reg::MSPSR));
+                                        this->readMetalReg(metal_reg::MER1));
 }
 
 RegVal
@@ -1866,29 +1864,37 @@ ISA::setMetalMiscReg(RegIndex idx, RegVal val)
             this->mrlb.flushAll();
             break;
         }
+        case metal_reg::MFLAGS : {
+            metal_reg::MFLAGS_t new_val = val;
+            metal_reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(idx);
+            if (mflags.pd != new_val.pd) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[pd]: %d -> %d.\n", mflags.pd, new_val.pd);
+            }
+            if (mflags.ii != new_val.ii) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[ii]:  %d -> %d.\n", mflags.ii, new_val.ii);
+            }
+            if (mflags.ei != new_val.ei) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[ei]:  %d -> %d.\n", mflags.ei, new_val.ei);
+            }
+            break;
+        }
         case metal_reg::MSR : {
             metal_reg::MSR_t new_val = val;
             metal_reg::MSR_t msr = readMetalMiscRegNoEffect(idx);
-            if (msr.pd != new_val.pd) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[pd]: %d -> %d.\n", msr.pd, new_val.pd);
+            if (msr.init != new_val.init) {
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[init]: %d -> %d.\n", msr.init, new_val.init);
             }
             if (msr.lv != new_val.lv) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[level]: %d -> %d.\n", msr.lv, new_val.lv);
-            }
-            if (msr.ii != new_val.ii) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[instruction intercept]:  %d -> %d.\n", msr.ii, new_val.ii);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[lv]: %d -> %d.\n", msr.lv, new_val.lv);
             }
             if (msr.im != new_val.im) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[instruction intercept masking]:  %d -> %d.\n", msr.im, new_val.im);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[im]:  %d -> %d.\n", msr.im, new_val.im);
             }
             if (msr.id != new_val.id) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[interrupt disabled]:  %d -> %d.\n", msr.id, new_val.id);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[id]:  %d -> %d.\n", msr.id, new_val.id);
             }
             if (msr.em != new_val.em) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[exception intercept masking]:  %d -> %d.\n", msr.em, new_val.em);
-            }
-            if (msr.ei != new_val.ei) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[exception intercept]:  %d -> %d.\n", msr.ei, new_val.ei);
+                METAL_DBGPRINT(ISA, REGS, "Setting MSR.[em]:  %d -> %d.\n", msr.em, new_val.em);
             }
             static_cast<MMU *>(tc->getMMUPtr())->invalidateMiscReg();
             break;

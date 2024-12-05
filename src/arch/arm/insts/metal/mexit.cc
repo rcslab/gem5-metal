@@ -32,21 +32,25 @@ namespace gem5 {
             pcState.instNPC(target_addr);
             xc->pcState(pcState);
 
-            CPSR newCpsr = 0;
             CPSR mspsr = 0;
+            metal_reg::MFLAGS_t msflags = 0;
             if (flags.rfi) {
                 // restore PSTATE from MSPSR
                 mspsr = tc->readMetalReg(metal_reg::MSPSR);
                 const CPSR cpsr = xc->readMiscReg(MISCREG_CPSR);
-                newCpsr = getPSTATEFromPSR(tc, cpsr, mspsr);
+                const CPSR newCpsr = getPSTATEFromPSR(tc, cpsr, mspsr);
                 // restore flags that are in separate regs
                 xc->setMiscReg(MISCREG_NZCV, newCpsr);
                 // restore other flags that are stored in CPSR
                 xc->setMiscReg(MISCREG_CPSR, newCpsr);
+
+                // restore MFLAGS
+                msflags = tc->readMetalReg(metal_reg::MSFLAGS);
+                tc->setMetalMiscReg(metal_reg::MFLAGS, msflags);
             }
 
-            METAL_DBGPRINT(INSTS, MEXIT, "Exiting Metal mode: MLR = 0x%lx, flags = 0x%lx [id = %d, rfi = %d (MSPSR = 0x%lx, NCPSR = 0x%lx), iim = %d, eim = %d]\n",
-                                                ret, reg, flags.id, flags.rfi, mspsr, newCpsr, flags.iim, flags.eim);
+            METAL_DBGPRINT(INSTS, MEXIT, "Exiting Metal mode: MLR = 0x%lx, flags = 0x%lx [id = %d, rfi = %d (MSPSR = 0x%lx, MSFLAGS = 0x%lx), iim = %d, eim = %d]\n",
+                                                ret, reg, flags.id, flags.rfi, mspsr, msflags, flags.iim, flags.eim);
 
             if (flags.iim) {
                 msr.im = 1;

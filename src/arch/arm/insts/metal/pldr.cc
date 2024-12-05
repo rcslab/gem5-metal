@@ -29,7 +29,7 @@ namespace gem5 {
                     static_cast<int>(mode) ,
                     sizeof(T));
 
-            if (!metal_reg::isInMetalMode(msr) || !metal_reg::isPrivInstsEnabled(msr)) {
+            if (!metal_reg::isInMetalMode(msr)) {
                 METAL_DBGPRINT(INSTS, PLDR, "Permission denied: MSR = 0x%lx.\n", msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
@@ -108,7 +108,7 @@ namespace gem5 {
                     rl, rm, rn, addr,
                     sizeof(T));
 
-            if (!metal_reg::isInMetalMode(msr) || !metal_reg::isPrivInstsEnabled(msr)) {
+            if (!metal_reg::isInMetalMode(msr)) {
                 METAL_DBGPRINT(INSTS, PLDR, "Permission denied: MSR = 0x%lx.\n", msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }

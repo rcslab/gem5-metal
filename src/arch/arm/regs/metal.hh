@@ -56,15 +56,16 @@ namespace metal_reg
         NumRegs,
 
         // aliases 
-        MIR0 = MI0,
-        MIR1 = MI1,
-        MIR2 = MI2,
+        MIR0 = MR0,
+        MIR1 = MR1,
+        MIR2 = MR2,
 
-        MER0 = MI0,
-        MER1 = MI1,
+        MER0 = MR0,
+        MER1 = MR1,
 
-        MSPSR = MI8,
-        MLR = MI9
+        MSPSR = MR9,
+        MSFLAGS = MR10,
+        MLR = MR11
     };
     static_assert(NumRegs == 32);
     static_assert(NumRegs <= (1 << 5));
@@ -93,9 +94,9 @@ namespace metal_reg
         "mr6",
         "mr7",
         "mr8",
-        "mr9",
-        "mr10",
-        "mr11",
+        "mspsr",
+        "msflags",
+        "mlr",
 
         "mi0",
         "mi1",
@@ -105,8 +106,8 @@ namespace metal_reg
         "mi5",
         "mi6",
         "mi7",
-        "mspsr",
-        "mlr",
+        "mi8",
+        "mi9",
     };
     static_assert((sizeof(regNames) / sizeof(regNames[0])) == NumRegs);
 } // namespace metal_reg

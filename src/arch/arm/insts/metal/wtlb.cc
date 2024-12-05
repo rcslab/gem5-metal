@@ -63,7 +63,7 @@ namespace gem5 {
                                             printMetalReg(rn), vaddr,
                                             printTlbExtAttr(info));
 
-            if (!metal_reg::isInMetalMode(msr) || !metal_reg::isPrivInstsEnabled(msr))
+            if (!metal_reg::isInMetalMode(msr))
             {
                 METAL_DBGPRINT(INSTS, WTLB, "Permission denied: MSR = 0x%lx.\n", msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);

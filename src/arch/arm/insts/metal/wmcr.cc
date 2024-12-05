@@ -45,22 +45,21 @@ namespace gem5 {
 
                 switch(this->mReg) {
                     case metal_reg::MSR: {
-                        metal_reg::MSR_t new_val = v;
-                        // msr.lv is readonly
-                        new_val.lv = msr.lv;
-                        // msr.init is readonly
-                        new_val.init = msr.init;
-                        v = new_val;
+                        METAL_DBGPRINT(INSTS, WMCR_U, "Ignoring MSR write (0x%lx).\n", v);
+                        // metal_reg::MSR_t new_val = v;
+                        // // msr.lv is readonly
+                        // new_val.lv = msr.lv;
+                        // // msr.init is readonly
+                        // new_val.init = msr.init;
+                        // v = new_val;
                         break;
                     }
                     
                     default: {
-                        break;
+                        METAL_DBGPRINT(INSTS, WMCR_U, "%s => 0x%lx.\n", printMetalMiscReg(mReg), v);
+                        tc->setMetalMiscReg(mReg, v);
                     }
                 }
-
-                METAL_DBGPRINT(INSTS, WMCR_U, "%s => 0x%lx.\n", printMetalMiscReg(mReg), v);
-                tc->setMetalMiscReg(mReg, v);
 
                 return NoFault;
             }

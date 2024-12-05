@@ -18,14 +18,17 @@ namespace metal_reg
 {
     BitUnion64(MSR_t)
         Bitfield<63> init; // whether metal is initialized
-        Bitfield<62> ii; // instruction intercept enable
-        Bitfield<61> im; // instruction intercept mask
-        Bitfield<60> ei; // exc intercept enable
-        Bitfield<59> em; // exc intercept mask
-        Bitfield<58> pd; // privileged instruction disable 
-        Bitfield<57> id; // temporary interrupt disable
+        Bitfield<62> im; // instruction intercept mask
+        Bitfield<61> em; // exc intercept mask
+        Bitfield<60> id; // temporary interrupt disable
         Bitfield<7,0> lv; // Metal nesting level
     EndBitUnion(MSR_t)
+
+    BitUnion64(MFLAGS_t)
+        Bitfield<0> ii; // instruction intercept enable
+        Bitfield<1> ei; // exc intercept enable
+        Bitfield<2> pd; // privileged instruction disable 
+    EndBitUnion(MFLAGS_t)
 
     BitUnion8(MTPField)
         Bitfield<0> read;
@@ -70,13 +73,14 @@ namespace metal_reg
         NumMiscRegs,
 
         // aliases
-        MSR = MG0, // Metal Status Register
+        MSR = MG0, // Metal Status Register (RO)
         MBR = MG1, // Metal Base Register
         MIB = MG2, // Metal Instruction Base Register
         MEB = MG3, // Metal Exception Base Register
         MTP = MG4, // Metal TLB Permissions Register
         MAR = MG5, // Metal Access Register
-        MSTK = MG6 // Metal Stack Register
+        MSTK = MG6, // Metal Stack Register
+        MFLAGS = MG7 // Metal Flags Register 
     };
     static_assert(NumMiscRegs == 32);
     static_assert(NumMiscRegs <= (1 << 5));
@@ -89,7 +93,7 @@ namespace metal_reg
         "mtp",
         "mar",
         "mstk",
-        "mg7",
+        "mflags",
         "mg8",
         "mg9",
         "mg10",
@@ -161,24 +165,24 @@ namespace metal_reg
         return !((mar >> (2 * idx + 1)) & 0x1);
     }
 
-    static inline bool isPrivInstsEnabled(MSR_t msr)
+    static inline bool isPrivInstsEnabled(MFLAGS_t mflags)
     {
-        return !static_cast<bool>(msr.pd);
+        return !static_cast<bool>(mflags.pd);
     }
 
-    static inline bool isInstInterceptEnabled(MSR_t msr)
+    static inline bool isInstInterceptEnabled(MFLAGS_t mflags)
     {
-        return static_cast<bool>(msr.ii);
+        return static_cast<bool>(mflags.ii);
+    }
+
+    static inline bool isExcInterceptEnabled(MFLAGS_t mflags)
+    {
+        return static_cast<bool>(mflags.ei);
     }
 
     static inline bool isInstInterceptMasked(MSR_t msr)
     {
         return static_cast<bool>(msr.im);
-    }
-
-    static inline bool isExcInterceptEnabled(MSR_t msr)
-    {
-        return static_cast<bool>(msr.ei);
     }
 
     static inline bool isExcInterceptMasked(MSR_t msr)
