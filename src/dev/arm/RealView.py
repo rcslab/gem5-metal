@@ -78,7 +78,7 @@ from m5.objects.PciHost import *
 from m5.objects.Platform import Platform
 from m5.objects.PS2 import *
 from m5.objects.Scmi import *
-from m5.objects.SimpleMemory import SimpleMemory
+from m5.objects.SimpleMemory import *
 from m5.objects.SMMUv3 import SMMUv3
 from m5.objects.SubSystem import SubSystem
 from m5.objects.Terminal import Terminal
@@ -985,7 +985,7 @@ class VExpress_EMM(RealView):
         return devices
 
     def _on_chip_memory(self):
-        memories = [self.bootmem]
+        memories = [self.bootmem, self.metalmem]
         return memories
 
     ### Off-chip devices ###
@@ -1290,7 +1290,8 @@ class VExpress_GEM5_Base(RealView):
     """
 
     # Everything above 2GiB is memory
-    _mem_regions = [AddrRange("2GiB", size="510GiB")]
+    _mem_regions = [AddrRange("2GiB", size="1GiB"),
+                    AddrRange("4GiB", size="508GiB")]
 
     _off_chip_ranges = [
         # CS1-CS5
@@ -1298,6 +1299,10 @@ class VExpress_GEM5_Base(RealView):
         # External AXI interface (PCI)
         AddrRange(0x2F000000, 0x80000000),
     ]
+
+    metalmem = SimpleMemory(
+        range=AddrRange(0xC0000000, size="1GiB"), latency="1ns", bandwidth="1024GiB/s"
+    )
 
     bootmem = SimpleMemory(
         range=AddrRange(0, size="64MiB"), conf_table_reported=False
@@ -1385,6 +1390,7 @@ class VExpress_GEM5_Base(RealView):
     def _on_chip_memory(self):
         memories = [
             self.bootmem,
+            self.metalmem,
             self.trusted_sram,
             self.trusted_dram,
             self.non_trusted_sram,

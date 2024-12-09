@@ -64,45 +64,44 @@ from common.cores.arm import (
     O3_ARM_v7a,
 )
 
-
-class L1Cache(Cache):
-    tag_latency = 2
-    data_latency = 2
-    response_latency = 2
-    tgts_per_mshr = 8
-    # Consider the L2 a victim cache also for clean lines
-    writeback_clean = True
-
-
-class L1I(L1Cache):
+class L1I(Cache):
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
     mshrs = 2
+    tgts_per_mshr = 8
     size = "32kB"
     assoc = 2
     is_read_only = True
-    tgts_per_mshr = 20
+    # Writeback clean lines as well
+    writeback_clean = True
 
 
-class L1D(L1Cache):
-    mshrs = 4
+class L1D(Cache):
+    tag_latency = 2
+    data_latency = 2
+    response_latency = 2
+    mshrs = 6
+    tgts_per_mshr = 8
     size = "32kB"
-    assoc = 4
-    write_buffers = 4
-
+    assoc = 2
+    write_buffers = 16
+    # Consider the L2 a victim cache also for clean lines
+    writeback_clean = True
 
 # L2 Cache
 class L2(Cache):
-    tag_latency = 9
-    data_latency = 9
-    response_latency = 9
-    mshrs = 8
-    tgts_per_mshr = 12
-    size = "512kB"
-    assoc = 8
-    write_buffers = 16
-    # prefetch_on_access = True
+    tag_latency = 12
+    data_latency = 12
+    response_latency = 12
+    mshrs = 16
+    tgts_per_mshr = 8
+    size = "1MB"
+    assoc = 16
+    write_buffers = 8
     clusivity = "mostly_excl"
     # Simple stride prefetcher
-    prefetcher = StridePrefetcher(degree=1, latency=1)
+    prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = RandomRP()
 
@@ -351,7 +350,7 @@ def main():
         default="timing",
         help="CPU model to use",
     )
-    parser.add_argument("--cpu-freq", type=str, default="4GHz")
+    parser.add_argument("--cpu-freq", type=str, default="1GHz")
     parser.add_argument(
         "--num-cores", type=int, default=1, help="Number of CPU cores"
     )
