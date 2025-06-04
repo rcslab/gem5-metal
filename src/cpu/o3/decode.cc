@@ -290,6 +290,7 @@ Decode::squash(const DynInstPtr &inst, ThreadID tid)
     toFetch->decodeInfo[tid].predIncorrect = true;
     toFetch->decodeInfo[tid].mispredictInst = inst;
     toFetch->decodeInfo[tid].squash = true;
+    toFetch->decodeInfo[tid].squashMist.set(inst->getPreExecMetalState());
     toFetch->decodeInfo[tid].doneSeqNum = inst->seqNum;
     set(toFetch->decodeInfo[tid].nextPC, *inst->branchTarget());
 

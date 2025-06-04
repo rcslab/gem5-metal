@@ -1045,6 +1045,8 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
             break;
           case CCRegClass:
           case MiscRegClass:
+          case MetalRegClass:
+          case MetalMiscRegClass:
             break;
 
           default:
@@ -1094,7 +1096,7 @@ Rename::renameDestRegs(const DynInstPtr &inst, ThreadID tid)
         const RegId& dest_reg = inst->destRegIdx(dest_idx);
         UnifiedRenameMap::RenameInfo rename_result;
 
-        RegId flat_dest_regid = dest_reg.flatten(*isa);
+        RegId flat_dest_regid = dest_reg.flatten(inst.get());
         flat_dest_regid.setNumPinnedWrites(dest_reg.getNumPinnedWrites());
 
         rename_result = map->rename(flat_dest_regid);

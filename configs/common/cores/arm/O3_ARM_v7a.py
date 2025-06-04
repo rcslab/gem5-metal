@@ -159,7 +159,8 @@ class O3_ARM_v7a_3(ArmO3CPU):
     trapLatency = 13
     backComSize = 5
     forwardComSize = 5
-    numPhysIntRegs = 128
+    numPhysIntRegs = 1024
+    numPhysMetalRegs = 1024
     numPhysFloatRegs = 192
     numPhysVecRegs = 48
     numIQEntries = 32

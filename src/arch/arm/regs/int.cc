@@ -44,6 +44,7 @@
 #include "arch/arm/regs/misc.hh"
 #include "arch/arm/utility.hh"
 #include "base/logging.hh"
+#include "cpu/exec_context.hh"
 
 namespace gem5
 {
@@ -51,21 +52,31 @@ namespace gem5
 namespace ArmISA
 {
 
+RegId 
+IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const {
+    return flattenWithStates(isa.readMiscRegNoEffect(MISCREG_CPSR), 
+                    isa.getMetalState().getMSR(), 
+                    id);
+}
+
 RegId
-IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const
+IntRegClassOps::flatten(ExecContext *xc, const RegId &id) const {
+    return flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR), 
+                    xc->getExecMetalState().getMSR(), 
+                    id);
+};
+
+RegId
+IntRegClassOps::flattenWithStates(RegVal _cpsr, metal_reg::MSR_t msr, const RegId &id)
 {
+    CPSR cpsr = _cpsr;
     const RegIndex reg_idx = id.index();
-
-    auto &arm_isa = static_cast<const ArmISA::ISA &>(isa);
-
     if (reg_idx < int_reg::NumArchRegs) {
-        return {flatIntRegClass, arm_isa.mapIntRegId(reg_idx)};
+        const RegId * intRegMap = ISA::getIntRegMap(cpsr, msr);
+        return {flatIntRegClass, intRegMap[reg_idx]};
     } else if (reg_idx < int_reg::NumRegs) {
         return {flatIntRegClass, id};
     } else if (reg_idx == int_reg::Spx) {
-        auto &arm_isa = static_cast<const ArmISA::ISA &>(isa);
-        CPSR cpsr = arm_isa.readMiscRegNoEffect(MISCREG_CPSR);
-        metal_reg::MSR_t msr = arm_isa.readMetalMiscRegNoEffect(metal_reg::MSR);
         if (metal_reg::isInMetalMode(msr)) {
             return {flatIntRegClass, int_reg::Spm};
         }

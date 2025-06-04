@@ -4,8 +4,11 @@
 
 namespace gem5 {
     namespace ArmISA {
-        class Wmcr64 : public MetalRegOp2
+        class Wmcr64 : public MetalMacroInst
         {
+        private:
+            RegIndex mReg;
+            RegIndex gReg;
         public:
             Wmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
 

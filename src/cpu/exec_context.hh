@@ -48,6 +48,7 @@
 #include "cpu/static_inst_fwd.hh"
 #include "cpu/translation.hh"
 #include "mem/request.hh"
+#include "cpu/metal_int_state.hh"
 
 namespace gem5
 {
@@ -81,6 +82,17 @@ class ExecContext
     virtual void setRegOperand(const StaticInst *si, int idx, RegVal val) = 0;
     virtual void setRegOperand(const StaticInst *si, int idx,
             const void *val) = 0;
+
+     /**
+     * @{
+     * @name Metal internal state interfaces
+     */
+    virtual const MetalInternalState& getExecMetalState(void) const = 0;
+    virtual void setExecMetalState(const MetalInternalState &) = 0;
+    virtual const MetalInternalState& getPreExecMetalState(void) const = 0;
+    virtual void setPreExecMetalState(const MetalInternalState &) = 0;
+    virtual const MetalInternalState& getPostExecMetalState(void) const = 0;
+    virtual void setPostExecMetalState(const MetalInternalState &) = 0;
 
     /**
      * @{

@@ -11,74 +11,115 @@ namespace gem5
     namespace ArmISA
     {
         static constexpr std::string_view MetalDisasmPrefix = "";
-        static constexpr size_t MAX_METAL_OPERANDS = 4;
+        static constexpr size_t MAX_METAL_OPERANDS = 16;
 
-        // a Metal instruction that can be either a regular op, a micro op or a macro op
         class MetalStaticInst : public PredOp
         {
-        private:
-            std::vector<StaticInstPtr> uops;
-        protected:
-            void clearMicroOps(void)
-            {
-                uops.clear();
-            }
-            void addMicroOps(StaticInstPtr inst)
-            {
-                uops.push_back(inst);
-            }
-            void finalizeMicroOps(void)
-            {
-                assert(this->uops.size() > 0);
-                uops.at(0)->setFirstMicroop();
-                for (size_t i = 0; i < this->uops.size() - 1; i++) {
-                    uops.at(i)->setDelayedCommit();
-                }
-                uops.at(this->uops.size() - 1)->setLastMicroop();
-            }
+        protected: 
+            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
+            RegId destRegIdxArr[MAX_METAL_OPERANDS];
         public:
             MetalStaticInst(const char *mnem, ExtMachInst _machInst, OpClass __opClass) : PredOp(mnem, _machInst, __opClass)
             {
-                this->flags[IsMetal] = true;
+                setRegIdxArrays(
+                    reinterpret_cast<RegIdArrayPtr>(
+                        &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
+                    reinterpret_cast<RegIdArrayPtr>(
+                        &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
+            }
+        };
+
+        class MetalMacroInst : public MetalStaticInst
+        {
+        protected:
+            uint32_t numMicroops;
+            StaticInstPtr * microOps;
+            void finalize(void)
+            {
+                if (numMicroops == 0) {
+                    return;
+                }
+
+                microOps[numMicroops - 1]->setLastMicroop();
+                microOps[0]->setFirstMicroop();
+                for(int i = 0; i < numMicroops - 1; i++) {
+                    microOps[i]->setDelayedCommit();
+                }
+            }
+        public:
+            MetalMacroInst(const char *mnem, ExtMachInst _machInst, OpClass __opClass) : 
+                MetalStaticInst(mnem, _machInst, __opClass),
+                numMicroops(0),
+                microOps(nullptr)
+            {
+                this->flags[IsMacroop] = true;
             }
 
-            ~MetalStaticInst()
+            ~MetalMacroInst()
             {
-                clearMicroOps();
+                if (microOps)
+                    delete [] microOps;
+            }
+
+            StaticInstPtr
+            fetchMicroop(MicroPC microPC) const override
+            {
+                assert(microPC < numMicroops);
+                return microOps[microPC];
+            }
+
+            Fault
+            execute(ExecContext *, trace::InstRecord *) const override
+            {
+                panic("Execute method called when it shouldn't!");
+            }
+
+            std::string generateDisassembly(
+                    Addr pc, const loader::SymbolTable *symtab) const override
+            {
+                    std::stringstream ss;
+                
+                    ccprintf(ss, "%-10s ", mnemonic);
+                
+                    return ss.str();
+            }
+
+            void size(size_t newSize) override
+            {
+                for (int i = 0; i < numMicroops; i++) {
+                    microOps[i]->size(newSize);
+                }
+                _size = newSize;
+            }
+        };
+
+        class MetalMicroInst : public MetalStaticInst
+        {
+        public:
+            MetalMicroInst(const char *mnem, ExtMachInst _machInst, OpClass __opClass) : MetalStaticInst(mnem, _machInst, __opClass)
+            {
+                this->flags[IsMicroop] = true;
             }
 
             void
             advancePC(PCStateBase &pcState) const override
             {
                 auto &apc = pcState.as<PCState>();
-                if (flags[IsLastMicroop]) {
+                if (flags[IsLastMicroop])
                     apc.uEnd();
-                } else if (flags[IsMicroop]) {
+                else
                     apc.uAdvance();
-                } else {
-                    apc.advance();
-                }
             }
-
+        
             void
             advancePC(ThreadContext *tc) const override
             {
                 PCState pc = tc->pcState().as<PCState>();
-                if (flags[IsLastMicroop]) {
+                if (flags[IsLastMicroop])
                     pc.uEnd();
-                } else if (flags[IsMicroop]) {
+                else
                     pc.uAdvance();
-                } else {
-                    pc.advance();
-                }
                 tc->pcState(pc);
-            }
-
-            StaticInstPtr
-            fetchMicroop(MicroPC microPC) const override
-            {
-                assert(flags[IsMacroop] && uops.size() > 0 && microPC < uops.size() );
-                return uops.at(microPC);
             }
         };
 
@@ -114,18 +155,11 @@ namespace gem5
         class MetalRegOp : public MetalStaticInst
         {
         protected:
-            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
-            RegId destRegIdxArr[MAX_METAL_OPERANDS];
             RegIndex mReg;
 
         public:
             MetalRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg) : MetalStaticInst(mnem, _machInst, __opClass), mReg(_mReg)
             {
-                setRegIdxArrays(
-                reinterpret_cast<RegIdArrayPtr>(
-                    &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
-                reinterpret_cast<RegIdArrayPtr>(
-                    &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
             }
 
             std::string generateDisassembly(
@@ -136,19 +170,12 @@ namespace gem5
         class MetalRegOp2 : public MetalStaticInst
         {
         protected:
-            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
-            RegId destRegIdxArr[MAX_METAL_OPERANDS];
             RegIndex mReg;
             RegIndex gReg;
 
         public:
             MetalRegOp2(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : MetalStaticInst(mnem, _machInst, __opClass), mReg(_mReg), gReg(_gReg)
             {
-                setRegIdxArrays(
-                reinterpret_cast<RegIdArrayPtr>(
-                    &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
-                reinterpret_cast<RegIdArrayPtr>(
-                    &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
             }
 
             virtual std::string generateDisassembly(
@@ -162,19 +189,12 @@ namespace gem5
             RegIndex rl;
             RegIndex rm;
             RegIndex rn;
-            RegId srcRegIdxArr[MAX_METAL_OPERANDS];
-            RegId destRegIdxArr[MAX_METAL_OPERANDS];
         public:
             MetalRegOp3(const char *mnem, ExtMachInst _machInst,
                 OpClass __opClass, RegIndex _rl, RegIndex _rm, RegIndex _rn)
                 : MetalStaticInst(mnem, _machInst, __opClass), rl(_rl),
                 rm(_rm), rn(_rn)
             {
-                setRegIdxArrays(
-                reinterpret_cast<RegIdArrayPtr>(
-                    &std::remove_pointer_t<decltype(this)>::srcRegIdxArr),
-                reinterpret_cast<RegIdArrayPtr>(
-                    &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
             }
 
             virtual std::string generateDisassembly(

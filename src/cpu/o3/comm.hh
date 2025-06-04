@@ -50,6 +50,7 @@
 #include "cpu/o3/dyn_inst_ptr.hh"
 #include "cpu/o3/limits.hh"
 #include "sim/faults.hh"
+#include "cpu/metal_int_state.hh"
 
 namespace gem5
 {
@@ -116,6 +117,7 @@ struct TimeStruct
         std::unique_ptr<PCStateBase> nextPC;
         DynInstPtr mispredictInst;
         DynInstPtr squashInst;
+        MetalInternalState squashMist;
         InstSeqNum doneSeqNum;
         Addr mispredPC;
         uint64_t branchAddr;
@@ -176,6 +178,9 @@ struct TimeStruct
 
         /// Instruction that caused the a non-mispredict squash
         DynInstPtr squashInst; // *F
+
+        /// the metal internal state after the squash
+        MetalInternalState squashMist; // *F
 
         /// Hack for now to send back a strictly ordered access to the
         /// IEW stage.

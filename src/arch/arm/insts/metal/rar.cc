@@ -9,23 +9,29 @@ namespace gem5 {
             _numTypedDestRegs[metalRegClass.type()]++;
 
             this->flags[IsInteger] = true;
+            // XXX: serialize here because it's messy to resolve runtime dependency
+            // when the dependency itself is held in a renamed register
+            // i.e. need to go back to rename stage after execute stage
+            this->flags[IsSerializeAfter] = true;
+            this->flags[IsNonSpeculative] = true;
         }
 
         Fault Rar64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext *tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscReg(metal_reg::MSR);
-            RegVal idx = tc->readMetalReg(this->mReg);
+            RegVal idx = xc->getRegOperand(this, 0);
 
-            METAL_DBGPRINT(INSTS, RAR, "idxMReg = %s, srcGReg = %d, dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
+            METAL_DBGPRINT(INSTS, RAR, "idxMReg = %s(%d), dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
             if (idx >= int_reg::NumArchRegs) {
                 METAL_DBGPRINT(INSTS, RAR, "Attempting to read out of bound arch reg index: %d.\n", idx);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
+            
+            // XXX: this part requires serialization
+            ThreadContext * tc = xc->tcBase();
+            RegVal v = xc->tcBase()->getReg(intRegClass[idx]);
 
-            RegVal v = xc->getReg(intRegClass[idx]);
-            tc->setMetalReg(this->gReg, v);
+            xc->setRegOperand(this, 0, v);
 
             return NoFault;
         }

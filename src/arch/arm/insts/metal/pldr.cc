@@ -15,13 +15,16 @@ namespace gem5 {
 
             this->flags[IsInteger] = true;
             this->flags[IsLoad] = true;
+            this->flags[IsWriteBarrier] = true;
+            this->flags[IsReadBarrier] = true;
         }
 
         template <typename T>
         Fault Pldri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
+            const MetalInternalState & mist = xc->getExecMetalState();
+
+            metal_reg::MSR_t msr = mist.getMSR();
             Addr base = xc->getRegOperand(this, 0);
 
             METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n",
@@ -100,8 +103,8 @@ namespace gem5 {
         template <typename T>
         Fault Pldrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
+            const MetalInternalState & mist = xc->getExecMetalState();
+            const metal_reg::MSR_t msr = mist.getMSR();
             const Addr addr = xc->getRegOperand(this, 0) + xc->getRegOperand(this, 1);
 
             METAL_DBGPRINT(INSTS, PLDRR, "dReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",

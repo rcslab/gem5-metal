@@ -58,6 +58,7 @@ namespace gem5
 enum RegClassType
 {
     IntRegClass,        ///< Integer register
+    MetalRegClass,      ///< Metal Registers
     FloatRegClass,      ///< Floating-point register
     /** Vector Register. */
     VecRegClass,
@@ -66,7 +67,6 @@ enum RegClassType
     VecPredRegClass,
     MatRegClass,        ///< Matrix Register
     CCRegClass,         ///< Condition-code register
-    MetalRegClass,      ///< Metal Registers
     MiscRegClass,       ///< Control (misc) register
     MetalMiscRegClass,  ///< Metal Misc register
     InvalidRegClass = -1
@@ -87,6 +87,7 @@ inline constexpr char MetalMiscRegClassName[] = "metalmisc";
 class RegClass;
 class RegClassIterator;
 class BaseISA;
+class ExecContext;
 
 /** Register ID: describe an architectural register with its class and index.
  * This structure is used instead of just the register index to disambiguate
@@ -143,7 +144,7 @@ class RegId
     constexpr bool
     isRenameable() const
     {
-        return classValue() != MiscRegClass && classValue() != InvalidRegClass;
+        return classValue() != MiscRegClass && classValue() != InvalidRegClass && classValue() != MetalMiscRegClass;
     }
 
     /** @return true if it is of the specified class. */
@@ -161,6 +162,7 @@ class RegId
 
     inline constexpr bool isFlat() const;
     inline RegId flatten(const BaseISA &isa) const;
+    inline RegId flatten(ExecContext *xc) const;
 
     int getNumPinnedWrites() const { return numPinnedWrites; }
     void setNumPinnedWrites(int num_writes) { numPinnedWrites = num_writes; }
@@ -181,6 +183,8 @@ class RegClassOps
     {
         return id;
     }
+    virtual RegId 
+    flatten(ExecContext *xc, const RegId &id) const;
 };
 
 class RegClassIterator;
@@ -256,6 +260,12 @@ class RegClass
         return isFlat() ? id : _ops->flatten(isa, id);
     }
 
+    RegId
+    flatten(ExecContext * xc, const RegId &id) const
+    {
+        return isFlat() ? id : _ops->flatten(xc, id);
+    }
+
     using iterator = RegClassIterator;
 
     inline iterator begin() const;
@@ -283,6 +293,12 @@ RegId
 RegId::flatten(const BaseISA &isa) const
 {
     return _regClass->flatten(isa, *this);
+}
+
+RegId
+RegId::flatten(ExecContext * xc) const
+{
+    return _regClass->flatten(xc, *this);
 }
 
 std::ostream&

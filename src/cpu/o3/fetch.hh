@@ -200,6 +200,8 @@ class Fetch
     /** To probe when a fetch request is successfully sent. */
     ProbePointArg<RequestPtr> *ppFetchRequestSent;
 
+    MetalInternalState curMetalState;
+
   public:
     /** Fetch constructor. */
     Fetch(CPU *_cpu, const BaseO3CPUParams &params);
@@ -305,8 +307,7 @@ class Fetch
     bool checkInterrupt(Addr pc) { return interruptPending; }
 
     /** Squashes a specific thread and resets the PC. */
-    void doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
-            ThreadID tid);
+    void doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst, const MetalInternalState& squashState, ThreadID tid);
 
     /** Squashes a specific thread and resets the PC. Also tells the CPU to
      * remove any instructions between fetch and decode
@@ -314,7 +315,9 @@ class Fetch
      */
     void squashFromDecode(const PCStateBase &new_pc,
                           const DynInstPtr squashInst,
-                          const InstSeqNum seq_num, ThreadID tid);
+                          const InstSeqNum seq_num, 
+                          const MetalInternalState& squashState,
+                          ThreadID tid);
 
     /** Checks if a thread is stalled. */
     bool checkStall(ThreadID tid) const;
@@ -329,7 +332,7 @@ class Fetch
      * squash should be the commit stage.
      */
     void squash(const PCStateBase &new_pc, const InstSeqNum seq_num,
-                DynInstPtr squashInst, ThreadID tid);
+                DynInstPtr squashInst, const MetalInternalState& squashState, ThreadID tid);
 
     /** Ticks the fetch stage, processing all inputs signals and fetching
      * as many instructions as possible.

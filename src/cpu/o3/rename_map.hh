@@ -231,6 +231,8 @@ class UnifiedRenameMap
             // misc regs aren't really renamed, they keep the same
             // mapping throughout the execution.
             return regFile->getMiscRegId(arch_reg.index());
+        } else if (reg_class == MetalMiscRegClass) {
+            return regFile->getMetalMiscRegId(arch_reg.index());
         }
         return renameMaps[reg_class].lookup(arch_reg);
     }

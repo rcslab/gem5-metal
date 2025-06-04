@@ -75,6 +75,10 @@ class PhysRegFile
     RegFile intRegFile;
     std::vector<PhysRegId> intRegIds;
 
+    /** Metal register file **/
+    RegFile metalRegFile;
+    std::vector<PhysRegId> metalRegIds;
+
     /** Floating point register file. */
     RegFile floatRegFile;
     std::vector<PhysRegId> floatRegIds;
@@ -102,10 +106,18 @@ class PhysRegFile
     /** Misc Reg Ids */
     std::vector<PhysRegId> miscRegIds;
 
+    /** Metal Misc Reg Ids */
+    std::vector<PhysRegId> metalMiscRegIds;
+
     /**
      * Number of physical general purpose registers
      */
     unsigned numPhysicalIntRegs;
+
+      /**
+     * Number of physical Metal registers
+     */
+    unsigned numPhysicalMetalRegs;
 
     /**
      * Number of physical floating point registers
@@ -146,6 +158,7 @@ class PhysRegFile
      * integer and floating point registers.
      */
     PhysRegFile(unsigned _numPhysicalIntRegs,
+                unsigned _numPhysicalMetalRegs,
                 unsigned _numPhysicalFloatRegs,
                 unsigned _numPhysicalVecRegs,
                 unsigned _numPhysicalVecPredRegs,
@@ -167,6 +180,10 @@ class PhysRegFile
     /** Gets a misc register PhysRegIdPtr. */
     PhysRegIdPtr getMiscRegId(RegIndex reg_idx) {
         return &miscRegIds[reg_idx];
+    }
+
+    PhysRegIdPtr getMetalMiscRegId(RegIndex reg_idx) {
+        return &metalMiscRegIds[reg_idx];
     }
 
     RegVal
@@ -195,6 +212,11 @@ class PhysRegFile
           case CCRegClass:
             val = ccRegFile.reg(idx);
             DPRINTF(IEW, "RegFile: Access to cc register %i has data %#x\n",
+                    idx, val);
+            return val;
+          case MetalRegClass:
+            val = metalRegFile.reg(idx);
+            DPRINTF(IEW, "RegFile: Access to Metal register %i has data %#x\n",
                     idx, val);
             return val;
           default:
@@ -234,6 +256,9 @@ class PhysRegFile
                     "data %s\n", idx, matRegFile.regClass.valString(val));
             break;
           case CCRegClass:
+            *(RegVal *)val = getReg(phys_reg);
+            break;
+          case MetalRegClass:
             *(RegVal *)val = getReg(phys_reg);
             break;
           default:
@@ -288,6 +313,11 @@ class PhysRegFile
             DPRINTF(IEW, "RegFile: Setting cc register %i to %#x\n",
                     idx, val);
             break;
+          case MetalRegClass:
+              metalRegFile.reg(idx) = val;
+              DPRINTF(IEW, "RegFile: Setting Metal register %i to %#x\n",
+                    idx, val);
+              break;
           default:
             panic("Unsupported register class type %d.", type);
         }
@@ -325,6 +355,9 @@ class PhysRegFile
             matRegFile.set(idx, val);
             break;
           case CCRegClass:
+            setReg(phys_reg, *(RegVal *)val);
+            break;
+          case MetalRegClass:
             setReg(phys_reg, *(RegVal *)val);
             break;
           default:

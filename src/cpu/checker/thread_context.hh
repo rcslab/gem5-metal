@@ -302,16 +302,6 @@ class CheckerThreadContext : public ThreadContext
         actualTC->setMiscReg(misc_reg, val);
     }
 
-    RegVal
-    readMetalReg(RegIndex metal_reg) override  {
-        panic("unimplemented");
-    }
-
-    void
-    setMetalReg(RegIndex metal_reg, RegVal val) override {
-        panic("unimplemented");
-    }
-
     void
     setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
         panic("unimplemented");

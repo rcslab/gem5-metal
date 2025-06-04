@@ -394,6 +394,7 @@ class PredMacroOp : public PredOp
  */
 class PredMicroop : public PredOp
 {
+protected:
     /// Constructor
     PredMicroop(const char *mnem, ExtMachInst _machInst, OpClass __opClass) :
                 PredOp(mnem, _machInst, __opClass)

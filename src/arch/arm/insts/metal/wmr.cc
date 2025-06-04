@@ -5,7 +5,7 @@ namespace gem5 {
         // wmr
         Wmr64::Wmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("wmr", _machInst, IntAluOp, _mreg, _greg)
         {
-            setSrcRegIdx(_numSrcRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[gReg]);
             setDestRegIdx(_numDestRegs++, metalRegClass[mReg]);
             _numTypedDestRegs[metalRegClass.type()]++;
             this->flags[IsInteger] = true;
@@ -13,13 +13,11 @@ namespace gem5 {
 
         Fault Wmr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-
             RegVal v = xc->getRegOperand(this, 0);
 
             METAL_DBGPRINT(INSTS, WMR, "%s => 0x%lx.\n", printMetalReg(mReg), v);
 
-            tc->setMetalReg(mReg, v);
+            xc->setRegOperand(this, 0, v);
 
             return NoFault;
         }

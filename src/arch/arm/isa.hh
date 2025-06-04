@@ -60,6 +60,7 @@
 #include "sim/sim_object.hh"
 #include "arch/arm/mlb.hh"
 #include "debug/Metal.hh"
+#include "cpu/metal_int_state.hh"
 
 namespace gem5
 {
@@ -130,10 +131,8 @@ namespace ArmISA
         int armFaultToIntID(const ArmFault & fault) const;
 
         RegVal miscRegs[NUM_MISCREGS];
-
-        std::array<RegVal, metal_reg::TotalGRegs> metalRegs;
         std::array<RegVal, metal_reg::NumMiscRegs> metalMiscRegs;
-        const RegId *intRegMap;
+        MetalInternalState metalInternalState;
 
         MRLB mrlb;
         IILB iilb;
@@ -148,6 +147,8 @@ public:
             Bitfield<0> valid;
         EndBitUnion(MroutineTableEntry)
         static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) && isPowerOf2(sizeof(MroutineTableEntry)));
+        static constexpr size_t MroutineTableLoadSize = 8 * sizeof(MroutineTableEntry);
+        static constexpr size_t MroutineTableTotalSize = MroutineTableMaxEntryNum * sizeof(MroutineTableEntry);
 
         // Instruction intercept
         BitUnion32(InstInterceptCtrl)
@@ -189,49 +190,50 @@ public:
         static constexpr size_t ExcInterceptTableTotalSize = ExcInterceptTableMaxEntryNum * sizeof(ExcInterceptTableEntry);
         static_assert((ExcInterceptTableTotalSize % ExcInterceptTableLoadSize) == 0 && (ExcInterceptTableLoadSize % sizeof(ExcInterceptTableEntry)) == 0);
 
-private:
-        void
-        updateRegMap(CPSR cpsr, metal_reg::MSR_t msr)
+public:
+        static const RegId *
+        getIntRegMap(CPSR cpsr, metal_reg::MSR_t msr)
         {
+            const RegId * intRegMap;
             if (cpsr.width == 0) {
-                intRegMap = int_reg::aarch64GetMetalRegMap(metal_reg::getMetalLevel(msr));
-                METAL_DBGPRINT(ISA, REGS, "Updated general regs window r0 = %d, metal level = %d.\n", intRegMap[0].index(), metal_reg::getMetalLevel(msr));
+                if (!metal_reg::isInMetalMode(msr)) {
+                    intRegMap = int_reg::Reg64Map;
+                } else {
+                    intRegMap = int_reg::Reg64MetalMap.at(metal_reg::getMetalLevel(msr));
+                }
             } else {
                 switch (cpsr.mode) {
-                  case MODE_USER:
-                  case MODE_SYSTEM:
-                    intRegMap = int_reg::RegUsrMap;
-                    break;
-                  case MODE_FIQ:
-                    intRegMap = int_reg::RegFiqMap;
-                    break;
-                  case MODE_IRQ:
-                    intRegMap = int_reg::RegIrqMap;
-                    break;
-                  case MODE_SVC:
-                    intRegMap = int_reg::RegSvcMap;
-                    break;
-                  case MODE_MON:
-                    intRegMap = int_reg::RegMonMap;
-                    break;
-                  case MODE_ABORT:
-                    intRegMap = int_reg::RegAbtMap;
-                    break;
-                  case MODE_HYP:
-                    intRegMap = int_reg::RegHypMap;
-                    break;
-                  case MODE_UNDEFINED:
-                    intRegMap = int_reg::RegUndMap;
-                    break;
-                  default:
-                    panic("Unrecognized mode setting in CPSR.\n");
+                    case MODE_USER:
+                    case MODE_SYSTEM:
+                        intRegMap = int_reg::RegUsrMap;
+                        break;
+                    case MODE_FIQ:
+                        intRegMap = int_reg::RegFiqMap;
+                        break;
+                    case MODE_IRQ:
+                        intRegMap = int_reg::RegIrqMap;
+                        break;
+                    case MODE_SVC:
+                        intRegMap = int_reg::RegSvcMap;
+                        break;
+                    case MODE_MON:
+                        intRegMap = int_reg::RegMonMap;
+                        break;
+                    case MODE_ABORT:
+                        intRegMap = int_reg::RegAbtMap;
+                        break;
+                    case MODE_HYP:
+                        intRegMap = int_reg::RegHypMap;
+                        break;
+                    case MODE_UNDEFINED:
+                        intRegMap = int_reg::RegUndMap;
+                        break;
+                    default:
+                        panic("Unrecognized mode setting in CPSR.\n");
                 }
             }
+            return intRegMap;
         }
-
-      public:
-        const RegId &mapIntRegId(RegIndex idx) const { return intRegMap[idx]; }
-
       public:
         void clear() override;
 
@@ -264,19 +266,21 @@ private:
         RegVal readMiscRegReset(RegIndex) const;
         void setMiscRegReset(RegIndex, RegVal val);
 
-        RegVal readMetalReg(RegIndex idx) const override;
-        void setMetalReg(RegIndex, RegVal val) override;
-
         RegVal readMetalMiscReg(RegIndex idx) const override;
         void setMetalMiscReg(RegIndex idx, RegVal val) override;
         RegVal readMetalMiscRegNoEffect(RegIndex idx) const override;
         void setMetalMiscRegNoEffect(RegIndex idx, RegVal val) override;
+        const MetalInternalState & getMetalState(void) const override {
+            return this->metalInternalState;
+        }
+        void setMetalState(const MetalInternalState & st) override {
+            this->metalInternalState.set(st);
+        }
 
         void setIntRegAtLevel(RegIndex idx, RegVal reg, unsigned int mlvl);
         RegVal readIntRegAtLevel(RegIndex idx, unsigned int mlvl) const;
 private:
         void resetMetalRegs(void);
-        RegIndex flattenMetalReg(RegIndex idx) const;
         void registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent);
         static MachInst shiftInstMask(MachInst encoding, MachInst mask)
         {
@@ -290,9 +294,9 @@ public:
         MRLB & getMrlbPtr();
         IILB & getIilbPtr();
         EILB & getEilbPtr();
-        void loadMroutineTable(MroutineTableEntry * rawEnts, size_t count, unsigned int startIdx);
+        void loadMroutineTable(void * rawEnts, size_t count, unsigned int startIdx);
         void loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size);
-        void loadExcInterceptTable(void * rawMem, Addr memAddr, size_t size);
+        void loadExcInterceptTable(void * rawMem, size_t size);
 
         bool checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const override;
         void doExcIntercept(const Fault &fault, const StaticInstPtr &nst) override;

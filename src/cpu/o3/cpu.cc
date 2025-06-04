@@ -87,6 +87,7 @@ CPU::CPU(const BaseO3CPUParams &params)
       commit(this, params),
 
       regFile(params.numPhysIntRegs,
+              params.numPhysMetalRegs,
               params.numPhysFloatRegs,
               params.numPhysVecRegs,
               params.numPhysVecPredRegs,
@@ -195,6 +196,8 @@ CPU::CPU(const BaseO3CPUParams &params)
 
     assert(params.numPhysIntRegs >=
             numThreads * regClasses.at(IntRegClass)->numRegs());
+    assert(params.numPhysMetalRegs >=
+            numThreads * regClasses.at(MetalRegClass)->numRegs());
     assert(params.numPhysFloatRegs >=
             numThreads * regClasses.at(FloatRegClass)->numRegs());
     assert(params.numPhysVecRegs >=

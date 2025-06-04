@@ -92,8 +92,8 @@ class SimpleExecContext : public ExecContext
                        "Number of times a function call or return occured"),
               ADD_STAT(numMatInsts, statistics::units::Count::get(),
                        "Number of matrix instructions"),
-              ADD_STAT(numMetalInsts, statistics::units::Count::get(),
-                       "Number of Metal instructions"),
+            //   ADD_STAT(numMetalInsts, statistics::units::Count::get(),
+            //            "Number of Metal instructions"),
               ADD_STAT(numIdleCycles, statistics::units::Cycle::get(),
                        "Number of idle cycles"),
               ADD_STAT(numBusyCycles, statistics::units::Cycle::get(),
@@ -145,9 +145,6 @@ class SimpleExecContext : public ExecContext
 
         // Number of matrix instructions
         statistics::Scalar numMatInsts;
-
-        // Number of matrix instructions
-        statistics::Scalar numMetalInsts;
 
         // Number of matrix register file accesses
         mutable statistics::Scalar numMatRegReads;
@@ -461,6 +458,26 @@ class SimpleExecContext : public ExecContext
     {
         return cpu->getCpuAddrMonitor(thread->threadId());
     }
+
+    const MetalInternalState& getExecMetalState(void) const override {
+        return tcBase()->getIsaPtr()->getMetalState();
+    }
+    const MetalInternalState& getPreExecMetalState(void) const override {
+        return tcBase()->getIsaPtr()->getMetalState();
+    }
+    const MetalInternalState& getPostExecMetalState(void) const override {
+        return tcBase()->getIsaPtr()->getMetalState();
+    };
+
+    void setExecMetalState(const MetalInternalState& state) override {
+        tcBase()->getIsaPtr()->setMetalState(state);
+    }
+    void setPreExecMetalState(const MetalInternalState& state) override {
+        tcBase()->getIsaPtr()->setMetalState(state);
+    }
+    void setPostExecMetalState(const MetalInternalState& state) override {
+        tcBase()->getIsaPtr()->setMetalState(state);
+    };
 };
 
 } // namespace gem5

@@ -20,8 +20,8 @@ namespace gem5 {
         template <typename T>
         Fault Pstri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
+            const MetalInternalState & mist = xc->getExecMetalState();
+            metal_reg::MSR_t msr = mist.getMSR();
 
             METAL_DBGPRINT(INSTS, PSTRI, "sReg = %u, aReg = %u, imm = %d, mode = %#x, size = %u.\n",
                     mReg, gReg, imm,
@@ -93,8 +93,8 @@ namespace gem5 {
         template <typename T>
         Fault Pstrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
+            const MetalInternalState & mist = xc->getExecMetalState();
+            metal_reg::MSR_t msr = mist.getMSR();
             const Addr addr = xc->getRegOperand(this, 1) + xc->getRegOperand(this, 2);
 
             METAL_DBGPRINT(INSTS, PSTRR, "sReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",

@@ -31,6 +31,7 @@
 #include <iostream>
 
 #include "cpu/thread_context.hh"
+#include "cpu/exec_context.hh"
 
 namespace gem5
 {
@@ -47,6 +48,15 @@ StaticInst::branchTarget(const PCStateBase &pc) const
 {
     panic("StaticInst::branchTarget() called on instruction "
           "that is not a PC-relative branch.");
+}
+
+Fault 
+StaticInst::preExec(ExecContext *xc, trace::InstRecord *traceData) const
+{
+    // non metal instructions don't need to alter Metal state
+    xc->setExecMetalState(xc->getPreExecMetalState());
+    xc->setPostExecMetalState(xc->getPreExecMetalState());
+    return NoFault;
 }
 
 std::unique_ptr<PCStateBase>

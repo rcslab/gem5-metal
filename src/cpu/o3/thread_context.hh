@@ -44,6 +44,7 @@
 
 #include "cpu/o3/cpu.hh"
 #include "cpu/thread_context.hh"
+#include "cpu/metal_int_state.hh"
 
 namespace gem5
 {
@@ -209,33 +210,22 @@ class ThreadContext : public gem5::ThreadContext
      * write might have as defined by the architecture. */
     void setMiscReg(RegIndex misc_reg, RegVal val) override;
 
-
-    RegVal
-    readMetalReg(RegIndex metal_reg) override  {
-        panic("unimplemented");
-    }
-
-    void
-    setMetalReg(RegIndex metal_reg, RegVal val) override {
-        panic("unimplemented");
-    }
-
     void
     setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
-        panic("unimplemented");
+        getIsaPtr()->setMetalMiscReg(metal_reg, val);
     }
 
     RegVal
     readMetalMiscReg(RegIndex metal_reg) const override {
-        panic("unimplemented");
+        return getIsaPtr()->readMetalMiscReg(metal_reg);
     }
 
     RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const override {
-        panic("unimplemented");
+        return getIsaPtr()->readMetalMiscRegNoEffect(metal_reg);
     };
 
     void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) override {
-        panic("unimplemented");
+        getIsaPtr()->setMetalMiscRegNoEffect(metal_reg, val);
     };
 
 
@@ -262,8 +252,9 @@ class ThreadContext : public gem5::ThreadContext
     void
     conditionalSquash()
     {
-        if (!thread->trapPending && !thread->noSquashFromTC)
+        if (!thread->trapPending && !thread->noSquashFromTC) {
             cpu->squashFromTC(thread->threadId());
+        }
     }
 
     RegVal getReg(const RegId &reg) const override;
@@ -280,52 +271,45 @@ class ThreadContext : public gem5::ThreadContext
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
 
     bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override {
-        panic("unimplemented!");
+        return this->getIsaPtr()->checkInstIntercept(inst, post);
     }
     void doInstIntercept(const StaticInstPtr &inst, bool post) override {
-        panic("unimplemented!");
+        this->getIsaPtr()->doInstIntercept(inst, post);
     }
     bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const override {
-        panic("unimplemented!");
+        return this->getIsaPtr()->checkExcIntercept(fault, inst);
     }
     void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) override{
-        panic("unimplemented!");
+        this->getIsaPtr()->doExcIntercept(fault, inst);
     }
+
     bool checkInstInterceptMasked(void) const override {
         panic("unimplemented!");
     }
     void doneInstInterceptMasked(void) override {
         panic("unimplemented!");
     }
-
     bool checkExcInterceptMasked(void) const override {
         panic("unimplemented!");
     }
-
     void doneExcInterceptMasked(void) override {
         panic("unimplemented!");
     }
-
     bool checkInterruptDisabled(void) const override {
         panic("unimplemented!");
     }
-
     void doneInterruptDisabled(void) override {
         panic("unimplemented!");
     }
-
     bool getExcInterceptMaskFlag(void) const override {
         panic("unimplemented!");
     }
-
     void setExcInterceptMaskFlag(bool) override {
         panic("unimplemented!");
     }
-
     bool getInterruptDisabledFlag(void) const override {
         panic("unimplemented!");
     }
-
     void setInterruptDisabledFlag(bool) override {
         panic("unimplemented!");
     }

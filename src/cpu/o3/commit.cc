@@ -55,6 +55,7 @@
 #include "cpu/o3/dyn_inst.hh"
 #include "cpu/o3/limits.hh"
 #include "cpu/o3/thread_state.hh"
+#include "cpu/o3/thread_context.hh"
 #include "cpu/timebuf.hh"
 #include "debug/Activity.hh"
 #include "debug/Commit.hh"
@@ -512,6 +513,10 @@ Commit::squashAll(ThreadID tid)
 
     toIEW->commitInfo[tid].mispredictInst = NULL;
     toIEW->commitInfo[tid].squashInst = NULL;
+
+    // send back the post squash metal state
+    BaseISA * isa = thread[tid]->getTC()->getIsaPtr();
+    toIEW->commitInfo[tid].squashMist.set(isa->getMetalState());
 
     set(toIEW->commitInfo[tid].pc, pc[tid]);
 }
@@ -1257,6 +1262,10 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         renameMap[tid]->setEntry(head_inst->flattenedDestIdx(i),
                                  head_inst->renamedDestIdx(i));
     }
+
+    // update the tc states
+    BaseISA * isa = thread[tid]->getTC()->getIsaPtr();
+    isa->setMetalState(head_inst->getPostExecMetalState());
 
     // hardware transactional memory
     // the HTM UID is purely for correctness and debugging purposes

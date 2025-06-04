@@ -683,11 +683,11 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
 }
 
 void
-Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
-        ThreadID tid)
+Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst, 
+    const MetalInternalState& squashState, ThreadID tid)
 {
-    DPRINTF(Fetch, "[tid:%i] Squashing, setting PC to: %s.\n",
-            tid, new_pc);
+    DPRINTF(Fetch, "[tid:%i] Squashing, setting PC to: %s, MetalState to: 0x%lx.\n",
+            tid, new_pc, squashState.getMSR());
 
     set(pc[tid], new_pc);
     fetchOffset[tid] = 0;
@@ -696,6 +696,9 @@ Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
     else
         macroop[tid] = NULL;
     decoder[tid]->reset();
+
+    // reverse the Metal state
+    curMetalState.set(squashState);
 
     // Clear the icache miss if it's outstanding.
     if (fetchStatus[tid] == IcacheWaitResponse) {
@@ -735,11 +738,11 @@ Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
 
 void
 Fetch::squashFromDecode(const PCStateBase &new_pc, const DynInstPtr squashInst,
-        const InstSeqNum seq_num, ThreadID tid)
+        const InstSeqNum seq_num, const MetalInternalState& squashState, ThreadID tid)
 {
     DPRINTF(Fetch, "[tid:%i] Squashing from decode.\n", tid);
 
-    doSquash(new_pc, squashInst, tid);
+    doSquash(new_pc, squashInst, squashState, tid);
 
     // Tell the CPU to remove any instructions that are in flight between
     // fetch and decode.
@@ -801,11 +804,11 @@ Fetch::updateFetchStatus()
 
 void
 Fetch::squash(const PCStateBase &new_pc, const InstSeqNum seq_num,
-        DynInstPtr squashInst, ThreadID tid)
+        DynInstPtr squashInst, const MetalInternalState& squashState, ThreadID tid)
 {
     DPRINTF(Fetch, "[tid:%i] Squash from commit.\n", tid);
 
-    doSquash(new_pc, squashInst, tid);
+    doSquash(new_pc, squashInst, squashState, tid);
 
     // Tell the CPU to remove any instructions that are not in the ROB.
     cpu->removeInstsNotInROB(tid);
@@ -935,7 +938,9 @@ Fetch::checkSignalsAndUpdate(ThreadID tid)
         // In any case, squash.
         squash(*fromCommit->commitInfo[tid].pc,
                fromCommit->commitInfo[tid].doneSeqNum,
-               fromCommit->commitInfo[tid].squashInst, tid);
+               fromCommit->commitInfo[tid].squashInst, 
+               fromCommit->commitInfo[tid].squashMist,
+               tid);
 
         // If it was a branch mispredict on a control instruction, update the
         // branch predictor with that instruction, otherwise just kill the
@@ -980,6 +985,7 @@ Fetch::checkSignalsAndUpdate(ThreadID tid)
             squashFromDecode(*fromDecode->decodeInfo[tid].nextPC,
                              fromDecode->decodeInfo[tid].squashInst,
                              fromDecode->decodeInfo[tid].doneSeqNum,
+                             fromDecode->decodeInfo[tid].squashMist,
                              tid);
 
             return true;
@@ -1064,6 +1070,24 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
 
     // Keep track of if we can take an interrupt at this boundary
     delayedCommit[tid] = instruction->isDelayedCommit();
+
+    // propagate metal internal state
+    instruction->setPreExecMetalState(curMetalState);
+    // pre-execute for metal internal state changes
+    Fault fault = instruction->preExec();
+    if (fault == NoFault) {
+        // update the latest metal internal state
+        curMetalState.set(instruction->getPostExecMetalState());
+    } else {
+        DPRINTF(Fetch, "[tid:%i][sn:%lli] instruction preExec faulted.\n", tid, seq);
+    }
+
+    DPRINTF(Fetch, "[tid:%i][sn:%lli] preMetalState: 0x%lx, execMetalState: 0x%lx, postMetalState: 0x%lx\n", 
+        tid,
+        seq,
+        instruction->getPreExecMetalState().getMSR(),
+        instruction->getExecMetalState().getMSR(),
+        instruction->getPostExecMetalState().getMSR());
 
     return instruction;
 }

@@ -214,10 +214,7 @@ class ThreadContext : public PCEventScope
 
     virtual void setMiscReg(RegIndex misc_reg, RegVal val) = 0;
 
-    virtual RegVal readMetalReg(RegIndex metal_reg) = 0;
-
-    virtual void setMetalReg(RegIndex metal_reg, RegVal val) = 0;
-
+    // Metal Reg Ops
     virtual RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const = 0;
 
     virtual void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) = 0;

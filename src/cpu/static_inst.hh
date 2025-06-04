@@ -157,7 +157,6 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isFloating()     const { return flags[IsFloating]; }
     bool isVector()       const { return flags[IsVector]; }
     bool isMatrix()       const { return flags[IsMatrix]; }
-    bool isMetal()        const { return flags[IsMetal]; }
 
     bool isControl()      const { return flags[IsControl]; }
     bool isCall()         const { return flags[IsCall]; }
@@ -305,6 +304,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     {
         panic("completeAcc not defined!");
     }
+
+    virtual Fault 
+    preExec(ExecContext *xc, trace::InstRecord *traceData) const;
 
     virtual void advancePC(PCStateBase &pc_state) const = 0;
     virtual void advancePC(ThreadContext *tc) const;

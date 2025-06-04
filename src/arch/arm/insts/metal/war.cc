@@ -5,18 +5,22 @@ namespace gem5 {
         War64::War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("war", _machInst, IntAluOp, _mreg, _greg)
         {
             setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
-            setSrcRegIdx(_numDestRegs++, metalRegClass[gReg]);
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[gReg]);
             // writing to int class
-            _numTypedDestRegs[intRegClass.type()]++;
+            // _numTypedDestRegs[intRegClass.type()]++;
 
             this->flags[IsInteger] = true;
+            this->flags[IsSerializeAfter] = true;
+            this->flags[IsNonSpeculative] = true;
         }
 
         Fault War64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
-            RegVal idx = tc->readMetalReg(this->mReg);
+            const MetalInternalState &mist = xc->getExecMetalState();
+            const metal_reg::MSR_t msr = mist.getMSR();
+
+            RegVal idx = xc->getRegOperand(this, 0);
+            RegVal v = xc->getRegOperand(this, 1);
 
             METAL_DBGPRINT(INSTS, WAR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
 
@@ -25,8 +29,7 @@ namespace gem5 {
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            RegVal v = tc->readMetalReg(this->gReg);
-            xc->setReg(intRegClass[idx], v);
+            xc->tcBase()->setReg(intRegClass[idx], v);
 
             return NoFault;
         }

@@ -49,6 +49,7 @@
 #include "arch/arm/regs/metal.hh"
 #include "debug/IntRegs.hh"
 #include "sim/core.hh"
+#include "cpu/exec_context.hh"
 
 namespace gem5
 {
@@ -127,7 +128,7 @@ enum : RegIndex
 
     // constants
     NumArchRegs = 32,
-    NumRegs = NumRegsOneWindow + NumArchRegs * (metal_reg::NumWindow - 1),
+    NumRegs = NumRegsOneWindow + NumArchRegs * metal_reg::MaxMetalLevel,
     _SpxIdx = NumRegs,
 
     _X0Idx = 0,
@@ -169,6 +170,11 @@ enum : RegIndex
 class IntRegClassOps : public RegClassOps
 {
     RegId flatten(const BaseISA &isa, const RegId &id) const override;
+
+    RegId flatten(ExecContext *xc, const RegId &id) const override;
+
+public:
+    static RegId flattenWithStates(RegVal cpsr, metal_reg::MSR_t msr, const RegId &id);
 };
 
 inline constexpr IntRegClassOps intRegClassOps;
@@ -446,31 +452,21 @@ const RegMap Reg64Map = {
     R8Fiq,  R9Fiq,  R10Fiq, R11Fiq, R12Fiq, R13Fiq, R14Fiq, Zero
 };
 
-inline constexpr std::array<RegId[NumArchRegs], metal_reg::NumWindow - 1> 
+inline constexpr std::array<RegId[NumArchRegs], metal_reg::MaxMetalLevel> 
 constructReg64MetalMap()
 {
-    std::array<RegId[NumArchRegs], metal_reg::NumWindow - 1> arr;
+    std::array<RegId[NumArchRegs], metal_reg::MaxMetalLevel> arr;
     for (unsigned int lvl = 0; lvl < arr.size(); lvl++) {
         RegId * ids = arr.at(lvl);
         for (unsigned int i = 0; i < NumArchRegs - 1; i++) {
-            ids[i] = RegId(flatIntRegClass, NumRegsOneWindow + lvl * NumArchRegs + i);
+            ids[i] = flatIntRegClass[NumRegsOneWindow + lvl * NumArchRegs + i];
         }
         ids[NumArchRegs - 1] = Zero;
     }
     return arr;
 }
 
-inline constexpr std::array<RegId[NumArchRegs], metal_reg::NumWindow - 1> Reg64MetalMap = constructReg64MetalMap();
-
-static inline const RegId * 
-aarch64GetMetalRegMap(unsigned int metal_lvl)
-{
-    if (metal_lvl == 0) {
-        return int_reg::Reg64Map;
-    } else {
-        return Reg64MetalMap.at(metal_lvl);
-    }
-}
+inline constexpr std::array<RegId[NumArchRegs], metal_reg::MaxMetalLevel> Reg64MetalMap = constructReg64MetalMap();
 
 static inline RegId
 x(unsigned index)

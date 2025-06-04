@@ -63,6 +63,7 @@
 #include "cpu/static_inst.hh"
 #include "cpu/translation.hh"
 #include "debug/HtmCpu.hh"
+#include "cpu/metal_int_state.hh"
 
 namespace gem5
 {
@@ -113,6 +114,8 @@ class DynInst : public ExecContext, public RefCounted
 
     /** Executes the instruction.*/
     Fault execute();
+
+    Fault preExec();
 
     /** Initiates the access.  Only valid for memory operations. */
     Fault initiateAcc();
@@ -235,6 +238,11 @@ class DynInst : public ExecContext, public RefCounted
 
     // Whether or not the source register is ready, one bit per register.
     uint8_t *_readySrcIdx;
+
+    // metal internal state for register flattening
+    MetalInternalState execMetalState;
+    MetalInternalState preMetalState;
+    MetalInternalState postMetalState;
 
   public:
     size_t numSrcs() const { return _numSrcs; }
@@ -1098,6 +1106,30 @@ class DynInst : public ExecContext, public RefCounted
     void trap(const Fault &fault);
 
   public:
+
+    const MetalInternalState& getExecMetalState(void) const override {
+        return execMetalState;
+    }
+
+    const MetalInternalState& getPostExecMetalState(void) const override {
+        return postMetalState;
+    }
+
+    const MetalInternalState& getPreExecMetalState(void) const override {
+        return preMetalState;
+    }
+
+    void setExecMetalState(const MetalInternalState& state) override {
+        execMetalState.set(state);
+    }
+
+    void setPostExecMetalState(const MetalInternalState& state) override {
+        postMetalState.set(state);
+    }
+
+    void setPreExecMetalState(const MetalInternalState& state) override {
+        preMetalState.set(state);
+    }
 
     // The register accessor methods provide the index of the
     // instruction's operand (e.g., 0 or 1), not the architectural

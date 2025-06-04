@@ -50,6 +50,7 @@ namespace o3
 {
 
 PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
+                         unsigned _numPhysicalMetalRegs,
                          unsigned _numPhysicalFloatRegs,
                          unsigned _numPhysicalVecRegs,
                          unsigned _numPhysicalVecPredRegs,
@@ -57,6 +58,7 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
                          unsigned _numPhysicalCCRegs,
                          const BaseISA::RegClasses &reg_classes)
     : intRegFile(*reg_classes.at(IntRegClass), _numPhysicalIntRegs),
+      metalRegFile(*reg_classes.at(MetalRegClass), _numPhysicalMetalRegs),
       floatRegFile(*reg_classes.at(FloatRegClass), _numPhysicalFloatRegs),
       vectorRegFile(*reg_classes.at(VecRegClass), _numPhysicalVecRegs),
       vectorElemRegFile(*reg_classes.at(VecElemClass), _numPhysicalVecRegs * (
@@ -67,6 +69,7 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
       matRegFile(*reg_classes.at(MatRegClass), _numPhysicalMatRegs),
       ccRegFile(*reg_classes.at(CCRegClass), _numPhysicalCCRegs),
       numPhysicalIntRegs(_numPhysicalIntRegs),
+      numPhysicalMetalRegs(_numPhysicalMetalRegs),
       numPhysicalFloatRegs(_numPhysicalFloatRegs),
       numPhysicalVecRegs(_numPhysicalVecRegs),
       numPhysicalVecElemRegs(_numPhysicalVecRegs * (
@@ -76,6 +79,7 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
       numPhysicalMatRegs(_numPhysicalMatRegs),
       numPhysicalCCRegs(_numPhysicalCCRegs),
       totalNumRegs(_numPhysicalIntRegs
+                   + _numPhysicalMetalRegs
                    + _numPhysicalFloatRegs
                    + _numPhysicalVecRegs
                    + numPhysicalVecElemRegs
@@ -92,6 +96,11 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
                 phys_reg, flat_reg_idx++);
     }
 
+    for (phys_reg = 0; phys_reg < numPhysicalMetalRegs; phys_reg++) {
+        metalRegIds.emplace_back(*reg_classes.at(MetalRegClass),
+                phys_reg, flat_reg_idx++);
+    }
+ 
     // The next batch of the registers are the floating-point physical
     // registers; put them onto the floating-point free list.
     for (phys_reg = 0; phys_reg < numPhysicalFloatRegs; phys_reg++) {
@@ -138,6 +147,11 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
             phys_reg++) {
         miscRegIds.emplace_back(*reg_classes.at(MiscRegClass), phys_reg, 0);
     }
+
+    // Metal Misc regs have a fixed mapping but still need PhysRegIds.
+    for (phys_reg = 0; phys_reg < reg_classes.at(MetalMiscRegClass)->numRegs(); phys_reg++) {
+        metalMiscRegIds.emplace_back(*reg_classes.at(MetalMiscRegClass), phys_reg, 0);
+}
 }
 
 
@@ -152,6 +166,12 @@ PhysRegFile::initFreeList(UnifiedFreeList *freeList)
         assert(intRegIds[reg_idx].index() == reg_idx);
     }
     freeList->addRegs(intRegIds.begin(), intRegIds.end());
+
+    // The initial batch of registers are the integer ones
+    for (reg_idx = 0; reg_idx < numPhysicalMetalRegs; reg_idx++) {
+        assert(metalRegIds[reg_idx].index() == reg_idx);
+    }
+    freeList->addRegs(metalRegIds.begin(), metalRegIds.end());
 
     // The next batch of the registers are the floating-point physical
     // registers; put them onto the floating-point free list.

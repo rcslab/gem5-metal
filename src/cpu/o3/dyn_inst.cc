@@ -70,6 +70,10 @@ DynInst::DynInst(const Arrays &arrays, const StaticInstPtr &static_inst,
     instFlags[Predicate] = true;
     instFlags[MemAccPredicate] = true;
 
+    execMetalState.reset();
+    preMetalState.reset();
+    postMetalState.reset();
+
 #ifndef NDEBUG
     ++cpu->instcount;
 
@@ -342,6 +346,18 @@ DynInst::setSquashed()
         }
     }
     setPinnedRegsSquashDone();
+}
+
+Fault DynInst::preExec()
+{
+    bool no_squash_from_TC = thread->noSquashFromTC;
+    thread->noSquashFromTC = true;
+
+    fault = staticInst->preExec(this, traceData);
+
+    thread->noSquashFromTC = no_squash_from_TC;
+
+    return fault;
 }
 
 Fault

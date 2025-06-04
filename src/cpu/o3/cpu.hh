@@ -316,7 +316,6 @@ class CPU : public BaseCPU
 
     void setReg(PhysRegIdPtr phys_reg, RegVal val, ThreadID tid);
     void setReg(PhysRegIdPtr phys_reg, const void *val, ThreadID tid);
-
     /** Architectural register accessors.  Looks up in the commit
      * rename table to obtain the true physical index of the
      * architected register first, then accesses that physical

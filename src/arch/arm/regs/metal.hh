@@ -6,6 +6,7 @@
 #include "debug/MetalRegs.hh"
 #include "cpu/reg_class.hh"
 #include "sim/core.hh"
+#include "metal_misc.hh"
 
 namespace gem5
 {
@@ -17,7 +18,26 @@ namespace metal_reg
 {
     enum : RegIndex
     {
-        /* All the unique register indices. */
+        /* Each window is 32 registers
+         * 
+         *
+         *   TOP of RegStack (each level grows downward)
+         *   |-------------|     |----------------|
+         *   | Input  lv.n |     | N/A            |
+         *   | Local  lv.n |     | N/A            |
+         *   | Output lv.n |     | Input   lv.n+1 |
+         *   |-------------|     | Local   lv.n+1 |
+         *                       | Output  lv.n+1 |
+         *                       |----------------|
+         * 
+         * Window shift is 22 regs (Input + Local)
+         * Each level requires 22 new regs
+         * Total regs = Window Size + (Max Level - 1) * Window Shift
+         * 
+        */
+        MaxMetalLevel = 7,
+
+        /* aliases for mregs in a certain window */
         MO0 = 0,
         MO1,
         MO2,
@@ -28,20 +48,19 @@ namespace metal_reg
         MO7,
         MO8,
         MO9,
-        NumIORegs,
 
-        MR0 = NumIORegs,
-        MR1,
-        MR2,
-        MR3,
-        MR4,
-        MR5,
-        MR6,
-        MR7,
-        MR8,
-        MR9,
-        MR10,
-        MR11,
+        ML0,
+        ML1,
+        ML2,
+        ML3,
+        ML4,
+        ML5,
+        ML6,
+        ML7,
+        ML8,
+        ML9,
+        ML10,
+        ML11,
 
         MI0,
         MI1,
@@ -53,25 +72,25 @@ namespace metal_reg
         MI7,
         MI8,
         MI9,
-        NumRegs,
+        WindowSize,
+        WindowShift = MI9 - MO9,
 
-        // aliases 
-        MIR0 = MR0,
-        MIR1 = MR1,
-        MIR2 = MR2,
+        // aliases for other features 
+        MIR0 = ML0,
+        MIR1 = ML1,
+        MIR2 = ML2,
 
-        MER0 = MR0,
-        MER1 = MR1,
+        MER0 = ML0,
+        MER1 = ML1,
 
-        MSPSR = MR9,
-        MSFLAGS = MR10,
-        MLR = MR11
+        MSPSR = ML9,
+        MSFLAGS = ML10,
+        MLR = ML11
     };
-    static_assert(NumRegs == 32);
-    static_assert(NumRegs <= (1 << 5));
-    static constexpr size_t NumWindow = 9;
-    static_assert(NumWindow > 0);
-    static constexpr size_t TotalGRegs = NumRegs + (NumWindow - 1) * (NumRegs - NumIORegs);
+    static_assert(WindowSize == 32);
+    static_assert(WindowSize <= (1 << 5));
+    static_assert(MaxMetalLevel > 0);
+    static constexpr size_t NumGRegs = WindowSize + MaxMetalLevel * (WindowShift);
 
     const char * const regNames[] = {
         "mo0",
@@ -109,16 +128,24 @@ namespace metal_reg
         "mi8",
         "mi9",
     };
-    static_assert((sizeof(regNames) / sizeof(regNames[0])) == NumRegs);
+    static_assert((sizeof(regNames) / sizeof(regNames[0])) == WindowSize);
 } // namespace metal_reg
 
-class MetalRegClassOps : public RegClassOps {};
+inline constexpr RegClass flatMetalRegClass =
+    RegClass(MetalRegClass, MetalRegClassName, metal_reg::NumGRegs, debug::MetalRegs);
+
+class MetalRegClassOps : public RegClassOps 
+{
+    RegId flatten(const BaseISA &isa, const RegId &id) const override;
+    RegId flatten(ExecContext * xc, const RegId &id) const override;
+    static RegId flattenWithStates(metal_reg::MSR_t msr, const RegId &id);
+};
 
 inline constexpr MetalRegClassOps metalRegClassOps;
 
 inline constexpr RegClass metalRegClass =
-    RegClass(MetalRegClass, MetalRegClassName, metal_reg::NumRegs, debug::MetalRegs).
-    ops(metalRegClassOps);
+    RegClass(MetalRegClass, MetalRegClassName, metal_reg::NumGRegs, debug::MetalRegs).
+    ops(metalRegClassOps).needsFlattening();
 
 } // namespace ARMISA
 } // namespace gem5

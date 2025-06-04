@@ -45,6 +45,7 @@
 #include "base/cprintf.hh"
 #include "sim/bufval.hh"
 #include "sim/byteswap.hh"
+#include "cpu/exec_context.hh"
 
 namespace gem5
 {
@@ -69,6 +70,12 @@ RegClassOps::valString(const void *val, size_t size) const
     // regular number.
 
     return printByteBuf(val, size, ByteOrder::big);
+}
+
+RegId 
+RegClassOps::flatten(ExecContext *xc, const RegId &id) const
+{
+    return flatten(*(xc->tcBase()->getIsaPtr()), id);
 }
 
 } // namespace gem5

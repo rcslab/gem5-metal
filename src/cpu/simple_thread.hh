@@ -289,24 +289,16 @@ class SimpleThread : public ThreadState, public ThreadContext
     {
         return isa->setMiscReg(misc_reg, val);
     }
-    
-    virtual RegVal readMetalReg(RegIndex metal_reg) override {
-        return isa->readMetalReg(metal_reg);
-    }
 
-    virtual void setMetalReg(RegIndex metal_reg, RegVal val) override {
-        isa->setMetalReg(metal_reg, val);
-    }
-
-    virtual RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const override {
+    RegVal readMetalMiscRegNoEffect(RegIndex metal_reg) const override {
         return isa->readMetalMiscRegNoEffect(metal_reg);
     }
 
-    virtual void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) override {
+    void setMetalMiscRegNoEffect(RegIndex metal_reg, RegVal val) override {
         isa->setMetalMiscRegNoEffect(metal_reg, val);
     }
     
-    virtual RegVal readMetalMiscReg(RegIndex metal_reg) const override {
+    RegVal readMetalMiscReg(RegIndex metal_reg) const override {
         return isa->readMetalMiscReg(metal_reg);
     }
     

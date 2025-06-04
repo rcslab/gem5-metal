@@ -4,18 +4,21 @@ namespace gem5 {
     namespace ArmISA {
         Rmcr64::Rmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("rmcr", _machInst, IntAluOp, _mreg, _greg)
         {
-            setDestRegIdx(_numDestRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
+            setDestRegIdx(_numDestRegs++, intRegClass[gReg]);
             setSrcRegIdx(_numSrcRegs++, metalMiscRegClass[mReg]);
             _numTypedDestRegs[intRegClass.type()]++;
 
             this->flags[IsInteger] = true;
+            this->flags[IsSerializeAfter] = true;
+            this->flags[IsNonSpeculative] = true;
         }
 
         Fault Rmcr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
+            const MetalInternalState &mist = xc->getExecMetalState();
+            const metal_reg::MSR_t msr = mist.getMSR();
 
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
+            ThreadContext * tc = xc->tcBase();
             const RegVal mar = tc->readMetalMiscRegNoEffect(metal_reg::MAR);
 
             if (!metal_reg::getReadPerm(mar, mReg) || !metal_reg::isInMetalMode(msr)) {

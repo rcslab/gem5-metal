@@ -376,14 +376,14 @@ ArmStaticInst::printMiscReg(std::ostream &os, RegIndex reg_idx) const
 void
 ArmStaticInst::printMetalReg(std::ostream &os, RegIndex reg_idx) const
 {
-    assert(reg_idx < metal_reg::NumRegs);
+    assert(reg_idx < metal_reg::WindowSize);
     ccprintf(os, "%s", printMetalReg(reg_idx));
 }
 
 const char *
 ArmStaticInst::printMetalReg(RegIndex reg_idx)
 {
-    assert(reg_idx < metal_reg::NumRegs);
+    assert(reg_idx < metal_reg::WindowSize);
     return ArmISA::metal_reg::regNames[reg_idx];
 }
 

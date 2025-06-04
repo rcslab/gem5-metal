@@ -45,17 +45,24 @@ namespace gem5 {
                        RegIndex _rn) : MetalRegOp3("wtlb", _machInst,
                                                        IntAluOp, _rl, _rm, _rn)
         {
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[rl]);
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[rm]);
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[rn]);
+
             this->flags[IsInteger] = true;
+            this->flags[IsNonSpeculative] = true;
+            this->flags[IsSerializeAfter] = true;
         }
 
         Fault Wtlb64::execute(ExecContext *xc, trace::InstRecord *traceData)
             const
         {
-            ThreadContext *tc = xc->tcBase();
-            metal_reg::MSR_t msr = tc->readMetalMiscRegNoEffect(metal_reg::MSR);
-            RegVal desc = tc->readMetalReg(rl);
-            RegVal info = tc->readMetalReg(rm);
-            RegVal vaddr = tc->readMetalReg(rn);
+            const MetalInternalState &mist = xc->getExecMetalState();
+            const metal_reg::MSR_t msr = mist.getMSR();
+
+            RegVal desc = xc->getRegOperand(this, 0);
+            RegVal info = xc->getRegOperand(this, 1);
+            RegVal vaddr = xc->getRegOperand(this, 2);
 
             METAL_DBGPRINT(INSTS, WTLB, "WTLB: descReg = %s (%#lx), extReg = %s (%#lx), vaReg = %s (%#lx). ExtAttrs = %s\n",
                                             printMetalReg(rl), desc,

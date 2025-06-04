@@ -4,7 +4,7 @@ namespace gem5 {
     namespace ArmISA {
         Rmr64::Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("rmr", _machInst, IntAluOp, _mreg, _greg)
         {
-            setDestRegIdx(_numDestRegs++, gem5::ArmISA::couldBeZero(gReg) ? RegId() : intRegClass[gReg]);
+            setDestRegIdx(_numDestRegs++, intRegClass[gReg]);
             setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
             _numTypedDestRegs[intRegClass.type()]++;
 
@@ -13,9 +13,7 @@ namespace gem5 {
 
         Fault Rmr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            ThreadContext * tc = xc->tcBase();
-
-            RegVal v = tc->readMetalReg(mReg);
+            RegVal v = xc->getRegOperand(this, 0);
 
             METAL_DBGPRINT(INSTS, RMR, "%s (0x%lx).\n", printMetalReg(mReg), v);
 
