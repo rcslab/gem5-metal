@@ -544,7 +544,7 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
 
                         ++stats.memOrderViolation;
 
-                        return std::make_shared<GenericISA::M5PanicFault>(
+                        return std::make_shared<GenericISA::M5PseudoFault>(
                             "Detected fault with inst [sn:%lli] and "
                             "[sn:%lli] at address %#x\n",
                             inst->seqNum, ld_inst->seqNum, ld_eff_addr1);
@@ -571,7 +571,7 @@ LSQUnit::checkViolations(typename LoadQueue::iterator& loadIt,
 
                 ++stats.memOrderViolation;
 
-                return std::make_shared<GenericISA::M5PanicFault>(
+                return std::make_shared<GenericISA::M5PseudoFault>(
                     "Detected fault with "
                     "inst [sn:%lli] and [sn:%lli] at address %#x\n",
                     inst->seqNum, ld_inst->seqNum, ld_eff_addr1);
@@ -1345,7 +1345,7 @@ LSQUnit::read(LSQRequest *request, ssize_t load_idx)
         // place to really handle request deletes.
         load_entry.setRequest(nullptr);
         request->discard();
-        return std::make_shared<GenericISA::M5PanicFault>(
+        return std::make_shared<GenericISA::M5PseudoFault>(
             "Strictly ordered load [sn:%llx] PC %s\n",
             load_inst->seqNum, load_inst->pcState());
     }

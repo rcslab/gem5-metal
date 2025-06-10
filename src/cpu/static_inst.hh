@@ -111,7 +111,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// See numDestRegs().
     uint8_t _numDestRegs = 0;
 
-    std::array<uint8_t, MiscRegClass + 1> _numTypedDestRegs = {};
+    std::array<uint8_t, NumRegClasses> _numTypedDestRegs = {};
 
   public:
 
@@ -305,7 +305,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
         panic("completeAcc not defined!");
     }
 
-    virtual Fault 
+    virtual Fault
     preExec(ExecContext *xc, trace::InstRecord *traceData) const;
 
     virtual void advancePC(PCStateBase &pc_state) const = 0;

@@ -27,7 +27,7 @@ namespace metal_reg
     BitUnion64(MFLAGS_t)
         Bitfield<0> ii; // instruction intercept enable
         Bitfield<1> ei; // exc intercept enable
-        Bitfield<2> pd; // privileged instruction disable 
+        Bitfield<2> pd; // privileged instruction disable
     EndBitUnion(MFLAGS_t)
 
     BitUnion8(MTPField)
@@ -80,7 +80,7 @@ namespace metal_reg
         MTP = MG4, // Metal TLB Permissions Register
         MAR = MG5, // Metal Access Register
         MSTK = MG6, // Metal Stack Register
-        MFLAGS = MG7 // Metal Flags Register 
+        MFLAGS = MG7 // Metal Flags Register
     };
     static_assert(NumMiscRegs == 32);
     static_assert(NumMiscRegs <= (1 << 5));
@@ -133,7 +133,7 @@ namespace metal_reg
 
     static inline bool isInitReg(RegIndex idx)
     {
-        return idx == MBR || idx == MSTK;
+        return idx == MBR || idx == MSTK || idx == MAR;
     }
 
     static inline bool isSetInit(RegIndex idx)

@@ -47,6 +47,8 @@
 
 #include <queue>
 
+#include "arch/generic/debugfaults.hh"
+#include "base/types.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
 #include "cpu/o3/fu_pool.hh"
@@ -1147,93 +1149,97 @@ IEW::executeInsts()
             continue;
         }
 
-        Fault fault = NoFault;
+        Fault fault = inst->getFault();
 
-        // Execute instruction.
-        // Note that if the instruction faults, it will be handled
-        // at the commit stage.
-        if (inst->isMemRef()) {
-            DPRINTF(IEW, "Execute: Calculating address for memory "
-                    "reference.\n");
-
-            // Tell the LDSTQ to execute this instruction (if it is a load).
-            if (inst->isAtomic()) {
-                // AMOs are treated like store requests
-                fault = ldstQueue.executeStore(inst);
-
-                if (inst->isTranslationDelayed() &&
-                    fault == NoFault) {
-                    // A hw page table walk is currently going on; the
-                    // instruction must be deferred.
-                    DPRINTF(IEW, "Execute: Delayed translation, deferring "
-                            "store.\n");
-                    instQueue.deferMemInst(inst);
-                    continue;
-                }
-            } else if (inst->isLoad()) {
-                // Loads will mark themselves as executed, and their writeback
-                // event adds the instruction to the queue to commit
-                fault = ldstQueue.executeLoad(inst);
-
-                if (inst->isTranslationDelayed() &&
-                    fault == NoFault) {
-                    // A hw page table walk is currently going on; the
-                    // instruction must be deferred.
-                    DPRINTF(IEW, "Execute: Delayed translation, deferring "
-                            "load.\n");
-                    instQueue.deferMemInst(inst);
-                    continue;
-                }
-
-                if (inst->isDataPrefetch() || inst->isInstPrefetch()) {
-                    inst->fault = NoFault;
-                }
-            } else if (inst->isStore()) {
-                fault = ldstQueue.executeStore(inst);
-
-                if (inst->isTranslationDelayed() &&
-                    fault == NoFault) {
-                    // A hw page table walk is currently going on; the
-                    // instruction must be deferred.
-                    DPRINTF(IEW, "Execute: Delayed translation, deferring "
-                            "store.\n");
-                    instQueue.deferMemInst(inst);
-                    continue;
-                }
-
-                // If the store had a fault then it may not have a mem req
-                if (fault != NoFault || !inst->readPredicate() ||
-                        !inst->isStoreConditional()) {
-                    // If the instruction faulted, then we need to send it
-                    // along to commit without the instruction completing.
-                    // Send this instruction to commit, also make sure iew
-                    // stage realizes there is activity.
-                    inst->setExecuted();
-                    instToCommit(inst);
-                    activityThisCycle();
-                }
-
-                // Store conditionals will mark themselves as
-                // executed, and their writeback event will add the
-                // instruction to the queue to commit.
-            } else {
-                panic("Unexpected memory type!\n");
-            }
-
+        if (fault != NoFault && typeid(*fault) != typeid(GenericISA::M5PseudoFault) ) {
+            DPRINTF(IEW, "Execute: inst [sn:%lli] already faulted with %s.\n", inst->seqNum, fault->name());
+            inst->setExecuted();
+            instToCommit(inst);
         } else {
-            // If the instruction has already faulted, then skip executing it.
-            // Such case can happen when it faulted during ITLB translation.
-            // If we execute the instruction (even if it's a nop) the fault
-            // will be replaced and we will lose it.
-            if (inst->getFault() == NoFault) {
+            // Execute instruction.
+            // Note that if the instruction faults, it will be handled
+            // at the commit stage.
+            if (inst->isMemRef()) {
+                DPRINTF(IEW, "Execute: Calculating address for memory "
+                        "reference.\n");
+
+                // Tell the LDSTQ to execute this instruction (if it is a load).
+                if (inst->isAtomic()) {
+                    // AMOs are treated like store requests
+                    fault = ldstQueue.executeStore(inst);
+
+                    if (inst->isTranslationDelayed() &&
+                        fault == NoFault) {
+                        // A hw page table walk is currently going on; the
+                        // instruction must be deferred.
+                        DPRINTF(IEW, "Execute: Delayed translation, deferring "
+                                "store.\n");
+                        instQueue.deferMemInst(inst);
+                        continue;
+                    }
+                } else if (inst->isLoad()) {
+                    // Loads will mark themselves as executed, and their writeback
+                    // event adds the instruction to the queue to commit
+                    fault = ldstQueue.executeLoad(inst);
+
+                    if (inst->isTranslationDelayed() &&
+                        fault == NoFault) {
+                        // A hw page table walk is currently going on; the
+                        // instruction must be deferred.
+                        DPRINTF(IEW, "Execute: Delayed translation, deferring "
+                                "load.\n");
+                        instQueue.deferMemInst(inst);
+                        continue;
+                    }
+
+                    if (inst->isDataPrefetch() || inst->isInstPrefetch()) {
+                        inst->fault = NoFault;
+                    }
+                } else if (inst->isStore()) {
+                    fault = ldstQueue.executeStore(inst);
+
+                    if (inst->isTranslationDelayed() &&
+                        fault == NoFault) {
+                        // A hw page table walk is currently going on; the
+                        // instruction must be deferred.
+                        DPRINTF(IEW, "Execute: Delayed translation, deferring "
+                                "store.\n");
+                        instQueue.deferMemInst(inst);
+                        continue;
+                    }
+
+                    // If the store had a fault then it may not have a mem req
+                    if (fault != NoFault || !inst->readPredicate() ||
+                            !inst->isStoreConditional()) {
+                        // If the instruction faulted, then we need to send it
+                        // along to commit without the instruction completing.
+                        // Send this instruction to commit, also make sure iew
+                        // stage realizes there is activity.
+                        inst->setExecuted();
+                        instToCommit(inst);
+                        activityThisCycle();
+                    }
+
+                    // Store conditionals will mark themselves as
+                    // executed, and their writeback event will add the
+                    // instruction to the queue to commit.
+                } else {
+                    panic("Unexpected memory type!\n");
+                }
+
+            } else {
+                // If the instruction has already faulted, then skip executing it.
+                // Such case can happen when it faulted during ITLB translation.
+                // If we execute the instruction (even if it's a nop) the fault
+                // will be replaced and we will lose it.
                 inst->execute();
                 if (!inst->readPredicate())
                     inst->forwardOldRegs();
+
+                inst->setExecuted();
+
+                instToCommit(inst);
             }
-
-            inst->setExecuted();
-
-            instToCommit(inst);
         }
 
         updateExeInstStats(inst);

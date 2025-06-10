@@ -121,6 +121,14 @@ class M5DebugOnceFault : public M5DebugFault
     }
 };
 
+class M5PseudoFault : public M5DebugFault
+{
+  public:
+    using M5DebugFault::M5DebugFault;
+    void debugFunc() override { panic(message()); }
+    FaultName name() const override { return "pseudo fault"; }
+};
+
 class M5PanicFault : public M5DebugFault
 {
   public:

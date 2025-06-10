@@ -1571,7 +1571,7 @@ TableWalker::memAttrsLPAE(ThreadContext *tc, TlbEntry &te,
     te.attributes |= (uint64_t) attr << 56;
 }
 
-void 
+void
 TableWalker::memAttrsAArch64Stage1(TlbEntry &te, uint8_t sh, uint8_t mairAttrs)
 {
     // Select attributes
@@ -1615,7 +1615,7 @@ TableWalker::memAttrsAArch64Stage1(TlbEntry &te, uint8_t sh, uint8_t mairAttrs)
         (sh << 7);
 }
 
-void 
+void
 TableWalker::memAttrsAArch64Stage2(TlbEntry &te, uint8_t memAttr)
 {
     uint8_t attr_hi = (memAttr >> 2) & 0x3;
@@ -2449,7 +2449,7 @@ void
 TableWalker::pendingChange()
 {
     unsigned n = pendingQueue.size();
-    if ((currState != NULL) && (currState != pendingQueue.front())) {
+    if ((currState != NULL) && (pendingQueue.empty() || (currState != pendingQueue.front()))) {
         ++n;
     }
 

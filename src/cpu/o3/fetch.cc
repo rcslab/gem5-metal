@@ -683,7 +683,7 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
 }
 
 void
-Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst, 
+Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
     const MetalInternalState& squashState, ThreadID tid)
 {
     DPRINTF(Fetch, "[tid:%i] Squashing, setting PC to: %s, MetalState to: 0x%lx.\n",
@@ -938,7 +938,7 @@ Fetch::checkSignalsAndUpdate(ThreadID tid)
         // In any case, squash.
         squash(*fromCommit->commitInfo[tid].pc,
                fromCommit->commitInfo[tid].doneSeqNum,
-               fromCommit->commitInfo[tid].squashInst, 
+               fromCommit->commitInfo[tid].squashInst,
                fromCommit->commitInfo[tid].squashMist,
                tid);
 
@@ -1080,9 +1080,10 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
         curMetalState.set(instruction->getPostExecMetalState());
     } else {
         DPRINTF(Fetch, "[tid:%i][sn:%lli] instruction preExec faulted.\n", tid, seq);
+        instruction->setSerializeAfter();
     }
 
-    DPRINTF(Fetch, "[tid:%i][sn:%lli] preMetalState: 0x%lx, execMetalState: 0x%lx, postMetalState: 0x%lx\n", 
+    DPRINTF(Fetch, "[tid:%i][sn:%lli] preMetalState: 0x%lx, execMetalState: 0x%lx, postMetalState: 0x%lx\n",
         tid,
         seq,
         instruction->getPreExecMetalState().getMSR(),

@@ -69,6 +69,7 @@ enum RegClassType
     CCRegClass,         ///< Condition-code register
     MiscRegClass,       ///< Control (misc) register
     MetalMiscRegClass,  ///< Metal Misc register
+    NumRegClasses,
     InvalidRegClass = -1
 };
 
@@ -183,7 +184,7 @@ class RegClassOps
     {
         return id;
     }
-    virtual RegId 
+    virtual RegId
     flatten(ExecContext *xc, const RegId &id) const;
 };
 
