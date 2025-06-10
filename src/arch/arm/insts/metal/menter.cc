@@ -159,13 +159,13 @@ namespace gem5 {
             MetalInternalState post;
             post.set(xc->getPreExecMetalState());
             
-            // exec state is the post state as metal registers are set in the new window
-            xc->setExecMetalState(post);
 
             metal_reg::MSR_t msr = post.getMSR();
             msr.lv = msr.lv + 1;
             post.setMSR(msr);
-            
+
+            // exec state is the post state as metal registers are set in the new window
+            xc->setExecMetalState(post);
             xc->setPostExecMetalState(post);
 
             return NoFault;
@@ -187,8 +187,8 @@ namespace gem5 {
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             } else {
                 doMenter(xc, this, 
-                    purifyTaggedAddr(mrlbEnt.getAddr(), xc->tcBase(), currEL(xc->tcBase()), true),  
-                    xc->tcBase()->pcState().instAddr() + this->instSize(), 
+                    purifyTaggedAddr(mrlbEnt.getAddr(), tc, currEL(tc), true),  
+                    xc->pcState().instAddr() + this->instSize(), 
                     0);
             }
             return NoFault;

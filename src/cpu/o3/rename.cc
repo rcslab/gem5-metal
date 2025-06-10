@@ -1011,16 +1011,14 @@ Rename::removeFromHistory(InstSeqNum inst_seq_num, ThreadID tid)
 void
 Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
 {
-    gem5::ThreadContext *tc = inst->tcBase();
     UnifiedRenameMap *map = renameMap[tid];
     unsigned num_src_regs = inst->numSrcRegs();
-    auto *isa = tc->getIsaPtr();
 
     // Get the architectual register numbers from the source and
     // operands, and redirect them to the right physical register.
     for (int src_idx = 0; src_idx < num_src_regs; src_idx++) {
         const RegId& src_reg = inst->srcRegIdx(src_idx);
-        const RegId flat_reg = src_reg.flatten(*isa);
+        const RegId flat_reg = src_reg.flatten(inst.get());
         PhysRegIdPtr renamed_reg;
 
         renamed_reg = map->lookup(flat_reg);
@@ -1055,9 +1053,9 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
 
         DPRINTF(Rename,
                 "[tid:%i] "
-                "Looking up %s arch reg %i, got phys reg %i (%s)\n",
+                "Looking up %s arch reg %i (flat %i), got phys reg %i (%s)\n",
                 tid, flat_reg.className(),
-                src_reg.index(), renamed_reg->index(),
+                src_reg.index(), flat_reg.index(), renamed_reg->index(),
                 renamed_reg->className());
 
         inst->renameSrcReg(src_idx, renamed_reg);
@@ -1086,10 +1084,8 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
 void
 Rename::renameDestRegs(const DynInstPtr &inst, ThreadID tid)
 {
-    gem5::ThreadContext *tc = inst->tcBase();
     UnifiedRenameMap *map = renameMap[tid];
     unsigned num_dest_regs = inst->numDestRegs();
-    auto *isa = tc->getIsaPtr();
 
     // Rename the destination registers.
     for (int dest_idx = 0; dest_idx < num_dest_regs; dest_idx++) {
@@ -1107,8 +1103,9 @@ Rename::renameDestRegs(const DynInstPtr &inst, ThreadID tid)
 
         DPRINTF(Rename,
                 "[tid:%i] "
-                "Renaming arch reg %i (%s) to physical reg %i (%i).\n",
+                "Renaming arch reg %i (%s) (flat %i) to physical reg %i (%i).\n",
                 tid, dest_reg.index(), dest_reg.className(),
+                flat_dest_regid.index(),
                 rename_result.first->index(),
                 rename_result.first->flatIndex());
 

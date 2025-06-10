@@ -815,13 +815,15 @@ Commit::commit()
             // All younger instructions will be squashed. Set the sequence
             // number as the youngest instruction in the ROB.
             youngestSeqNum[tid] = squashed_inst;
-
+            const MetalInternalState& state = rob->findInst(tid, squashed_inst)->getPostExecMetalState();
             rob->squash(squashed_inst, tid);
             changedROBNumEntries[tid] = true;
 
             toIEW->commitInfo[tid].doneSeqNum = squashed_inst;
 
             toIEW->commitInfo[tid].squash = true;
+
+            toIEW->commitInfo[tid].squashMist.set(state);
 
             // Send back the rob squashing signal so other stages know that
             // the ROB is in the process of squashing.
