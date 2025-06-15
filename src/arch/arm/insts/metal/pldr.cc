@@ -1,6 +1,5 @@
 #include "arch/arm/insts/metal/pldr.hh"
 #include "arch/generic/memhelpers.hh"
-#include "mem/packet_access.hh"
 
 namespace gem5 {
     namespace ArmISA {
@@ -22,20 +21,20 @@ namespace gem5 {
         template <typename T>
         Fault Pldri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState & mist = xc->getExecMetalState();
+            const MetalInternalState & mist = xc->getMetalState();
 
             metal_reg::MSR_t msr = mist.getMSR();
-            Addr base = xc->getRegOperand(this, 0);
-
-            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n",
-                    mReg, gReg, imm,
-                    static_cast<int>(mode) ,
-                    sizeof(T));
 
             if (!metal_reg::isInMetalMode(msr)) {
                 METAL_DBGPRINT(INSTS, PLDR, "Permission denied: MSR = 0x%lx.\n", msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
+
+            Addr base = xc->getRegOperand(this, 0);
+            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n",
+                    r1, r2, imm,
+                    static_cast<int>(mode) ,
+                    sizeof(T));
 
             switch (mode) {
                 case Mode::PREINDEX:
@@ -52,7 +51,8 @@ namespace gem5 {
             Fault fault = NoFault;
 
             fault = initiateMemRead(xc, base, sizeof(T), ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
-
+            if(traceData)
+                traceData->setMem(base, sizeof(T), ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
             return fault;
         }
 
@@ -103,12 +103,12 @@ namespace gem5 {
         template <typename T>
         Fault Pldrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState & mist = xc->getExecMetalState();
+            const MetalInternalState & mist = xc->getMetalState();
             const metal_reg::MSR_t msr = mist.getMSR();
             const Addr addr = xc->getRegOperand(this, 0) + xc->getRegOperand(this, 1);
 
             METAL_DBGPRINT(INSTS, PLDRR, "dReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",
-                    rl, rm, rn, addr,
+                    r1, r2, r3, addr,
                     sizeof(T));
 
             if (!metal_reg::isInMetalMode(msr)) {

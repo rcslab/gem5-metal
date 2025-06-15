@@ -3,7 +3,7 @@
 
 namespace gem5 {
     namespace ArmISA {
-        class Rmr64 : public MetalRegOp2
+        class Rmr64 : public MetalMRegRegOp
         {
         public:
             Rmr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);

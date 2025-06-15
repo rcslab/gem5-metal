@@ -41,6 +41,7 @@
 #include "arch/arm/regs/int.hh"
 
 #include "arch/arm/isa.hh"
+#include "arch/arm/insts/static_inst.hh"
 #include "arch/arm/regs/metal.hh"
 #include "arch/arm/utility.hh"
 #include "debug/Metal.hh"
@@ -59,7 +60,7 @@ namespace ArmISA
 
     RegId MetalRegClassOps::flatten(ExecContext *xc, const RegId &id) const
     {
-        return flattenWithStates(xc->getExecMetalState().getMSR(), id);
+        return flattenWithStates(xc->getMetalState().getMSR(), id);
     }
 
     RegId MetalRegClassOps::flattenWithStates(metal_reg::MSR_t msr, const RegId &id)
@@ -71,12 +72,12 @@ namespace ArmISA
         if (level > metal_reg::MaxMetalLevel) {
             panic("Metal level overflow.");
         }
-      
+
         const size_t window = (metal_reg::NumGRegs - metal_reg::WindowSize) - level * metal_reg::WindowShift;
         const RegIndex fidx = window + idx;
-        // METAL_DBGPRINT(REGS, GEN, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
+        METAL_DBGPRINT(REGS, GEN, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
 
-        return RegId(flatMetalRegClass, fidx);
+        return flatMetalRegClass[fidx];
     }
 } // namespace ArmISA
 } // namespace gem5

@@ -1,11 +1,8 @@
 #ifndef __ARCH_ARM_REGS_METAL_HH__
 #define __ARCH_ARM_REGS_METAL_HH__
 
-#include "arch/arm/types.hh"
-#include "base/logging.hh"
 #include "debug/MetalRegs.hh"
 #include "cpu/reg_class.hh"
-#include "sim/core.hh"
 #include "metal_misc.hh"
 
 namespace gem5
@@ -19,7 +16,7 @@ namespace metal_reg
     enum : RegIndex
     {
         /* Each window is 32 registers
-         * 
+         *
          *
          *   TOP of RegStack (each level grows downward)
          *   |-------------|     |----------------|
@@ -29,11 +26,11 @@ namespace metal_reg
          *   |-------------|     | Local   lv.n+1 |
          *                       | Output  lv.n+1 |
          *                       |----------------|
-         * 
+         *
          * Window shift is 22 regs (Input + Local)
          * Each level requires 22 new regs
          * Total regs = Window Size + (Max Level - 1) * Window Shift
-         * 
+         *
         */
         MaxMetalLevel = 7,
 
@@ -75,7 +72,7 @@ namespace metal_reg
         WindowSize,
         WindowShift = MI9 - MO9,
 
-        // aliases for other features 
+        // aliases for other features
         MIR0 = ML0,
         MIR1 = ML1,
         MIR2 = ML2,
@@ -134,7 +131,7 @@ namespace metal_reg
 inline constexpr RegClass flatMetalRegClass =
     RegClass(MetalRegClass, MetalRegClassName, metal_reg::NumGRegs, debug::MetalRegs);
 
-class MetalRegClassOps : public RegClassOps 
+class MetalRegClassOps : public RegClassOps
 {
     RegId flatten(const BaseISA &isa, const RegId &id) const override;
     RegId flatten(ExecContext * xc, const RegId &id) const override;

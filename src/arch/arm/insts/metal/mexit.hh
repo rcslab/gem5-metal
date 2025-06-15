@@ -5,7 +5,7 @@
 namespace gem5 {
     namespace ArmISA {
         // mexit
-        class Mexit64 : public MetalImmOp8
+        class Mexit64 : public MetalImmOp
         {
         private:
             BitUnion8(MexitFlags)
@@ -16,8 +16,8 @@ namespace gem5 {
             EndBitUnion(MexitFlags)
 
         public:
-            Mexit64(ExtMachInst _machInst, uint8_t _imm);
-            Fault preExec(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Mexit64(ExtMachInst _machInst, uint _imm);
+            Fault preExec(ExecContext *xc, trace::InstRecord *traceData) override;
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
     }

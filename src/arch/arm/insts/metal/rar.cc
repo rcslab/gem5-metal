@@ -1,39 +1,61 @@
 #include "arch/arm/insts/metal/rar.hh"
+#include "arch/arm/regs/metal_misc.hh"
+#include "arch/arm/regs/int.hh"
+#include "arch/arm/regs/misc.hh"
+#include "arch/arm/utility.hh"
+#include "base/types.hh"
+#include "cpu/metal_int_state.hh"
+#include "cpu/reg_class.hh"
 
-namespace gem5 {
-    namespace ArmISA {
-        Rar64::Rar64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("rar", _machInst, IntAluOp, _mreg, _greg)
+namespace gem5
+{
+    namespace ArmISA
+    {
+        Rar64::Rar64(ExtMachInst _machInst, RegIndex _reg, uint8_t _imm1, uint8_t _imm2) :
+            MetalRegImm2Op("rar", _machInst, IntAluOp, _reg, _imm1, _imm2)
         {
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
-            setDestRegIdx(_numDestRegs++, metalRegClass[gReg]);
-            _numTypedDestRegs[metalRegClass.type()]++;
+            setDestRegIdx(_numDestRegs++, intRegClass[_reg]);
+            // writing to metal class
+            _numTypedDestRegs[intRegClass.type()]++;
 
             this->flags[IsInteger] = true;
-            // XXX: serialize here because it's messy to resolve runtime dependency
-            // when the dependency itself is held in a renamed register
-            // i.e. need to go back to rename stage after execute stage
-            this->flags[IsSerializeAfter] = true;
-            this->flags[IsNonSpeculative] = true;
+            this->flags[IsPreExecOperandUpdate] = true;
+        }
+
+        Fault Rar64::preExec(ExecContext *xc, trace::InstRecord *traceData)
+        {
+            const RegIndex arid = imm1;
+            const metal_reg::MSR_t msr = xc->getMetalState().getMSR();
+            const int target_level = metal_reg::getMetalLevel(msr) - imm2;
+
+            if (arid >= int_reg::NumArchRegs || target_level < 0) {
+                METAL_DBGPRINT(INSTS, RAR, "Invalid arguments: dst = %d, src = %d, window = %d, MSR = 0x%lx.\n",
+                    reg, imm1, imm2, msr);
+                return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
+            }
+
+            // manually flatten
+            metal_reg::MSR_t new_msr = msr;
+            new_msr.lv = target_level;
+            setSrcRegIdx(_numSrcRegs++,
+                IntRegClassOps::flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR),
+                        msr, intRegClass[arid]));
+
+            return NoFault;
         }
 
         Fault Rar64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            RegVal idx = xc->getRegOperand(this, 0);
+            METAL_DBGPRINT(INSTS, RAR, "dst = %s, src = %s, window = %d.\n",
+                printIntReg(reg).c_str(), printIntReg(imm1).c_str(), imm2);
 
-            METAL_DBGPRINT(INSTS, RAR, "idxMReg = %s(%d), dstMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
+            RegVal val = xc->getRegOperand(this, 0);
+            xc->setRegOperand(this, 0, val);
 
-            if (idx >= int_reg::NumArchRegs) {
-                METAL_DBGPRINT(INSTS, RAR, "Attempting to read out of bound arch reg index: %d.\n", idx);
-                return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
-            }
-            
-            // XXX: this part requires serialization
-            ThreadContext * tc = xc->tcBase();
-            RegVal v = xc->tcBase()->getReg(intRegClass[idx]);
-
-            xc->setRegOperand(this, 0, v);
+            if (traceData)
+                traceData->setData(intRegClass, val);
 
             return NoFault;
         }
-    }
-}
+    } // namespace ArmISA
+} // namespace gem5

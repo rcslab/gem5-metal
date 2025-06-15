@@ -114,13 +114,8 @@ class ExecContext : public gem5::ExecContext
             size, addr, flags, nullptr, nullptr, byte_enable);
     }
 
-    const MetalInternalState& getExecMetalState(void) const override { panic("unimplemented!"); };
-    const MetalInternalState& getPreExecMetalState(void) const override { panic("unimplemented!"); };
-    const MetalInternalState& getPostExecMetalState(void) const override { panic("unimplemented!"); };
-
-    void setExecMetalState(const MetalInternalState&) override { panic("unimplemented!"); };
-    void setPreExecMetalState(const MetalInternalState&) override { panic("unimplemented!"); };
-    void setPostExecMetalState(const MetalInternalState&) override { panic("unimplemented!"); };
+    const MetalInternalState& getMetalState(void) const override { panic("unimplemented!"); };
+    void setMetalState(const MetalInternalState&) override { panic("unimplemented!"); };
 
     Fault
     initiateMemMgmtCmd(Request::Flags flags) override

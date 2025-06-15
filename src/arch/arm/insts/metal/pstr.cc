@@ -20,18 +20,18 @@ namespace gem5 {
         template <typename T>
         Fault Pstri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState & mist = xc->getExecMetalState();
+            const MetalInternalState & mist = xc->getMetalState();
             metal_reg::MSR_t msr = mist.getMSR();
-
-            METAL_DBGPRINT(INSTS, PSTRI, "sReg = %u, aReg = %u, imm = %d, mode = %#x, size = %u.\n",
-                    mReg, gReg, imm,
-                    static_cast<int>(mode),
-                    sizeof(T));
 
             if (!metal_reg::isInMetalMode(msr)) {
                 METAL_DBGPRINT(INSTS, PSTR, "Permission denied: MSR = 0x%lx.\n", msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
+
+            METAL_DBGPRINT(INSTS, PSTRI, "sReg = %u, aReg = %u, imm = %d, mode = %#x, size = %u.\n",
+                    r1, r2, imm,
+                    static_cast<int>(mode),
+                    sizeof(T));
 
             Addr base = xc->getRegOperand(this, 1);
 
@@ -93,12 +93,12 @@ namespace gem5 {
         template <typename T>
         Fault Pstrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState & mist = xc->getExecMetalState();
+            const MetalInternalState & mist = xc->getMetalState();
             metal_reg::MSR_t msr = mist.getMSR();
             const Addr addr = xc->getRegOperand(this, 1) + xc->getRegOperand(this, 2);
 
             METAL_DBGPRINT(INSTS, PSTRR, "sReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",
-                    rl, rm, rn, addr,
+                    r1, r2, r3, addr,
                     sizeof(T));
 
             if (!metal_reg::isInMetalMode(msr)) {
@@ -115,7 +115,8 @@ namespace gem5 {
             } else {
                 fault = writeMemTimingLE(xc, traceData, mem, addr, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU, nullptr);
             }
-
+            if(traceData)
+                traceData->setMem(addr, sizeof(T), ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
             return fault;
         }
 

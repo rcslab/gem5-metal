@@ -41,8 +41,13 @@
 #include "cpu/o3/dyn_inst.hh"
 
 #include <algorithm>
+#include <cstdint>
+#include <new>
 
 #include "base/intmath.hh"
+#include "base/trace.hh"
+#include "debug/Metal.hh"
+#include "cpu/static_inst_fwd.hh"
 #include "debug/DynInst.hh"
 #include "debug/IQ.hh"
 #include "debug/O3PipeView.hh"
@@ -55,13 +60,9 @@ namespace o3
 
 DynInst::DynInst(const Arrays &arrays, const StaticInstPtr &static_inst,
         const StaticInstPtr &_macroop, InstSeqNum seq_num, CPU *_cpu)
-    : seqNum(seq_num), staticInst(static_inst), cpu(_cpu),
-      _numSrcs(arrays.numSrcs), _numDests(arrays.numDests),
-      _flatDestIdx(arrays.flatDestIdx), _destIdx(arrays.destIdx),
-      _prevDestIdx(arrays.prevDestIdx), _srcIdx(arrays.srcIdx),
-      _readySrcIdx(arrays.readySrcIdx), macroop(_macroop)
+    : seqNum(seq_num), staticInst(static_inst), cpu(_cpu), regArraysBuf(nullptr), macroop(_macroop)
 {
-    std::fill(_readySrcIdx, _readySrcIdx + (numSrcs() + 7) / 8, 0);
+    regArrays.set(arrays);
 
     status.reset();
 
@@ -70,9 +71,7 @@ DynInst::DynInst(const Arrays &arrays, const StaticInstPtr &static_inst,
     instFlags[Predicate] = true;
     instFlags[MemAccPredicate] = true;
 
-    execMetalState.reset();
-    preMetalState.reset();
-    postMetalState.reset();
+    metalState.reset();
 
 #ifndef NDEBUG
     ++cpu->instcount;
@@ -137,58 +136,138 @@ DynInst::DynInst(const Arrays &arrays, const StaticInstPtr &_staticInst,
  * pointers to them. The fields of "arrays" are initialized in this operator,
  * and are then consumed in the DynInst constructor.
  */
-void *
-DynInst::operator new(size_t count, Arrays &arrays)
+void
+DynInst::Arrays::process()
 {
     // Convenience variables for brevity.
-    const auto num_dests = arrays.numDests;
-    const auto num_srcs = arrays.numSrcs;
+    const auto num_dests = numDests;
+    const auto num_srcs = numSrcs;
 
     // Figure out where everything will go.
     uintptr_t inst = 0;
-    size_t inst_size = count;
+    size_t inst_size = 0;
 
     uintptr_t flat_dest_idx = roundUp(inst + inst_size, alignof(RegId));
-    size_t flat_dest_idx_size = sizeof(*arrays.flatDestIdx) * num_dests;
+    size_t flat_dest_idx_size = sizeof(*flatDestIdx) * num_dests;
 
     uintptr_t dest_idx =
         roundUp(flat_dest_idx + flat_dest_idx_size, alignof(PhysRegIdPtr));
-    size_t dest_idx_size = sizeof(*arrays.destIdx) * num_dests;
+    size_t dest_idx_size = sizeof(*destIdx) * num_dests;
 
     uintptr_t prev_dest_idx =
         roundUp(dest_idx + dest_idx_size, alignof(PhysRegIdPtr));
-    size_t prev_dest_idx_size = sizeof(*arrays.prevDestIdx) * num_dests;
+    size_t prev_dest_idx_size = sizeof(*prevDestIdx) * num_dests;
 
     uintptr_t src_idx =
         roundUp(prev_dest_idx + prev_dest_idx_size, alignof(PhysRegIdPtr));
-    size_t src_idx_size = sizeof(*arrays.srcIdx) * num_srcs;
+    size_t src_idx_size = sizeof(*srcIdx) * num_srcs;
 
     uintptr_t ready_src_idx =
         roundUp(src_idx + src_idx_size, alignof(uint8_t));
     size_t ready_src_idx_size =
-        sizeof(*arrays.readySrcIdx) * ((num_srcs + 7) / 8);
+        sizeof(*readySrcIdx) * ((num_srcs + 7) / 8);
 
     // Figure out how much space we need in total.
-    size_t total_size = ready_src_idx + ready_src_idx_size;
+    buf_size = ready_src_idx + ready_src_idx_size;
 
-    // Actually allocate it.
-    uint8_t *buf = (uint8_t *)::operator new(total_size);
+    // Fill in "arrays" with offsets to all the arrays.
+    // the actual pointers will be constructed once the init() is called with the allocated buffer
+    flatDestIdx = (RegId *)(flat_dest_idx);
+    destIdx = (PhysRegIdPtr *)(dest_idx);
+    prevDestIdx = (PhysRegIdPtr *)(prev_dest_idx);
+    srcIdx = (PhysRegIdPtr *)(src_idx);
+    readySrcIdx = (uint8_t *)(ready_src_idx);
+}
 
-    // Fill in "arrays" with pointers to all the arrays.
-    arrays.flatDestIdx = (RegId *)(buf + flat_dest_idx);
-    arrays.destIdx = (PhysRegIdPtr *)(buf + dest_idx);
-    arrays.prevDestIdx = (PhysRegIdPtr *)(buf + prev_dest_idx);
-    arrays.srcIdx = (PhysRegIdPtr *)(buf + src_idx);
-    arrays.readySrcIdx = (uint8_t *)(buf + ready_src_idx);
+void
+DynInst::Arrays::set(const Arrays & other)
+{
+    if (this != &other) {
+        this->numDests = other.numDests;
+        this->numSrcs = other.numSrcs;
+        this->buf_size = other.buf_size;
+        this->flatDestIdx = other.flatDestIdx;
+        this->destIdx = other.destIdx;
+        this->prevDestIdx = other.prevDestIdx;
+        this->srcIdx = other.srcIdx;
+        this->readySrcIdx = other.readySrcIdx;
+    }
+}
+
+void
+DynInst::Arrays::init(void * _buf)
+{
+    uint8_t * buf = static_cast<uint8_t *>(_buf);
+    // update the pointers using the offset values stored and the buffer
+    flatDestIdx = (RegId *)(buf + (uintptr_t)flatDestIdx);
+    destIdx = (PhysRegIdPtr *)(buf + (uintptr_t)destIdx);
+    prevDestIdx = (PhysRegIdPtr *)(buf + (uintptr_t)prevDestIdx);
+    srcIdx = (PhysRegIdPtr *)(buf + (uintptr_t)srcIdx);
+    readySrcIdx = (uint8_t *)(buf + (uintptr_t)readySrcIdx);
 
     // Initialize all the extra components.
-    new (arrays.flatDestIdx) RegId[num_dests];
-    new (arrays.destIdx) PhysRegIdPtr[num_dests];
-    new (arrays.prevDestIdx) PhysRegIdPtr[num_dests];
-    new (arrays.srcIdx) PhysRegIdPtr[num_srcs];
-    new (arrays.readySrcIdx) uint8_t[num_srcs];
+    new (flatDestIdx) RegId[numDests];
+    new (destIdx) PhysRegIdPtr[numDests];
+    new (prevDestIdx) PhysRegIdPtr[numDests];
+    new (srcIdx) PhysRegIdPtr[numSrcs];
+    new (readySrcIdx) uint8_t[numSrcs];
+
+    // fill ready bitmap with 0
+    std::fill(readySrcIdx, readySrcIdx + (numSrcs + 7) / 8, 0);
+}
+
+void
+DynInst::Arrays::destroy()
+{
+    /*
+     * The buffer this DynInst occupies also holds some of the structures it
+     * points to. We need to call their destructors manually to make sure that
+     * they're cleaned up appropriately, but we don't need to free their memory
+     * explicitly since that's part of the DynInst's buffer and is already
+     * going to be freed as part of deleting the DynInst.
+     */
+    for (int i = 0; i < numDests; i++) {
+        flatDestIdx[i].~RegId();
+        destIdx[i].~PhysRegIdPtr();
+        prevDestIdx[i].~PhysRegIdPtr();
+    }
+
+    for (int i = 0; i < numSrcs; i++)
+        srcIdx[i].~PhysRegIdPtr();
+
+    for (int i = 0; i < ((numSrcs + 7) / 8); i++)
+        readySrcIdx[i].~uint8_t();
+}
+
+void *
+DynInst::operator new(size_t count, Arrays &arrays)
+{
+    arrays.process();
+
+    uint8_t * buf = (uint8_t*)::operator new(arrays.buf_size + count);
+
+    arrays.init(buf + count);
 
     return buf;
+}
+
+void
+DynInst::updateArrays()
+{
+    assert(regArraysBuf == nullptr);
+
+    // destroy the previous array
+    regArrays.destroy();
+
+    // update regs from the staticInst
+    regArrays.numDests = staticInst->numDestRegs();
+    regArrays.numSrcs = staticInst->numSrcRegs();
+
+    METAL_DBGPRINT(UPDATE, ARRAYS, "updating arrays for %s .. dest: %d, src: %d\n", staticInst->getName(), regArrays.numDests, regArrays.numSrcs);
+
+    regArrays.process();
+    regArraysBuf = ::operator new(regArrays.buf_size);
+    regArrays.init(regArraysBuf);
 }
 
 // Because of the custom "new" operator that allocates more bytes than the
@@ -202,24 +281,11 @@ DynInst::operator delete(void *ptr)
 
 DynInst::~DynInst()
 {
-    /*
-     * The buffer this DynInst occupies also holds some of the structures it
-     * points to. We need to call their destructors manually to make sure that
-     * they're cleaned up appropriately, but we don't need to free their memory
-     * explicitly since that's part of the DynInst's buffer and is already
-     * going to be freed as part of deleting the DynInst.
-     */
-    for (int i = 0; i < _numDests; i++) {
-        _flatDestIdx[i].~RegId();
-        _destIdx[i].~PhysRegIdPtr();
-        _prevDestIdx[i].~PhysRegIdPtr();
+    regArrays.destroy();
+    if (regArraysBuf != nullptr) {
+        // this inst reallocated regArraysBuf
+        ::operator delete(regArraysBuf);
     }
-
-    for (int i = 0; i < _numSrcs; i++)
-        _srcIdx[i].~PhysRegIdPtr();
-
-    for (int i = 0; i < ((_numSrcs + 7) / 8); i++)
-        _readySrcIdx[i].~uint8_t();
 
 #if TRACING_ON
     if (debug::O3PipeView) {
@@ -354,6 +420,9 @@ Fault DynInst::preExec()
     thread->noSquashFromTC = true;
 
     fault = staticInst->preExec(this, traceData);
+
+    if (staticInst->isPreExecOperandUpdate())
+        updateArrays();
 
     thread->noSquashFromTC = no_squash_from_TC;
 

@@ -5,13 +5,13 @@
 namespace gem5 {
     namespace ArmISA {
     // menter
-        class Menter64 : public MetalImmOp8
+        class Menter64 : public MetalImmOp
         {
         public:
-            Menter64(ExtMachInst _machInst, uint8_t _imm);
+            Menter64(ExtMachInst _machInst, uint _imm);
 
-            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
-            Fault preExec(ExecContext *xc, trace::InstRecord *traceData) const override;
+            virtual Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+            virtual Fault preExec(ExecContext *xc, trace::InstRecord *traceData) override;
             // Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             // Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
             static void doMenter(ExecContext *xc, const StaticInst * inst, Addr npc, Addr lpc, int mlr_idx);

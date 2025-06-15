@@ -1,5 +1,6 @@
 #include "arch/arm/insts/metal/wtlb.hh"
 #include "arch/arm/table_walker.hh"
+#include <array>
 
 namespace gem5 {
     namespace ArmISA {
@@ -41,13 +42,13 @@ namespace gem5 {
             return lookup.at(attr.pgsz);
         }
 
-        Wtlb64::Wtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
-                       RegIndex _rn) : MetalRegOp3("wtlb", _machInst,
-                                                       IntAluOp, _rl, _rm, _rn)
+        Wtlb64::Wtlb64(ExtMachInst _machInst, RegIndex _r1, RegIndex _r2,
+                       RegIndex _r3) : MetalReg3Op("wtlb", _machInst,
+                                                       IntAluOp, _r1, _r2, _r3)
         {
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[rl]);
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[rm]);
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[rn]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[r1]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[r2]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[r3]);
 
             this->flags[IsInteger] = true;
             this->flags[IsNonSpeculative] = true;
@@ -57,24 +58,24 @@ namespace gem5 {
         Fault Wtlb64::execute(ExecContext *xc, trace::InstRecord *traceData)
             const
         {
-            const MetalInternalState &mist = xc->getExecMetalState();
+            const MetalInternalState &mist = xc->getMetalState();
             const metal_reg::MSR_t msr = mist.getMSR();
 
             RegVal desc = xc->getRegOperand(this, 0);
             RegVal info = xc->getRegOperand(this, 1);
             RegVal vaddr = xc->getRegOperand(this, 2);
 
-            METAL_DBGPRINT(INSTS, WTLB, "WTLB: descReg = %s (%#lx), extReg = %s (%#lx), vaReg = %s (%#lx). ExtAttrs = %s\n",
-                                            printMetalReg(rl), desc,
-                                            printMetalReg(rm), info,
-                                            printMetalReg(rn), vaddr,
-                                            printTlbExtAttr(info));
-
             if (!metal_reg::isInMetalMode(msr))
             {
                 METAL_DBGPRINT(INSTS, WTLB, "Permission denied: MSR = 0x%lx.\n", msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
+
+            METAL_DBGPRINT(INSTS, WTLB, "WTLB: desc = %#lx, attr = %#lx, vaddr = %#lx. ExtAttrs = [%s]\n",
+                                            desc,
+                                            info,
+                                            vaddr,
+                                            printTlbExtAttr(info));
 
             const auto ea = static_cast<TlbExtAttr>(info);
             TlbEntry te;
@@ -141,21 +142,12 @@ namespace gem5 {
             TLB * tlb = mmu->getTlb(ea.itlb ? BaseMMU::Execute : BaseMMU::Read, te.isHyp);
             tlb->insert(te);
 
-            return NoFault;
-        }
+            if (traceData) {
+                std::array<RegVal, 3> vals{desc, info, vaddr};
+                traceData->setData(vals);
+            }
 
-        std::string Wtlb64::generateDisassembly(
-                Addr pc, const loader::SymbolTable *symtab) const
-        {
-            std::stringstream ss;
-            ss << MetalDisasmPrefix;
-            printMnemonic(ss, "", false);
-            printMetalReg(ss, rl);
-            ccprintf(ss, ", ");
-            printMetalReg(ss, rm);
-            ccprintf(ss, ", ");
-            printMetalReg(ss, rn);
-            return ss.str();
+            return NoFault;
         }
     }
 }

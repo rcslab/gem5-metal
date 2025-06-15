@@ -201,27 +201,11 @@ class CheckerCPU : public BaseCPU, public ExecContext
         return thread->getReg(id);
     }
 
-    const MetalInternalState& getExecMetalState(void) const override {
+    const MetalInternalState& getMetalState(void) const override {
         panic("unimplemented");
     }
 
-    void setExecMetalState(const MetalInternalState &) override {
-        panic("unimplemented");
-    }
-
-    const MetalInternalState& getPreExecMetalState(void) const override {
-        panic("unimplemented");
-    }
-
-    void setPreExecMetalState(const MetalInternalState &) override {
-        panic("unimplemented");
-    }
-
-    const MetalInternalState& getPostExecMetalState(void) const override {
-        panic("unimplemented");
-    }
-    
-    void setPostExecMetalState(const MetalInternalState &) override {
+    void setMetalState(const MetalInternalState &) override {
         panic("unimplemented");
     }
 

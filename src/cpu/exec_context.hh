@@ -87,12 +87,8 @@ class ExecContext
      * @{
      * @name Metal internal state interfaces
      */
-    virtual const MetalInternalState& getExecMetalState(void) const = 0;
-    virtual void setExecMetalState(const MetalInternalState &) = 0;
-    virtual const MetalInternalState& getPreExecMetalState(void) const = 0;
-    virtual void setPreExecMetalState(const MetalInternalState &) = 0;
-    virtual const MetalInternalState& getPostExecMetalState(void) const = 0;
-    virtual void setPostExecMetalState(const MetalInternalState &) = 0;
+    virtual const MetalInternalState& getMetalState(void) const = 0;
+    virtual void setMetalState(const MetalInternalState &) = 0;
 
     /**
      * @{

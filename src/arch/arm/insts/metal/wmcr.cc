@@ -1,5 +1,4 @@
 #include "arch/arm/insts/metal/wmcr.hh"
-#include "arch/generic/memhelpers.hh"
 #include "arch/arm/insts/metal/uops/mleit_u.hh"
 #include "arch/arm/insts/metal/uops/mlmrt_u.hh"
 #include "arch/arm/insts/metal/uops/wmcr_u.hh"
@@ -8,7 +7,7 @@
 namespace gem5 {
     namespace ArmISA {
         // wmr
-        Wmcr64::Wmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : 
+        Wmcr64::Wmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) :
             MetalMacroInst("wmcr", _machInst, IntAluOp), mReg(_mreg), gReg(_greg)
         {
             this->flags[IsInteger] = true;
@@ -27,24 +26,24 @@ namespace gem5 {
                 this->flags[IsLoad] = true;
                 this->numMicroops += ISA::MroutineTableTotalSize / ISA::MroutineTableLoadSize;
             }
-            
+
             this->microOps = new StaticInstPtr[this->numMicroops];
-            StaticInst * inst = new Wmcr64_u(_machInst, _opClass, mReg, gReg);
+            StaticInst * inst = new Wmcr64_u(_machInst, mReg, gReg);
             this->microOps[0] = inst;
 
             if (mReg == metal_reg::MIB) {
                 for (int i = 0; i < ISA::InstInterceptTableTotalSize / ISA::InstInterceptTableLoadSize; i++) {
-                    StaticInstPtr uop = new Mliit64_u(_machInst, _opClass, i * ISA::InstInterceptTableLoadSize, ISA::InstInterceptTableLoadSize);
+                    StaticInstPtr uop = new Mliit64_u(_machInst, i * ISA::InstInterceptTableLoadSize, ISA::InstInterceptTableLoadSize);
                     this->microOps[i+1] = uop;
                 }
             } else if (mReg == metal_reg::MEB) {
                 for (int i = 0; i < ISA::ExcInterceptTableTotalSize / ISA::ExcInterceptTableLoadSize; i++) {
-                    StaticInstPtr uop = new Mleit64_u(_machInst, _opClass, i * ISA::ExcInterceptTableLoadSize, ISA::ExcInterceptTableLoadSize);
+                    StaticInstPtr uop = new Mleit64_u(_machInst, i * ISA::ExcInterceptTableLoadSize, ISA::ExcInterceptTableLoadSize);
                     this->microOps[i+1] = uop;
                 }
             } else if (mReg == metal_reg::MBR) {
                 for (int i = 0; i < ISA::MroutineTableTotalSize / ISA::MroutineTableLoadSize; i++) {
-                    StaticInstPtr uop = new Mlmrt64_u(_machInst, _opClass, i * ISA::MroutineTableLoadSize, ISA::MroutineTableLoadSize, 
+                    StaticInstPtr uop = new Mlmrt64_u(_machInst, i * ISA::MroutineTableLoadSize, ISA::MroutineTableLoadSize,
                             i * (ISA::MroutineTableLoadSize / sizeof(ISA::MroutineTableEntry)));
                     this->microOps[i+1] = uop;
                 }

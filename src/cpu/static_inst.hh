@@ -195,6 +195,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isHtmStart() const { return flags[IsHtmStart]; }
     bool isHtmStop() const { return flags[IsHtmStop]; }
     bool isHtmCancel() const { return flags[IsHtmCancel]; }
+    bool isPreExecOperandUpdate() const {return flags[IsPreExecOperandUpdate]; }
 
     bool
     isHtmCmd() const
@@ -306,7 +307,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     }
 
     virtual Fault
-    preExec(ExecContext *xc, trace::InstRecord *traceData) const;
+    preExec(ExecContext *xc, trace::InstRecord *traceData);
 
     virtual void advancePC(PCStateBase &pc_state) const = 0;
     virtual void advancePC(ThreadContext *tc) const;

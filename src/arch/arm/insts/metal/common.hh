@@ -1,10 +1,6 @@
 #pragma once
 
-#include "arch/arm/insts/static_inst.hh"
-#include "arch/arm/insts/macromem.hh"
-#include "arch/arm/regs/metal.hh"
-#include "arch/arm/regs/metal_misc.hh"
-#include "debug/Metal.hh"
+#include "arch/arm/insts/pred_inst.hh"
 
 namespace gem5
 {
@@ -15,7 +11,7 @@ namespace gem5
 
         class MetalStaticInst : public PredOp
         {
-        protected: 
+        protected:
             RegId srcRegIdxArr[MAX_METAL_OPERANDS];
             RegId destRegIdxArr[MAX_METAL_OPERANDS];
         public:
@@ -47,7 +43,7 @@ namespace gem5
                 }
             }
         public:
-            MetalMacroInst(const char *mnem, ExtMachInst _machInst, OpClass __opClass) : 
+            MetalMacroInst(const char *mnem, ExtMachInst _machInst, OpClass __opClass) :
                 MetalStaticInst(mnem, _machInst, __opClass),
                 numMicroops(0),
                 microOps(nullptr)
@@ -78,9 +74,9 @@ namespace gem5
                     Addr pc, const loader::SymbolTable *symtab) const override
             {
                     std::stringstream ss;
-                
+
                     ccprintf(ss, "%-10s ", mnemonic);
-                
+
                     return ss.str();
             }
 
@@ -110,7 +106,7 @@ namespace gem5
                 else
                     apc.uAdvance();
             }
-        
+
             void
             advancePC(ThreadContext *tc) const override
             {
@@ -124,14 +120,13 @@ namespace gem5
         };
 
         // Metal instructions with an immediate (menter)
-        class MetalImmOp8 : public MetalStaticInst
+        class MetalImmOp : public MetalStaticInst
         {
         protected:
-            uint8_t imm;
-
+            uint imm;
         public:
-            MetalImmOp8(const char *mnem, ExtMachInst _machInst, OpClass __opClass,
-                       uint8_t _imm) : MetalStaticInst(mnem, _machInst, __opClass), imm(_imm)
+            MetalImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass,
+                       uint _imm) : MetalStaticInst(mnem, _machInst, __opClass), imm(_imm)
             {
             }
 
@@ -155,10 +150,10 @@ namespace gem5
         class MetalRegOp : public MetalStaticInst
         {
         protected:
-            RegIndex mReg;
+            RegIndex reg;
 
         public:
-            MetalRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg) : MetalStaticInst(mnem, _machInst, __opClass), mReg(_mReg)
+            MetalRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _reg) : MetalStaticInst(mnem, _machInst, __opClass), reg(_reg)
             {
             }
 
@@ -167,33 +162,32 @@ namespace gem5
         };
 
         // Metal instructions with 2 reg args (rmr, wmr)
-        class MetalRegOp2 : public MetalStaticInst
+        class MetalMRegRegOp : public MetalStaticInst
         {
         protected:
             RegIndex mReg;
             RegIndex gReg;
 
         public:
-            MetalRegOp2(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : MetalStaticInst(mnem, _machInst, __opClass), mReg(_mReg), gReg(_gReg)
+            MetalMRegRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg) : MetalStaticInst(mnem, _machInst, __opClass), mReg(_mReg), gReg(_gReg)
             {
+
             }
 
             virtual std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
-        // Metal instructions with 3 args (rtlb64, wtlb64)
-        class MetalRegOp3 : public MetalStaticInst
+        class MetalReg2Op : public MetalStaticInst
         {
         protected:
-            RegIndex rl;
-            RegIndex rm;
-            RegIndex rn;
+            RegIndex r1;
+            RegIndex r2;
         public:
-            MetalRegOp3(const char *mnem, ExtMachInst _machInst,
-                OpClass __opClass, RegIndex _rl, RegIndex _rm, RegIndex _rn)
-                : MetalStaticInst(mnem, _machInst, __opClass), rl(_rl),
-                rm(_rm), rn(_rn)
+            MetalReg2Op(const char *mnem, ExtMachInst _machInst,
+                OpClass __opClass, RegIndex _r1, RegIndex _r2)
+                : MetalStaticInst(mnem, _machInst, __opClass), r1(_r1),
+                r2(_r2)
             {
             }
 
@@ -201,19 +195,55 @@ namespace gem5
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
-        class MetalPMemRegOp : public MetalRegOp3
+        class MetalReg3Op : public MetalStaticInst
         {
+        protected:
+            RegIndex r1;
+            RegIndex r2;
+            RegIndex r3;
         public:
-            MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
-                MetalRegOp3(mnem, _machInst, __opClass, _dReg, _bReg, _oReg)
+            MetalReg3Op(const char *mnem, ExtMachInst _machInst,
+                OpClass __opClass, RegIndex _r1, RegIndex _r2, RegIndex _r3)
+                : MetalStaticInst(mnem, _machInst, __opClass), r1(_r1),
+                r2(_r2), r3(_r3)
             {
+            }
+
+            virtual std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        class MetalRegImm2Op : public MetalStaticInst
+        {
+        protected:
+            RegIndex reg;
+            uint imm1;
+            uint imm2;
+        public:
+            MetalRegImm2Op(const char *mnem, ExtMachInst _machInst, OpClass __opClass,
+                       RegIndex _reg, uint _imm1, uint _imm2) : MetalStaticInst(mnem, _machInst, __opClass), reg(_reg), imm1(_imm1), imm2(_imm2)
+            {
+
             }
 
             std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
 
-        class MetalPMemRegImmOp : public MetalRegOp2
+        class MetalPMemRegOp : public MetalReg3Op
+        {
+        public:
+            MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
+                MetalReg3Op(mnem, _machInst, __opClass, _dReg, _bReg, _oReg)
+            {
+
+            }
+
+            std::string generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const override;
+        };
+
+        class MetalPMemRegImmOp : public MetalReg2Op
         {
         public:
             enum class Mode {
@@ -222,19 +252,17 @@ namespace gem5
                 POSTINDEX
             };
         protected:
-            int32_t imm;
+            int imm;
             Mode mode;
         public:
-            MetalPMemRegImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _mReg, RegIndex _gReg, int32_t _imm, Mode _mode) :
-                MetalRegOp2(mnem, _machInst, __opClass, _mReg, _gReg), imm(_imm), mode(_mode)
+            MetalPMemRegImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _r1, RegIndex _r2, int32_t _imm, Mode _mode) :
+                MetalReg2Op(mnem, _machInst, __opClass, _r1, _r2), imm(_imm), mode(_mode)
             {
+
             }
 
             std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
-
-
     } // namespace ArmISA
 } // namespace gem5
-

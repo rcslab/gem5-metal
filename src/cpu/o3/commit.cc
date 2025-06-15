@@ -815,7 +815,7 @@ Commit::commit()
             // All younger instructions will be squashed. Set the sequence
             // number as the youngest instruction in the ROB.
             youngestSeqNum[tid] = squashed_inst;
-            const MetalInternalState& state = rob->findInst(tid, squashed_inst)->getPostExecMetalState();
+            const MetalInternalState& state = rob->findInst(tid, squashed_inst)->getMetalState();
             rob->squash(squashed_inst, tid);
             changedROBNumEntries[tid] = true;
 
@@ -1267,7 +1267,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
 
     // update the tc states
     BaseISA * isa = thread[tid]->getTC()->getIsaPtr();
-    isa->setMetalState(head_inst->getPostExecMetalState());
+    isa->setMetalState(head_inst->getMetalState());
 
     // hardware transactional memory
     // the HTM UID is purely for correctness and debugging purposes

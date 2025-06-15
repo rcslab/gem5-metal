@@ -50,12 +50,10 @@ StaticInst::branchTarget(const PCStateBase &pc) const
           "that is not a PC-relative branch.");
 }
 
-Fault 
-StaticInst::preExec(ExecContext *xc, trace::InstRecord *traceData) const
+Fault
+StaticInst::preExec(ExecContext *xc, trace::InstRecord *traceData)
 {
     // non metal instructions don't need to alter Metal state
-    xc->setExecMetalState(xc->getPreExecMetalState());
-    xc->setPostExecMetalState(xc->getPreExecMetalState());
     return NoFault;
 }
 

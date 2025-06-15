@@ -13,27 +13,28 @@ namespace ArmISA {
         uint32_t offset;
         uint32_t size;
     public:
-        Mliit64_u(ExtMachInst _machInst, OpClass __opClass,
-                uint32_t _offset, uint32_t _size) :
-        MetalMicroInst("mliit_u", _machInst, __opClass), offset(_offset), size(_size)
+        Mliit64_u(ExtMachInst _machInst, uint32_t _offset, uint32_t _size) :
+        MetalMicroInst("mliit_u", _machInst, MemReadOp), offset(_offset), size(_size)
         {
             this->flags[IsLoad] = true;
         }
 
-        Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override 
+        Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override
         {
             ThreadContext *tc = xc->tcBase();
-            RegVal mib = tc->readMetalMiscRegNoEffect(metal_reg::MIB);
+            const RegVal mib = tc->readMetalMiscRegNoEffect(metal_reg::MIB);
+            const Addr base = purifyTaggedAddr(this->offset + mib, tc, currEL(tc), true);
 
             // no permission check here because wmcr_u already checks it
             METAL_DBGPRINT(INSTS, MLIIT_U, "Loading inst intercept table at 0x%lx + 0x%lx, size %u.\n", mib, this->offset, this->size);
 
-            Fault fault = initiateMemRead(xc, purifyTaggedAddr(this->offset + mib, tc, currEL(tc), true), this->size, ArmISA::MMU::AllowUnaligned);
-
+            Fault fault = initiateMemRead(xc, base, this->size, ArmISA::MMU::AllowUnaligned);
+            if(traceData)
+                traceData->setMem(base, this->size, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
             return NoFault;
         }
 
-        Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override 
+        Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override
         {
             ThreadContext *tc = xc->tcBase();
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
@@ -50,7 +51,7 @@ namespace ArmISA {
             return NoFault;
         }
 
-        Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override 
+        Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override
         {
             panic("unimplemented");
         }

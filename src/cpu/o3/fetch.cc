@@ -1071,24 +1071,26 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
     // Keep track of if we can take an interrupt at this boundary
     delayedCommit[tid] = instruction->isDelayedCommit();
 
+    MetalInternalState curState;
+    curState.set(curMetalState);
+
     // propagate metal internal state
-    instruction->setPreExecMetalState(curMetalState);
+    instruction->setMetalState(curState);
     // pre-execute for metal internal state changes
     Fault fault = instruction->preExec();
     if (fault == NoFault) {
         // update the latest metal internal state
-        curMetalState.set(instruction->getPostExecMetalState());
+        curMetalState.set(instruction->getMetalState());
     } else {
         DPRINTF(Fetch, "[tid:%i][sn:%lli] instruction preExec faulted.\n", tid, seq);
         instruction->setSerializeAfter();
     }
 
-    DPRINTF(Fetch, "[tid:%i][sn:%lli] preMetalState: 0x%lx, execMetalState: 0x%lx, postMetalState: 0x%lx\n",
+    DPRINTF(Fetch, "[tid:%i][sn:%lli] preMetalState: 0x%lx, postMetalState: 0x%lx\n",
         tid,
         seq,
-        instruction->getPreExecMetalState().getMSR(),
-        instruction->getExecMetalState().getMSR(),
-        instruction->getPostExecMetalState().getMSR());
+        curState.getMSR(),
+        instruction->getMetalState().getMSR());
 
     return instruction;
 }

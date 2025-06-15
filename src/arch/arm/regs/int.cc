@@ -52,17 +52,17 @@ namespace gem5
 namespace ArmISA
 {
 
-RegId 
+RegId
 IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const {
-    return flattenWithStates(isa.readMiscRegNoEffect(MISCREG_CPSR), 
-                    isa.getMetalState().getMSR(), 
+    return flattenWithStates(isa.readMiscRegNoEffect(MISCREG_CPSR),
+                    isa.getMetalState().getMSR(),
                     id);
 }
 
 RegId
 IntRegClassOps::flatten(ExecContext *xc, const RegId &id) const {
-    return flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR), 
-                    xc->getExecMetalState().getMSR(), 
+    return flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR),
+                    xc->getMetalState().getMSR(),
                     id);
 };
 

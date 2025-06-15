@@ -89,20 +89,23 @@ getMem(PacketPtr pkt, MemT &mem, trace::InstRecord *traceData)
 }
 
 static inline void
-getMemRawPtr(PacketPtr pkt, void * dst, size_t sz, [[maybe_unused]] trace::InstRecord *traceData)
+getMemRawPtr(PacketPtr pkt, void * dst, size_t sz, trace::InstRecord *traceData)
 {
     const char * src = pkt->getConstPtr<char>();
+    if (traceData)
+        traceData->setMem(pkt->getAddr(), sz, pkt->getFlags());
     memcpy(reinterpret_cast<char *>(dst), src, sz);
-    // if (traceData)
-    //      traceData->setData(mem);
 }
 
 template <class MemT>
 void
-getMemRaw(PacketPtr pkt, MemT &mem, [[maybe_unused]] trace::InstRecord *traceData)
+getMemRaw(PacketPtr pkt, MemT &mem, trace::InstRecord *traceData)
 {
     static_assert(std::is_standard_layout_v<MemT>);
-    getMemRawPtr(pkt, reinterpret_cast<void *>(&mem), sizeof(MemT), traceData);
+    getMemRawPtr(pkt, reinterpret_cast<void *>(&mem), sizeof(MemT), nullptr);
+    if (traceData) {
+        traceData->setData(mem);
+    }
 }
 
 template <class MemT>

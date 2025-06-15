@@ -1637,7 +1637,7 @@ ISA::getEILBEntryFromFault(const ArmFault & armFault) const
 {
     int exc;
     const EILBMode mode = EILBEntry::armFaultToMode(armFault);
-    
+
     if (mode == EILBMode::MODE_SYNC) {
         exc = armFault.getSyndrome(tc);
     } else {
@@ -1726,9 +1726,9 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
 
     // // set registers in the current window
     // // MER0 = ESR or intid
-    // this->setMetalReg(metal_reg::MER0, result.getMode() == EILBMode::MODE_SYNC ? 
+    // this->setMetalReg(metal_reg::MER0, result.getMode() == EILBMode::MODE_SYNC ?
     //     static_cast<int>(armFault->getSyndrome(tc)) : this->armFaultToIntID(*armFault));
-  
+
     // // MER1 = Fault VADDR (if available)
     // Addr fvaddr;
     // if (armFault->getFaultVAddr(fvaddr)) {
@@ -1870,26 +1870,6 @@ ISA::setMetalMiscReg(RegIndex idx, RegVal val)
 
     setMetalMiscRegNoEffect(idx, val);
     // updateRegMap(this->miscRegs[MISCREG_CPSR], readMetalMiscRegNoEffect(metal_reg::MSR));
-}
-
-void ISA::setIntRegAtLevel(RegIndex idx, RegVal val, unsigned int mlvl)
-{
-    assert(idx < int_reg::NumArchRegs);
-    // manually flatten
-    metal_reg::MSR_t msr = metalInternalState.getMSR();
-    msr.lv = mlvl;
-    RegId id = IntRegClassOps::flattenWithStates(readMiscRegNoEffect(MISCREG_CPSR), msr, intRegClass[idx]);
-    this->tc->setReg(id, val);
-}
-
-RegVal ISA::readIntRegAtLevel(RegIndex idx, unsigned int mlvl) const
-{
-    assert(idx < int_reg::NumArchRegs);
-    // manually flatten
-    metal_reg::MSR_t msr = metalInternalState.getMSR();
-    msr.lv = mlvl;
-    RegId id = IntRegClassOps::flattenWithStates(readMiscRegNoEffect(MISCREG_CPSR), msr, intRegClass[idx]);
-    return this->tc->getReg(id);
 }
 
 BaseISADevice &

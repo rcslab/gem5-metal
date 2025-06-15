@@ -88,13 +88,40 @@ class DynInst : public ExecContext, public RefCounted
         size_t numSrcs;
         size_t numDests;
 
+        size_t buf_size;
+
+        // Flattened register index of the destination registers of this
+        // instruction.
         RegId *flatDestIdx;
+
+        // Physical register index of the destination registers of this
+        // instruction.
         PhysRegIdPtr *destIdx;
+
+        // Physical register index of the previous producers of the
+        // architected destinations.
         PhysRegIdPtr *prevDestIdx;
+
+        // Physical register index of the source registers of this instruction.
         PhysRegIdPtr *srcIdx;
+
+        // Whether or not the source register is ready, one bit per register.
         uint8_t *readySrcIdx;
+
+        // duplicate an Arrays
+        void set(const Arrays & other);
+
+        // calculate other fields and the buffer size based on the # of src and dest register
+        void process();
+
+        // initialize fields given (after process()) a buffer
+        void init(void * buf);
+
+        // destroy the buffer but not deallocate it
+        void destroy();
     };
 
+    public:
     static void *operator new(size_t count, Arrays &arrays);
     static void  operator delete(void* ptr);
 
@@ -218,42 +245,26 @@ class DynInst : public ExecContext, public RefCounted
      */
     std::vector<short> _destMiscRegIdx;
 
-    size_t _numSrcs;
-    size_t _numDests;
+    Arrays regArrays;
+    // buffer for the above array iff the instruction requires reallocation
+    // otherwise null
+    void * regArraysBuf;
 
-    // Flattened register index of the destination registers of this
-    // instruction.
-    RegId *_flatDestIdx;
-
-    // Physical register index of the destination registers of this
-    // instruction.
-    PhysRegIdPtr *_destIdx;
-
-    // Physical register index of the previous producers of the
-    // architected destinations.
-    PhysRegIdPtr *_prevDestIdx;
-
-    // Physical register index of the source registers of this instruction.
-    PhysRegIdPtr *_srcIdx;
-
-    // Whether or not the source register is ready, one bit per register.
-    uint8_t *_readySrcIdx;
+    void updateArrays();
 
     // metal internal state for register flattening
-    MetalInternalState execMetalState;
-    MetalInternalState preMetalState;
-    MetalInternalState postMetalState;
+    MetalInternalState metalState;
 
   public:
-    size_t numSrcs() const { return _numSrcs; }
-    size_t numDests() const { return _numDests; }
+    size_t numSrcs() const { return regArrays.numSrcs; }
+    size_t numDests() const { return regArrays.numDests; }
 
     // Returns the flattened register index of the idx'th destination
     // register.
     const RegId &
     flattenedDestIdx(int idx) const
     {
-        return _flatDestIdx[idx];
+        return regArrays.flatDestIdx[idx];
     }
 
     // Flattens a destination architectural register index into a logical
@@ -261,7 +272,7 @@ class DynInst : public ExecContext, public RefCounted
     void
     flattenedDestIdx(int idx, const RegId &reg_id)
     {
-        _flatDestIdx[idx] = reg_id;
+        regArrays.flatDestIdx[idx] = reg_id;
     }
 
     // Returns the physical register index of the idx'th destination
@@ -269,14 +280,14 @@ class DynInst : public ExecContext, public RefCounted
     PhysRegIdPtr
     renamedDestIdx(int idx) const
     {
-        return _destIdx[idx];
+        return regArrays.destIdx[idx];
     }
 
     // Set the renamed dest register id.
     void
     renamedDestIdx(int idx, PhysRegIdPtr phys_reg_id)
     {
-        _destIdx[idx] = phys_reg_id;
+        regArrays.destIdx[idx] = phys_reg_id;
     }
 
     // Returns the physical register index of the previous physical
@@ -284,40 +295,40 @@ class DynInst : public ExecContext, public RefCounted
     PhysRegIdPtr
     prevDestIdx(int idx) const
     {
-        return _prevDestIdx[idx];
+        return regArrays.prevDestIdx[idx];
     }
 
     // Set the previous renamed dest register id.
     void
     prevDestIdx(int idx, PhysRegIdPtr phys_reg_id)
     {
-        _prevDestIdx[idx] = phys_reg_id;
+        regArrays.prevDestIdx[idx] = phys_reg_id;
     }
 
     // Returns the physical register index of the i'th source register.
     PhysRegIdPtr
     renamedSrcIdx(int idx) const
     {
-        return _srcIdx[idx];
+        return regArrays.srcIdx[idx];
     }
 
     void
     renamedSrcIdx(int idx, PhysRegIdPtr phys_reg_id)
     {
-        _srcIdx[idx] = phys_reg_id;
+        regArrays.srcIdx[idx] = phys_reg_id;
     }
 
     bool
     readySrcIdx(int idx) const
     {
-        uint8_t &byte = _readySrcIdx[idx / 8];
+        uint8_t &byte = regArrays.readySrcIdx[idx / 8];
         return bits(byte, idx % 8);
     }
 
     void
     readySrcIdx(int idx, bool ready)
     {
-        uint8_t &byte = _readySrcIdx[idx / 8];
+        uint8_t &byte = regArrays.readySrcIdx[idx / 8];
         replaceBits(byte, idx % 8, ready ? 1 : 0);
     }
 
@@ -1107,28 +1118,12 @@ class DynInst : public ExecContext, public RefCounted
 
   public:
 
-    const MetalInternalState& getExecMetalState(void) const override {
-        return execMetalState;
+    const MetalInternalState& getMetalState(void) const override {
+        return metalState;
     }
 
-    const MetalInternalState& getPostExecMetalState(void) const override {
-        return postMetalState;
-    }
-
-    const MetalInternalState& getPreExecMetalState(void) const override {
-        return preMetalState;
-    }
-
-    void setExecMetalState(const MetalInternalState& state) override {
-        execMetalState.set(state);
-    }
-
-    void setPostExecMetalState(const MetalInternalState& state) override {
-        postMetalState.set(state);
-    }
-
-    void setPreExecMetalState(const MetalInternalState& state) override {
-        preMetalState.set(state);
+    void setMetalState(const MetalInternalState& state) override {
+        metalState.set(state);
     }
 
     // The register accessor methods provide the index of the

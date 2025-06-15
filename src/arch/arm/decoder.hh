@@ -136,6 +136,11 @@ class Decoder : public InstDecoder
     decode(ExtMachInst mach_inst, Addr addr)
     {
         StaticInstPtr si = defaultCache.decode(this, mach_inst, addr);
+        // XXX: hack to skip caching instructions where PreExec could change Operands
+        // this should prob be in DynInst
+        if (si->isPreExecOperandUpdate()) {
+            si = this->decodeInst(mach_inst);
+        }
         DPRINTF(Decode, "Decode: Decoded %s instruction: %#x\n",
                 si->getName(), mach_inst);
         si->size((!emi.thumb || emi.bigThumb) ? 4 : 2);

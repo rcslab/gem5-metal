@@ -1,38 +1,50 @@
 #include "arch/arm/insts/metal/war.hh"
 
-namespace gem5 {
-    namespace ArmISA {
-        War64::War64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalRegOp2("war", _machInst, IntAluOp, _mreg, _greg)
+namespace gem5
+{
+    namespace ArmISA
+    {
+        War64::War64(ExtMachInst _machInst, RegIndex _reg, uint8_t _imm1, uint8_t _imm2) :
+            MetalRegImm2Op("war", _machInst, IntAluOp, _reg, _imm1, _imm2)
         {
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[mReg]);
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[gReg]);
-            // writing to int class
-            // _numTypedDestRegs[intRegClass.type()]++;
-
+            setSrcRegIdx(_numSrcRegs++, intRegClass[_reg]);
             this->flags[IsInteger] = true;
-            this->flags[IsSerializeAfter] = true;
-            this->flags[IsNonSpeculative] = true;
+            this->flags[IsPreExecOperandUpdate] = true;
         }
 
-        Fault War64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        Fault War64::preExec(ExecContext *xc, trace::InstRecord *traceData)
         {
-            const MetalInternalState &mist = xc->getExecMetalState();
-            const metal_reg::MSR_t msr = mist.getMSR();
+            const RegIndex arid = imm1;
+            const metal_reg::MSR_t msr = xc->getMetalState().getMSR();
+            const int target_level = metal_reg::getMetalLevel(msr) - imm2;
 
-            RegVal idx = xc->getRegOperand(this, 0);
-            RegVal v = xc->getRegOperand(this, 1);
-
-            METAL_DBGPRINT(INSTS, WAR, "idxMReg = %s, dstGReg = %d, srcMReg = %s.\n", printMetalReg(this->mReg), idx, printMetalReg(this->gReg));
-
-            if (idx >= int_reg::NumArchRegs) {
-                METAL_DBGPRINT(INSTS, WAR, "Attempting to write out of bound arch reg index: %d.\n", idx);
+            if (arid >= int_reg::NumArchRegs || target_level < 0) {
+                METAL_DBGPRINT(INSTS, RAR, "Invalid arguments: dst = %d, src = %d, window = %d, MSR = 0x%lx.\n",
+                    reg, imm1, imm2, msr);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            xc->tcBase()->setReg(intRegClass[idx], v);
+            // manually flatten
+            metal_reg::MSR_t new_msr = msr;
+            new_msr.lv = target_level;
+            setDestRegIdx(_numDestRegs++,
+                IntRegClassOps::flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR),
+                        new_msr, intRegClass[arid]));
+            _numTypedDestRegs[intRegClass.type()]++;
 
             return NoFault;
         }
 
-    }
-}
+        Fault War64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            METAL_DBGPRINT(INSTS, WAR, "src = %s, dst = %s, window = %d.\n",
+                printIntReg(reg).c_str(), printIntReg(imm1).c_str(), imm2);
+
+            RegVal val = xc->getRegOperand(this, 0);
+            xc->setRegOperand(this, 0, val);
+            if (traceData)
+                traceData->setData(intRegClass, val);
+            return NoFault;
+        }
+    } // namespace ArmISA
+} // namespace gem5

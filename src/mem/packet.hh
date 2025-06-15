@@ -630,6 +630,8 @@ class Packet : public Printable, public Extensible<Packet>
             !isMaskedWrite();
     }
 
+    Flags getFlags() { return flags; }
+
     //@{
     /// Snoop flags
     /**

@@ -1,6 +1,6 @@
 #pragma once
 
-// basic 
+// basic
 #include "arch/arm/insts/metal/menter.hh"
 #include "arch/arm/insts/metal/mexit.hh"
 
@@ -19,7 +19,5 @@
 #include "arch/arm/insts/metal/rmcr.hh"
 
 // arch extension
-#include "arch/arm/insts/metal/rpr.hh"
-#include "arch/arm/insts/metal/wpr.hh"
 #include "arch/arm/insts/metal/war.hh"
 #include "arch/arm/insts/metal/rar.hh"

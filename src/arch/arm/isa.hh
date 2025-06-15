@@ -276,9 +276,6 @@ public:
         void setMetalState(const MetalInternalState & st) override {
             this->metalInternalState.set(st);
         }
-
-        void setIntRegAtLevel(RegIndex idx, RegVal reg, unsigned int mlvl);
-        RegVal readIntRegAtLevel(RegIndex idx, unsigned int mlvl) const;
 private:
         void resetMetalRegs(void);
         void registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent);

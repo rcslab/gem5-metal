@@ -1,6 +1,5 @@
 #pragma once
 
-#include "arch/arm/insts/metal/common.hh"
 #include "arch/arm/insts/metal/menter.hh"
 
 namespace gem5 {
@@ -8,9 +7,12 @@ namespace gem5 {
     // menter
         class Mint64 : public Menter64
         {
+        private:
+            RegVal saved_mflags;
         public:
-            Mint64(ExtMachInst _machInst, uint8_t _imm);
+            Mint64(ExtMachInst _machInst, uint _imm);
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+            Fault preExec(ExecContext *xc, trace::InstRecord *traceData) override;
         };
     }
 }

@@ -151,18 +151,31 @@ namespace metal_reg
         return static_cast<MTPField>(mtp);
     }
 
-    static inline bool getReadPerm(RegVal mar, unsigned int idx)
+    static inline bool getReadPerm(RegVal mar, RegIndex idx)
     {
         assert(idx < 32);
 
         return !((mar >> (2 * idx)) & 0x1);
     }
 
-    static inline bool getWritePerm(RegVal mar, unsigned int idx)
+    static inline bool getWritePerm(RegVal mar, RegIndex idx)
     {
         assert(idx < 32);
 
         return !((mar >> (2 * idx + 1)) & 0x1);
+    }
+
+    static inline bool canAccessMiscReg(RegIndex idx, MSR_t msr, RegVal mar, bool write)
+    {
+        bool allowAccess = false;
+        if (!msr.init && isInitReg(idx)) {
+            // allow Metal initialization
+            allowAccess = true;
+        } else if (isInMetalMode(msr)) {
+            allowAccess = write ? getWritePerm(mar, idx) : getReadPerm(mar, idx);
+        }
+
+        return allowAccess;
     }
 
     static inline bool isPrivInstsEnabled(MFLAGS_t mflags)

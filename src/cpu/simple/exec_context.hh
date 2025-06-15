@@ -195,7 +195,7 @@ class SimpleExecContext : public ExecContext
         (*this->execContextStats.numRegReads[reg.classValue()])++;
         this->thread->getReg(reg, val);
     }
-    
+
     void
     setReg(const RegId& reg, RegVal val) override
     {
@@ -459,25 +459,13 @@ class SimpleExecContext : public ExecContext
         return cpu->getCpuAddrMonitor(thread->threadId());
     }
 
-    const MetalInternalState& getExecMetalState(void) const override {
+    const MetalInternalState& getMetalState(void) const override {
         return tcBase()->getIsaPtr()->getMetalState();
     }
-    const MetalInternalState& getPreExecMetalState(void) const override {
-        return tcBase()->getIsaPtr()->getMetalState();
-    }
-    const MetalInternalState& getPostExecMetalState(void) const override {
-        return tcBase()->getIsaPtr()->getMetalState();
-    };
 
-    void setExecMetalState(const MetalInternalState& state) override {
+    void setMetalState(const MetalInternalState& state) override {
         tcBase()->getIsaPtr()->setMetalState(state);
     }
-    void setPreExecMetalState(const MetalInternalState& state) override {
-        tcBase()->getIsaPtr()->setMetalState(state);
-    }
-    void setPostExecMetalState(const MetalInternalState& state) override {
-        tcBase()->getIsaPtr()->setMetalState(state);
-    };
 };
 
 } // namespace gem5

@@ -49,6 +49,7 @@
 #include "base/cprintf.hh"
 #include "base/loader/symtab.hh"
 #include "cpu/reg_class.hh"
+#include <sstream>
 
 namespace gem5
 {
@@ -293,6 +294,14 @@ ArmStaticInst::shift_carry_rs(uint32_t base, uint32_t shamt,
         break;
     }
     return 0;
+}
+
+std::string
+ArmStaticInst::printIntReg(RegIndex reg_idx, uint8_t opWidth) const
+{
+    std::stringstream ss;
+    printIntReg(ss, reg_idx, opWidth);
+    return ss.str();
 }
 
 void

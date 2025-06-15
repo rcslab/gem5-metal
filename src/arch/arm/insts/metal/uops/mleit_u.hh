@@ -12,9 +12,9 @@ namespace ArmISA {
         uint32_t offset;
         uint32_t size;
     public:
-        Mleit64_u(ExtMachInst _machInst, OpClass __opClass,
+        Mleit64_u(ExtMachInst _machInst,
                 uint32_t _offset, uint32_t _size) :
-                MetalMicroInst("mleit_u", _machInst, __opClass), offset(_offset), size(_size)
+                MetalMicroInst("mleit_u", _machInst, MemReadOp), offset(_offset), size(_size)
         {
             this->flags[IsLoad] = true;
         }
@@ -22,13 +22,17 @@ namespace ArmISA {
         Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override
         {
             ThreadContext *tc = xc->tcBase();
-            RegVal meb = tc->readMetalMiscRegNoEffect(metal_reg::MEB);
+            const RegVal meb = tc->readMetalMiscRegNoEffect(metal_reg::MEB);
+            const Addr base = purifyTaggedAddr(this->offset + meb, tc, currEL(tc), true);
 
             // no permission check here because wmcr_u already checks it
 
             METAL_DBGPRINT(INSTS, MLEIT_U, "Loading exc intercept table at 0x%lx + 0x%lx, size %u.\n", meb, this->offset, this->size);
 
-            Fault fault = initiateMemRead(xc, purifyTaggedAddr(this->offset + meb, tc, currEL(tc), true), this->size, ArmISA::MMU::AllowUnaligned);
+            Fault fault = initiateMemRead(xc, base, this->size, ArmISA::MMU::AllowUnaligned);
+            if (traceData) {
+                traceData->setMem(base, this->size, ArmISA::MMU::AllowUnaligned);
+            }
 
             return NoFault;
         }

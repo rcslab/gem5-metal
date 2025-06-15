@@ -3,6 +3,7 @@
 #include "arch/arm/insts/metal/common.hh"
 #include "cpu/metal_int_state.hh"
 #include "arch/generic/memhelpers.hh"
+#include "cpu/op_class.hh"
 
 namespace gem5 {
 namespace ArmISA {
@@ -14,9 +15,8 @@ namespace ArmISA {
         uint32_t size;
         uint32_t startIdx;
     public:
-        Mlmrt64_u(ExtMachInst _machInst, OpClass __opClass,
-                    uint32_t _offset, uint32_t _size, uint32_t _startIdx) :
-        MetalMicroInst("mlmrt_u", _machInst, __opClass), offset(_offset), size(_size), startIdx(_startIdx)
+        Mlmrt64_u(ExtMachInst _machInst, uint32_t _offset, uint32_t _size, uint32_t _startIdx) :
+        MetalMicroInst("mlmrt_u", _machInst, MemReadOp), offset(_offset), size(_size), startIdx(_startIdx)
         {
             this->flags[IsLoad] = true;
         }
@@ -25,11 +25,13 @@ namespace ArmISA {
         {
             ThreadContext * tc = xc->tcBase();
             const RegVal mbr = xc->tcBase()->readMetalMiscRegNoEffect(metal_reg::MBR);
+            const Addr base = purifyTaggedAddr(mbr + offset, tc, currEL(tc), true);
 
             METAL_DBGPRINT(INSTS, MLMRT_U, "Loading mroutine table at 0x%lx + 0x%lx, size %u, startIdx %d.\n", mbr, offset, this->size, this->startIdx);
 
-            Fault fault = initiateMemRead(xc, purifyTaggedAddr(mbr + offset, tc, currEL(tc), true), this->size, ArmISA::MMU::AllowUnaligned);
-
+            Fault fault = initiateMemRead(xc, base, this->size, ArmISA::MMU::AllowUnaligned);
+            if(traceData)
+                traceData->setMem(base, this->size, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
             return NoFault;
         }
 

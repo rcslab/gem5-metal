@@ -1052,9 +1052,9 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
         }
 
         DPRINTF(Rename,
-                "[tid:%i] "
-                "Looking up %s arch reg %i (flat %i), got phys reg %i (%s)\n",
-                tid, flat_reg.className(),
+                "[tid:%i] [sn:%lli] "
+                "Looking up %s arch SRC reg %i (flat %i), got phys reg %i (%s)\n",
+                tid, inst->seqNum, flat_reg.className(),
                 src_reg.index(), flat_reg.index(), renamed_reg->index(),
                 renamed_reg->className());
 
@@ -1063,17 +1063,17 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
         // See if the register is ready or not.
         if (scoreboard->getReg(renamed_reg)) {
             DPRINTF(Rename,
-                    "[tid:%i] "
-                    "Register %d (flat: %d) (%s) is ready.\n",
-                    tid, renamed_reg->index(), renamed_reg->flatIndex(),
+                    "[tid:%i] [sn:%llu] "
+                    "SRC register %d (%s) is ready.\n",
+                    tid, inst->seqNum, renamed_reg->index(),
                     renamed_reg->className());
 
             inst->markSrcRegReady(src_idx);
         } else {
             DPRINTF(Rename,
-                    "[tid:%i] "
-                    "Register %d (flat: %d) (%s) is not ready.\n",
-                    tid, renamed_reg->index(), renamed_reg->flatIndex(),
+                    "[tid:%i] [sn:%llu] "
+                    "SRC register %d (%s) is not ready.\n",
+                    tid, inst->seqNum, renamed_reg->index(),
                     renamed_reg->className());
         }
 
@@ -1102,9 +1102,9 @@ Rename::renameDestRegs(const DynInstPtr &inst, ThreadID tid)
         scoreboard->unsetReg(rename_result.first);
 
         DPRINTF(Rename,
-                "[tid:%i] "
-                "Renaming arch reg %i (%s) (flat %i) to physical reg %i (%i).\n",
-                tid, dest_reg.index(), dest_reg.className(),
+                "[tid:%i] [sn:%llu] "
+                "Renaming DEST arch reg %i (%s) (flat %i) to physical reg %i (%i).\n",
+                tid, inst->seqNum,  dest_reg.index(), dest_reg.className(),
                 flat_dest_regid.index(),
                 rename_result.first->index(),
                 rename_result.first->flatIndex());

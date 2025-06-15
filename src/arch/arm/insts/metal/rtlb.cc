@@ -4,7 +4,7 @@ namespace gem5 {
     namespace ArmISA {
         Rtlb64::Rtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
                        RegIndex _rn)
-                       : MetalRegOp3("rtlb", _machInst, IntAluOp, _rl, _rm,
+                       : MetalReg3Op("rtlb", _machInst, IntAluOp, _rl, _rm,
                                          _rn)
         {
             this->flags[IsInteger] = true;
