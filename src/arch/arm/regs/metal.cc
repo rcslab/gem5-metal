@@ -75,7 +75,7 @@ namespace ArmISA
 
         const size_t window = (metal_reg::NumGRegs - metal_reg::WindowSize) - level * metal_reg::WindowShift;
         const RegIndex fidx = window + idx;
-        METAL_DBGPRINT(REGS, GEN, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
+        // METAL_DBGPRINT(REGS, GEN, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
 
         return flatMetalRegClass[fidx];
     }

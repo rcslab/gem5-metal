@@ -92,9 +92,10 @@ static inline void
 getMemRawPtr(PacketPtr pkt, void * dst, size_t sz, trace::InstRecord *traceData)
 {
     const char * src = pkt->getConstPtr<char>();
-    if (traceData)
-        traceData->setMem(pkt->getAddr(), sz, pkt->getFlags());
     memcpy(reinterpret_cast<char *>(dst), src, sz);
+    if (traceData) {
+        traceData->setData(*(uint64_t*)src);
+    }
 }
 
 template <class MemT>

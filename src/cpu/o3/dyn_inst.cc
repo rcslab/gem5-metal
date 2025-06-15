@@ -263,8 +263,6 @@ DynInst::updateArrays()
     regArrays.numDests = staticInst->numDestRegs();
     regArrays.numSrcs = staticInst->numSrcRegs();
 
-    METAL_DBGPRINT(UPDATE, ARRAYS, "updating arrays for %s .. dest: %d, src: %d\n", staticInst->getName(), regArrays.numDests, regArrays.numSrcs);
-
     regArrays.process();
     regArraysBuf = ::operator new(regArrays.buf_size);
     regArrays.init(regArraysBuf);
