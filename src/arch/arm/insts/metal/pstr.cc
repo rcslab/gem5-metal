@@ -1,19 +1,25 @@
 #include "arch/arm/insts/metal/pstr.hh"
 #include "arch/generic/memhelpers.hh"
+#include "enums/StaticInstFlags.hh"
 
 namespace gem5 {
     namespace ArmISA {
+        static constexpr size_t log2(size_t n)
+        {
+            return ( (n<2) ? 0 : 1 + log2(n/2));
+        }
+        static constexpr const char * MNEM_LOOKUP_TABLE[] = {"pstrb", "pstrh", "pstrw", "pstr"};
+
         // pstr, imm offset
         template <typename T>
         Pstri<T>::Pstri(ExtMachInst _machInst, RegIndex _sReg, RegIndex _aReg, int32_t _imm, Mode _mode) :
-            MetalPMemRegImmOp("pstr", _machInst, MemWriteOp, _sReg, _aReg, _imm, _mode)
+            MetalPMemRegImmOp(MNEM_LOOKUP_TABLE[log2(sizeof(T))], _machInst, MemWriteOp, _sReg, _aReg, _imm, _mode)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[_sReg]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[_aReg]);
             setDestRegIdx(_numDestRegs++,intRegClass[_aReg]);
             _numTypedDestRegs[intRegClass.type()]++;
 
-            this->flags[IsInteger] = true;
             this->flags[IsStore] = true;
         }
 
@@ -80,13 +86,12 @@ namespace gem5 {
         // pstr, reg offset
         template <typename T>
         Pstrr<T>::Pstrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
-            MetalPMemRegOp("pstr", _machInst, MemWriteOp, _dReg, _bReg, _oReg)
+            MetalPMemRegOp(MNEM_LOOKUP_TABLE[log2(sizeof(T))], _machInst, MemWriteOp, _dReg, _bReg, _oReg)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[_dReg]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[_bReg]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[_oReg]);
 
-            this->flags[IsInteger] = true;
             this->flags[IsStore] = true;
         }
 

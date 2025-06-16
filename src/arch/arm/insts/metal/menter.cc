@@ -70,7 +70,7 @@ namespace gem5 {
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
 
-            assert(&mrlbEnt != &MRLB::NullEntry && msr.lv < metal_reg::MaxMetalLevel);
+            assert(&mrlbEnt != &MRLB::NullEntry && msr.lv <= metal_reg::MaxMetalLevel);
 
             METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
 

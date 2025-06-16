@@ -199,7 +199,7 @@ public:
                 if (!metal_reg::isInMetalMode(msr)) {
                     intRegMap = int_reg::Reg64Map;
                 } else {
-                    intRegMap = int_reg::Reg64MetalMap.at(metal_reg::getMetalLevel(msr));
+                    intRegMap = int_reg::Reg64MetalMap.at(metal_reg::getMetalLevel(msr) - 1);
                 }
             } else {
                 switch (cpsr.mode) {

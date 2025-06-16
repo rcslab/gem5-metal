@@ -39,7 +39,7 @@ namespace gem5
             new_msr.lv = target_level;
             setSrcRegIdx(_numSrcRegs++,
                 IntRegClassOps::flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR),
-                        msr, intRegClass[arid]));
+                        new_msr, intRegClass[arid]));
 
             return NoFault;
         }
@@ -47,7 +47,7 @@ namespace gem5
         Fault Rar64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             METAL_DBGPRINT(INSTS, RAR, "dst = %s, src = %s, window = %d.\n",
-                printIntReg(reg).c_str(), printIntReg(imm1).c_str(), imm2);
+                printIntReg(reg, 64).c_str(), printIntReg(imm1, 64).c_str(), imm2);
 
             RegVal val = xc->getRegOperand(this, 0);
             xc->setRegOperand(this, 0, val);

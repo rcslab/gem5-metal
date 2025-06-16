@@ -38,7 +38,7 @@ namespace gem5
         Fault War64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             METAL_DBGPRINT(INSTS, WAR, "src = %s, dst = %s, window = %d.\n",
-                printIntReg(reg).c_str(), printIntReg(imm1).c_str(), imm2);
+                printIntReg(reg, 64).c_str(), printIntReg(imm1, 64).c_str(), imm2);
 
             RegVal val = xc->getRegOperand(this, 0);
             xc->setRegOperand(this, 0, val);

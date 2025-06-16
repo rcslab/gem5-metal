@@ -84,11 +84,12 @@ namespace gem5
             std::stringstream ss;
             ss << MetalDisasmPrefix;
             printMnemonic(ss, "", false);
-            printMetalReg(ss, reg);
-            ccprintf(ss, ", %d, %d", imm1, imm2);
+            printIntReg(ss, reg, 64);
+            ccprintf(ss, ", ");
+            printIntReg(ss, imm1, 64);
+            ccprintf(ss, ", %d", imm2);
             return ss.str();
         }
-
 
         std::string MetalPMemRegOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
         {

@@ -3,19 +3,22 @@
 
 namespace gem5 {
     namespace ArmISA {
+        static constexpr size_t log2(size_t n)
+        {
+            return ( (n<2) ? 0 : 1 + log2(n/2));
+        }
+        static constexpr const char * MNEM_LOOKUP_TABLE[] = {"pldrb", "pldrh", "pldrw", "pldr"};
+
         template <typename T>
-        Pldri<T>::Pldri(ExtMachInst _machInst, RegIndex _dReg, RegIndex _sReg, int32_t _imm, Mode _mode) :
-            MetalPMemRegImmOp("pldr", _machInst, MemReadOp, _dReg, _sReg, _imm, _mode)
+        Pldri<T>::Pldri(ExtMachInst _machInst, RegIndex _dReg, RegIndex _sReg, int32_t _imm, Mode _mode) : 
+            MetalPMemRegImmOp(MNEM_LOOKUP_TABLE[log2(sizeof(T))] , _machInst, MemReadOp, _dReg, _sReg, _imm, _mode)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[_sReg]);
             setDestRegIdx(_numDestRegs++, intRegClass[_dReg]);
             setDestRegIdx(_numDestRegs++, intRegClass[_sReg]);
             _numTypedDestRegs[intRegClass.type()] += 2;
 
-            this->flags[IsInteger] = true;
             this->flags[IsLoad] = true;
-            this->flags[IsWriteBarrier] = true;
-            this->flags[IsReadBarrier] = true;
         }
 
         template <typename T>
@@ -89,14 +92,13 @@ namespace gem5 {
         // pldrr
         template <typename T>
         Pldrr<T>::Pldrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
-            MetalPMemRegOp("pldr", _machInst, MemReadOp, _dReg, _bReg, _oReg)
+            MetalPMemRegOp(MNEM_LOOKUP_TABLE[log2(sizeof(T))], _machInst, MemReadOp, _dReg, _bReg, _oReg)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[_bReg]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[_oReg]);
             setDestRegIdx(_numDestRegs++, intRegClass[_dReg]);
             _numTypedDestRegs[intRegClass.type()]++;
 
-            this->flags[IsInteger] = true;
             this->flags[IsLoad] = true;
         }
 

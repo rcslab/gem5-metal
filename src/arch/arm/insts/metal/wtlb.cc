@@ -50,7 +50,6 @@ namespace gem5 {
             setSrcRegIdx(_numSrcRegs++, intRegClass[r2]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[r3]);
 
-            this->flags[IsInteger] = true;
             this->flags[IsNonSpeculative] = true;
             this->flags[IsSerializeAfter] = true;
         }

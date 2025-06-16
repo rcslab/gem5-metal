@@ -244,7 +244,6 @@ inline constexpr RegId
     Sp2 = intRegClass[_Sp2Idx],
     Sp3 = intRegClass[_Sp3Idx],
     Spm = intRegClass[_SpmIdx],
-
     Spx = intRegClass[_SpxIdx],
 
     X0 = intRegClass[_X0Idx],
