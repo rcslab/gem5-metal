@@ -306,6 +306,10 @@ class SimpleThread : public ThreadState, public ThreadContext
         isa->setMetalMiscReg(metal_reg, val);
     }
 
+    const MetalInternalState & getTransientMetalState() const override { panic("unimplemented"); };
+
+    void setTransientMetalState(const MetalInternalState &) override { panic("unimplemented"); };
+
     unsigned readStCondFailures() const override { return storeCondFailures; }
 
     bool

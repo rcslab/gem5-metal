@@ -62,6 +62,7 @@
 #include "base/flags.hh"
 #include "base/types.hh"
 #include "cpu/inst_seq.hh"
+#include "cpu/metal_int_state.hh"
 #include "mem/htm.hh"
 #include "sim/cur_tick.hh"
 
@@ -470,6 +471,12 @@ class Request : public Extensible<Request>
     /** The cause for HTM transaction abort */
     HtmFailureFaultCause _htmAbortCause = HtmFailureFaultCause::INVALID;
 
+    struct PersistentState {
+        MetalInternalState mist;    
+    };
+    /** Persistent CPU states for this request */
+    PersistentState pstate;
+
   public:
 
     /**
@@ -514,6 +521,7 @@ class Request : public Extensible<Request>
           _extraData(other._extraData), _contextId(other._contextId),
           _pc(other._pc), _reqInstSeqNum(other._reqInstSeqNum),
           _localAccessor(other._localAccessor),
+          pstate(other.pstate),
           translateDelta(other.translateDelta),
           accessDelta(other.accessDelta), depth(other.depth)
     {
@@ -562,6 +570,12 @@ class Request : public Extensible<Request>
         assert(hasStreamId());
         _substreamId = ssid;
         privateFlags.set(VALID_SUBSTREAM_ID);
+    }
+
+    PersistentState &
+    getPersistentState()
+    {
+        return pstate;
     }
 
     /**

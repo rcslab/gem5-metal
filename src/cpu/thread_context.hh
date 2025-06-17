@@ -49,6 +49,7 @@
 #include "arch/generic/isa.hh"
 #include "arch/generic/pcstate.hh"
 #include "base/types.hh"
+#include "cpu/metal_int_state.hh"
 #include "cpu/pc_event.hh"
 #include "cpu/reg_class.hh"
 
@@ -151,6 +152,11 @@ class ThreadContext : public PCEventScope
     virtual Status status() const = 0;
 
     virtual void setStatus(Status new_status) = 0;
+
+    // transient Metal State used by instructions in flight but not committed yet
+    virtual const MetalInternalState & getTransientMetalState() const = 0;
+
+    virtual void setTransientMetalState(const MetalInternalState &) = 0;
 
     /// Set the status to Active.
     virtual void activate() = 0;

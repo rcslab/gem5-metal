@@ -417,6 +417,7 @@ CPU::init()
     for (int tid = 0; tid < numThreads; ++tid)
         thread[tid]->noSquashFromTC = false;
 
+    fetch.setThreads(thread);
     commit.setThreads(thread);
 }
 

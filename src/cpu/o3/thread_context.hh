@@ -70,6 +70,7 @@ class ThreadContext : public gem5::ThreadContext
   public:
    /** Pointer to the CPU. */
     CPU *cpu;
+    MetalInternalState transientMetalState;
 
     bool
     schedule(PCEvent *e) override
@@ -210,8 +211,15 @@ class ThreadContext : public gem5::ThreadContext
      * write might have as defined by the architecture. */
     void setMiscReg(RegIndex misc_reg, RegVal val) override;
 
-    void
-    setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
+    const MetalInternalState & getTransientMetalState() const override {
+        return transientMetalState;
+    }
+
+    void setTransientMetalState(const MetalInternalState & other) override {
+        transientMetalState.set(other);
+    }
+
+    void setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
         getIsaPtr()->setMetalMiscReg(metal_reg, val);
     }
 

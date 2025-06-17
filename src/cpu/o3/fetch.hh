@@ -47,6 +47,7 @@
 #include "cpu/o3/comm.hh"
 #include "cpu/o3/dyn_inst_ptr.hh"
 #include "cpu/o3/limits.hh"
+#include "cpu/o3/thread_state.hh"
 #include "cpu/pc_event.hh"
 #include "cpu/pred/bpred_unit.hh"
 #include "cpu/timebuf.hh"
@@ -200,7 +201,7 @@ class Fetch
     /** To probe when a fetch request is successfully sent. */
     ProbePointArg<RequestPtr> *ppFetchRequestSent;
 
-    MetalInternalState curMetalState;
+    std::vector<ThreadState *> threads;
 
   public:
     /** Fetch constructor. */
@@ -215,6 +216,9 @@ class Fetch
 
     /** Sets the main backwards communication time buffer pointer. */
     void setTimeBuffer(TimeBuffer<TimeStruct> *time_buffer);
+
+    /** Sets the thread states. */
+    void setThreads(std::vector<ThreadState *> &threads);
 
     /** Sets pointer to list of active threads. */
     void setActiveThreads(std::list<ThreadID> *at_ptr);

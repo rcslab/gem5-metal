@@ -56,6 +56,7 @@
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
 #include "cpu/o3/limits.hh"
+#include "cpu/thread_context.hh"
 #include "debug/Activity.hh"
 #include "debug/Drain.hh"
 #include "debug/Fetch.hh"
@@ -244,6 +245,12 @@ Fetch::setTimeBuffer(TimeBuffer<TimeStruct> *time_buffer)
     fromRename = timeBuffer->getWire(-renameToFetchDelay);
     fromIEW = timeBuffer->getWire(-iewToFetchDelay);
     fromCommit = timeBuffer->getWire(-commitToFetchDelay);
+}
+
+void
+Fetch::setThreads(std::vector<ThreadState *> &threads)
+{
+    this->threads = threads;
 }
 
 void
@@ -562,7 +569,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         fetchBufferBlockPC, fetchBufferSize,
         Request::INST_FETCH, cpu->instRequestorId(), pc,
         cpu->thread[tid]->contextId());
-
+    mem_req->getPersistentState().mist.set(threads[tid]->getTC()->getTransientMetalState());
     mem_req->taskId(cpu->taskId());
 
     memReq[tid] = mem_req;
@@ -698,7 +705,7 @@ Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
     decoder[tid]->reset();
 
     // reverse the Metal state
-    curMetalState.set(squashState);
+    threads[tid]->getTC()->setTransientMetalState(squashState);
 
     // Clear the icache miss if it's outstanding.
     if (fetchStatus[tid] == IcacheWaitResponse) {
@@ -1072,7 +1079,7 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
     delayedCommit[tid] = instruction->isDelayedCommit();
 
     MetalInternalState curState;
-    curState.set(curMetalState);
+    curState.set(threads[tid]->getTC()->getTransientMetalState());
 
     // propagate metal internal state
     instruction->setMetalState(curState);
@@ -1080,7 +1087,7 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
     Fault fault = instruction->preExec();
     if (fault == NoFault) {
         // update the latest metal internal state
-        curMetalState.set(instruction->getMetalState());
+        threads[tid]->getTC()->setTransientMetalState(instruction->getMetalState());
     } else {
         DPRINTF(Fetch, "[tid:%i][sn:%lli] instruction preExec faulted.\n", tid, seq);
         instruction->setSerializeAfter();

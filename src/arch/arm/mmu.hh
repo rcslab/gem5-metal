@@ -46,6 +46,7 @@
 #include "arch/arm/utility.hh"
 #include "arch/generic/mmu.hh"
 #include "base/memoizer.hh"
+#include "cpu/metal_int_state.hh"
 #include "enums/ArmLookupLevel.hh"
 
 #include "params/ArmMMU.hh"
@@ -162,7 +163,6 @@ class MMU : public BaseMMU
             hcr = rhs.hcr;
             dacr = rhs.dacr;
             mtp = rhs.mtp;
-            msr = rhs.msr;
             miscRegValid = rhs.miscRegValid;
             curTranType = rhs.curTranType;
             stage2Req = rhs.stage2Req;
@@ -185,7 +185,6 @@ class MMU : public BaseMMU
         bool isStage2 = false;
         CPSR cpsr = 0;
         RegVal mtp = 0;
-        RegVal msr = 0;
         bool aarch64 = false;
         ExceptionLevel aarch64EL = EL0;
         SCTLR sctlr = 0;

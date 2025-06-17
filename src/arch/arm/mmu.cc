@@ -556,7 +556,7 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
             stats.permsFaults++;
             DPRINTF(TLB, "TLB Fault: Prefetch abort on permission check. "
                     "ns:%d scr.sif:%d sctlr.afe: %d ao: %d aoid: %d MTP: 0x%lx MSR: 0x%lx.\n",
-                    te->ns, state.scr.sif, state.sctlr.afe, te->ao, te->aoid, state.mtp, state.msr);
+                    te->ns, state.scr.sif, state.sctlr.afe, te->ao, te->aoid, state.mtp, req->getPersistentState().mist.getMSR());
             // Use PC value instead of vaddr because vaddr might be aligned to
             // cache line and should not be the address reported in FAR
             return std::make_shared<PrefetchAbort>(
@@ -567,7 +567,7 @@ MMU::checkPermissions64(TlbEntry *te, const RequestPtr &req, Mode mode,
             stats.permsFaults++;
             DPRINTF(TLB, "TLB Fault: Data abort on permission check. "
                     "ns:%d ao: %d aoid: %d MTP: 0x%lx MSR: 0x%lx.\n", 
-                    te->ns, te->ao, te->aoid, state.mtp, state.msr);
+                    te->ns, te->ao, te->aoid, state.mtp, req->getPersistentState().mist.getMSR());
             return std::make_shared<DataAbort>(
                 vaddr_tainted, te->domain,
                 (is_atomic && !grant_read) ? false : is_write,
@@ -628,7 +628,7 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
     uint8_t ap, xn, pxn;
     if (te->ao) {
         metal_reg::MTPField mtp = metal_reg::getMTPField(state.mtp, te->aoid);
-        if (metal_reg::isInMetalMode(state.msr)) {
+        if (metal_reg::isInMetalMode(req->getPersistentState().mist.getMSR())) {
             grant_read = true;
             grant_write = true;
             grant_exec = true;
@@ -642,7 +642,7 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
                                             "MSR = %#lx\n", 
                                             te->print().c_str(), 
                                             grant_read, grant_write, grant_exec,
-                                            state.mtp, state.msr);
+                                            state.mtp, req->getPersistentState().mist.getMSR());
     } else {
         ap = te->ap & 0b11;  // 2-bit access protection field
         xn = te->xn;
@@ -997,9 +997,9 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
             state.isPriv, flags & UserMode, state.isSecure,
             tran_type & S1S2NsTran);
 
-    DPRINTF(TLB, "translateFs tained addr %#x, untained %#x, mode %d, st2 %d, scr %#x sctlr %#x "
+    DPRINTF(TLB, "translateFs tained addr %#x, untained %#x, mode %d, st2 %d, scr %#x sctlr %#x MSR %#x "
                  "flags %#lx tranType 0x%x\n", vaddr_tainted, vaddr, mode,
-                 state.isStage2, state.scr, state.sctlr, flags, tran_type);
+                 state.isStage2, state.scr, state.sctlr, req->getPersistentState().mist.getMSR(), flags, tran_type);
 
     if (!state.isStage2) {
         if ((req->isInstFetch() && (!state.sctlr.i)) ||
@@ -1101,7 +1101,7 @@ MMU::translateFunctional(const RequestPtr &req, ThreadContext *tc, Mode mode,
     if (FullSystem)
         fault = translateFs(req, tc, mode, NULL, delay, false,
             tran_type, true, state);
-   else
+    else
         fault = translateSe(req, tc, mode, NULL, delay, false, state);
     assert(!delay);
     return fault;
@@ -1246,7 +1246,6 @@ MMU::CachedState::updateMiscReg(ThreadContext *tc,
         ELIs64(tc, aarch64EL == EL0 ? EL1 : aarch64EL);
     
     mtp = tc->readMetalMiscReg(metal_reg::MTP);
-    msr = tc->readMetalMiscReg(metal_reg::MSR);
     hcr = tc->readMiscReg(MISCREG_HCR_EL2);
     if (aarch64) {  // AArch64
         // determine EL we need to translate in

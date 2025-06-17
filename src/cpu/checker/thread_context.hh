@@ -115,6 +115,10 @@ class CheckerThreadContext : public ThreadContext
         return actualTC->getCurrentInstCount();
     }
 
+    const MetalInternalState & getTransientMetalState() const override { panic("unimplemented"); };
+
+    void setTransientMetalState(const MetalInternalState &) override { panic("unimplemented"); };
+
     BaseCPU *getCpuPtr() override { return actualTC->getCpuPtr(); }
 
     uint32_t socketId() const override { return actualTC->socketId(); }
