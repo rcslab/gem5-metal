@@ -52,7 +52,9 @@
 #include "base/types.hh"
 #include "cpu/base.hh"
 #include "cpu/exetrace.hh"
+#include "cpu/metal_int_state.hh"
 #include "cpu/nop_static_inst.hh"
+#include "cpu/null_static_inst.hh"
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
 #include "cpu/o3/limits.hh"
@@ -540,13 +542,17 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
 
     assert(!cpu->switchedOut());
 
+    const auto * isa = threads[tid]->getTC()->getIsaPtr();
+    const auto & mist = isa->getMetalState();
     // @todo: not sure if these should block translation.
     //AlphaDep
     if (cacheBlocked) {
         DPRINTF(Fetch, "[tid:%i] Can't fetch cache line, cache blocked\n",
                 tid);
         return false;
-    } else if (checkInterrupt(pc) && !delayedCommit[tid]) {
+        // XXX: shouldn't we only check thread[0]?
+    } else if (checkInterrupt(pc) && !delayedCommit[tid] 
+                && (mist.getLevel() == 0) && (!mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK))) {
         // Hold off fetch from getting new instructions when:
         // Cache is blocked, or
         // while an interrupt is pending and we're not in PAL mode, or
@@ -569,7 +575,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         fetchBufferBlockPC, fetchBufferSize,
         Request::INST_FETCH, cpu->instRequestorId(), pc,
         cpu->thread[tid]->contextId());
-    mem_req->getPersistentState().mist.set(threads[tid]->getTC()->getTransientMetalState());
+    mem_req->getPersistentState().mist.set(transientMetalState);
     mem_req->taskId(cpu->taskId());
 
     memReq[tid] = mem_req;
@@ -691,10 +697,10 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
 
 void
 Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
-    const MetalInternalState& squashState, ThreadID tid)
+    const metal::InternalState& squashState, ThreadID tid)
 {
-    DPRINTF(Fetch, "[tid:%i] Squashing, setting PC to: %s, MetalState to: 0x%lx.\n",
-            tid, new_pc, squashState.getMSR());
+    DPRINTF(Fetch, "[tid:%i] Squashing, setting PC to: %s, MetalState to: [%s].\n",
+            tid, new_pc, squashState.toStr().c_str());
 
     set(pc[tid], new_pc);
     fetchOffset[tid] = 0;
@@ -705,7 +711,7 @@ Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
     decoder[tid]->reset();
 
     // reverse the Metal state
-    threads[tid]->getTC()->setTransientMetalState(squashState);
+    transientMetalState.set(squashState);
 
     // Clear the icache miss if it's outstanding.
     if (fetchStatus[tid] == IcacheWaitResponse) {
@@ -745,7 +751,7 @@ Fetch::doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst,
 
 void
 Fetch::squashFromDecode(const PCStateBase &new_pc, const DynInstPtr squashInst,
-        const InstSeqNum seq_num, const MetalInternalState& squashState, ThreadID tid)
+        const InstSeqNum seq_num, const metal::InternalState& squashState, ThreadID tid)
 {
     DPRINTF(Fetch, "[tid:%i] Squashing from decode.\n", tid);
 
@@ -811,7 +817,7 @@ Fetch::updateFetchStatus()
 
 void
 Fetch::squash(const PCStateBase &new_pc, const InstSeqNum seq_num,
-        DynInstPtr squashInst, const MetalInternalState& squashState, ThreadID tid)
+        DynInstPtr squashInst, const metal::InternalState& squashState, ThreadID tid)
 {
     DPRINTF(Fetch, "[tid:%i] Squash from commit.\n", tid);
 
@@ -1078,27 +1084,6 @@ Fetch::buildInst(ThreadID tid, StaticInstPtr staticInst,
     // Keep track of if we can take an interrupt at this boundary
     delayedCommit[tid] = instruction->isDelayedCommit();
 
-    MetalInternalState curState;
-    curState.set(threads[tid]->getTC()->getTransientMetalState());
-
-    // propagate metal internal state
-    instruction->setMetalState(curState);
-    // pre-execute for metal internal state changes
-    Fault fault = instruction->preExec();
-    if (fault == NoFault) {
-        // update the latest metal internal state
-        threads[tid]->getTC()->setTransientMetalState(instruction->getMetalState());
-    } else {
-        DPRINTF(Fetch, "[tid:%i][sn:%lli] instruction preExec faulted.\n", tid, seq);
-        instruction->setSerializeAfter();
-    }
-
-    DPRINTF(Fetch, "[tid:%i][sn:%lli] preMetalState: 0x%lx, postMetalState: 0x%lx\n",
-        tid,
-        seq,
-        curState.getMSR(),
-        instruction->getMetalState().getMSR());
-
     return instruction;
 }
 
@@ -1246,6 +1231,7 @@ Fetch::fetch(bool &status_change)
             }
         }
 
+        const BaseISA * isa = threads[tid]->getTC()->getIsaPtr();
         // Extract as many instructions and/or microops as we can from
         // the memory we've processed so far.
         do {
@@ -1255,6 +1241,17 @@ Fetch::fetch(bool &status_change)
 
                     // Increment stat of fetched instructions.
                     cpu->fetchStats[tid]->numInsts++;
+                    
+                    const metal::InternalFlags miflags = transientMetalState.getFlags();
+
+                    if (!miflags.isSet(metal::FLAG_INST_INTERCEPT_MASK)) {
+                        StaticInstPtr interceptInst = isa->interceptInst(staticInst);
+                        if (interceptInst != nullStaticInstPtr) {
+                            DPRINTF(Fetch, "intercepting instruction \"%s\" @ %s.\n",
+                                            staticInst->disassemble(this_pc.instAddr()).c_str(), this_pc);
+                            staticInst = interceptInst;
+                        }
+                    }
 
                     if (staticInst->isMacroop()) {
                         curMacroop = staticInst;
@@ -1283,6 +1280,30 @@ Fetch::fetch(bool &status_change)
 
             DynInstPtr instruction = buildInst(
                     tid, staticInst, curMacroop, this_pc, *next_pc, true);
+            
+            // propagate metal internal state
+            instruction->setPreExecMetalState(transientMetalState);
+
+            // clear transient flags
+            transientMetalState.clearFlags(metal::FLAG_EXC_INTERCEPT_MASK | 
+                metal::FLAG_INST_INTERCEPT_MASK | 
+                metal::FLAG_INTERRUPT_MASK);
+            instruction->setMetalState(transientMetalState);
+
+            // pre-execute for metal internal state changes
+            Fault preExecFault = instruction->preExec();
+            if (preExecFault == NoFault) {
+                // update the latest metal internal state
+                transientMetalState.set(instruction->getMetalState());
+                DPRINTF(Fetch, "[tid:%i][sn:%lli] PreExec: Metal level %d -> %d, flags 0x%lx -> 0x%lx]\n", 
+                        tid, instruction->seqNum,
+                        instruction->getPreExecMetalState().getLevel(), instruction->getPreExecMetalState().getFlags(),
+                        instruction->getMetalState().getLevel(), instruction->getMetalState().getFlags());
+            } else {
+                DPRINTF(Fetch, "[tid:%i][sn:%lli] PreExec faulted: %s.\n", tid, instruction->seqNum, preExecFault->name());
+                instruction->setSerializeAfter();
+            }
+
 
             ppFetch->notify(instruction);
             numInst++;

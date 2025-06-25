@@ -6,6 +6,8 @@ namespace gem5
 {
     namespace ArmISA
     {
+        namespace metal { namespace inst {
+
         static constexpr std::string_view MetalDisasmPrefix = "";
         static constexpr size_t MAX_METAL_OPERANDS = 16;
 
@@ -266,5 +268,7 @@ namespace gem5
             std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
+
+        }}
     } // namespace ArmISA
 } // namespace gem5

@@ -55,29 +55,29 @@ namespace ArmISA
 RegId
 IntRegClassOps::flatten(const BaseISA &isa, const RegId &id) const {
     return flattenWithStates(isa.readMiscRegNoEffect(MISCREG_CPSR),
-                    isa.getMetalState().getMSR(),
+                    isa.getMetalState(),
                     id);
 }
 
 RegId
 IntRegClassOps::flatten(ExecContext *xc, const RegId &id) const {
     return flattenWithStates(xc->tcBase()->readMiscRegNoEffect(MISCREG_CPSR),
-                    xc->getMetalState().getMSR(),
+                    xc->getMetalState(),
                     id);
 };
 
 RegId
-IntRegClassOps::flattenWithStates(RegVal _cpsr, metal_reg::MSR_t msr, const RegId &id)
+IntRegClassOps::flattenWithStates(RegVal _cpsr, const gem5::metal::InternalState & state, const RegId &id)
 {
     CPSR cpsr = _cpsr;
     const RegIndex reg_idx = id.index();
     if (reg_idx < int_reg::NumArchRegs) {
-        const RegId * intRegMap = ISA::getIntRegMap(cpsr, msr);
+        const RegId * intRegMap = ISA::getIntRegMap(cpsr, state);
         return {flatIntRegClass, intRegMap[reg_idx]};
     } else if (reg_idx < int_reg::NumRegs) {
         return {flatIntRegClass, id};
     } else if (reg_idx == int_reg::Spx) {
-        if (metal_reg::isInMetalMode(msr)) {
+        if (state.getLevel() > 0) {
             return {flatIntRegClass, int_reg::Spm};
         }
         ExceptionLevel el = opModeToEL((OperatingMode)(uint8_t)cpsr.mode);

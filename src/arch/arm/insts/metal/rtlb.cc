@@ -2,6 +2,7 @@
 
 namespace gem5 {
     namespace ArmISA {
+    namespace metal { namespace inst {
         Rtlb64::Rtlb64(ExtMachInst _machInst, RegIndex _rl, RegIndex _rm,
                        RegIndex _rn)
                        : MetalReg3Op("rtlb", _machInst, IntAluOp, _rl, _rm,
@@ -121,5 +122,6 @@ namespace gem5 {
             // xc->setMetalReg(rm, (RegVal)tei.data);
             //return NoFault;
         }
+    }}
     }
 }

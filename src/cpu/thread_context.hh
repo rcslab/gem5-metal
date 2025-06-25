@@ -52,6 +52,7 @@
 #include "cpu/metal_int_state.hh"
 #include "cpu/pc_event.hh"
 #include "cpu/reg_class.hh"
+#include "cpu/static_inst_fwd.hh"
 
 namespace gem5
 {
@@ -153,11 +154,6 @@ class ThreadContext : public PCEventScope
 
     virtual void setStatus(Status new_status) = 0;
 
-    // transient Metal State used by instructions in flight but not committed yet
-    virtual const MetalInternalState & getTransientMetalState() const = 0;
-
-    virtual void setTransientMetalState(const MetalInternalState &) = 0;
-
     /// Set the status to Active.
     virtual void activate() = 0;
 
@@ -248,27 +244,6 @@ class ThreadContext : public PCEventScope
                                      HtmFailureFaultCause cause) = 0;
     virtual BaseHTMCheckpointPtr& getHtmCheckpointPtr() = 0;
     virtual void setHtmCheckpointPtr(BaseHTMCheckpointPtr cpt) = 0;
-
-    // instruction interception
-    // check* functions only checks if an instruction should be intercepted
-    // do*/done* functions actually perform the intercept by changing architectural states, including PC
-    virtual bool checkInstIntercept(const StaticInstPtr &inst, bool post) const = 0;
-    virtual void doInstIntercept(const StaticInstPtr &inst, bool post) = 0;
-    virtual bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const = 0;
-    virtual void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) = 0;
-
-    virtual bool checkInstInterceptMasked(void) const = 0;
-    virtual void doneInstInterceptMasked(void) = 0;
-
-    virtual bool checkExcInterceptMasked(void) const = 0;
-    virtual void doneExcInterceptMasked(void) = 0;
-    virtual bool getExcInterceptMaskFlag(void) const = 0;
-    virtual void setExcInterceptMaskFlag(bool) = 0;
-
-    virtual bool checkInterruptDisabled(void) const = 0;
-    virtual void doneInterruptDisabled(void) = 0;
-    virtual void setInterruptDisabledFlag(bool) = 0;
-    virtual bool getInterruptDisabledFlag(void) const = 0;
 };
 
 /** @{ */

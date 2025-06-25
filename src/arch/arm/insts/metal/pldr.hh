@@ -4,10 +4,11 @@
 
 namespace gem5 {
     namespace ArmISA {
+        namespace metal { namespace inst {
         template <typename T>
         class Pldri : public MetalPMemRegImmOp
         {
-            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)) && (sizeof(T) > 0));
+            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)));
         public:
             Pldri(ExtMachInst _machInst, RegIndex _dReg, RegIndex _sReg, int32_t _imm, Mode _mode);
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
@@ -23,7 +24,7 @@ namespace gem5 {
         template <typename T>
         class Pldrr : public MetalPMemRegOp
         {
-            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)) && (sizeof(T) > 0));
+            static_assert(isPowerOf2(sizeof(T)) && (sizeof(T) <= sizeof(RegVal)));
         public:
             Pldrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg);
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
@@ -34,5 +35,6 @@ namespace gem5 {
         template class Pldrr<uint16_t>;
         template class Pldrr<uint32_t>;
         template class Pldrr<uint64_t>;
+    }}
     }
 }

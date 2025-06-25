@@ -4,6 +4,7 @@
 
 namespace gem5 {
     namespace ArmISA {
+    namespace metal { namespace inst {
         class Wmcr64 : public MetalMacroInst
         {
         private:
@@ -17,5 +18,6 @@ namespace gem5 {
             std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
+    }}
     }
 }

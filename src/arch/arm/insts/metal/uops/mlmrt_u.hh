@@ -1,13 +1,12 @@
 #pragma once
 
 #include "arch/arm/insts/metal/common.hh"
-#include "cpu/metal_int_state.hh"
 #include "arch/generic/memhelpers.hh"
 #include "cpu/op_class.hh"
 
 namespace gem5 {
 namespace ArmISA {
-
+namespace metal { namespace inst {
     class Mlmrt64_u : public MetalMicroInst
     {
     private:
@@ -24,7 +23,7 @@ namespace ArmISA {
         Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override
         {
             ThreadContext * tc = xc->tcBase();
-            const RegVal mbr = xc->tcBase()->readMetalMiscRegNoEffect(metal_reg::MBR);
+            const RegVal mbr = xc->tcBase()->readMetalMiscRegNoEffect(reg::MBR);
             const Addr base = purifyTaggedAddr(mbr + offset, tc, currEL(tc), true);
 
             METAL_DBGPRINT(INSTS, MLMRT_U, "Loading mroutine table at 0x%lx + 0x%lx, size %u, startIdx %d.\n", mbr, offset, this->size, this->startIdx);
@@ -44,11 +43,11 @@ namespace ArmISA {
                 panic("Data fetch failed.");
             }
 
-            static char buf[ISA::MroutineTableLoadSize];
-            assert(this->size <= ISA::MroutineTableLoadSize);
+            static char buf[MroutineTableLoadSize];
+            assert(this->size <= MroutineTableLoadSize);
             getMemRawPtr(pkt, buf, size, traceData);
 
-            isa->loadMroutineTable(buf, size / sizeof(ISA::MroutineTableEntry), startIdx);
+            isa->loadMroutineTable(buf, size / sizeof(MroutineTableEntry), startIdx);
             return NoFault;
         }
 
@@ -67,6 +66,6 @@ namespace ArmISA {
             return ss.str();
         }
     };
-
+}}
 }
 }

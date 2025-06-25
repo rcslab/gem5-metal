@@ -253,7 +253,8 @@ class DynInst : public ExecContext, public RefCounted
     void updateArrays();
 
     // metal internal state for register flattening
-    MetalInternalState metalState;
+    metal::InternalState metalState;
+    metal::InternalState preMetalState;
 
   public:
     size_t numSrcs() const { return regArrays.numSrcs; }
@@ -1117,12 +1118,22 @@ class DynInst : public ExecContext, public RefCounted
     void trap(const Fault &fault);
 
   public:
+    // preExec metal state is only used for checking flags 
+    // whereas MetalState is the state during and after execution
+    // only used by o3
+    const metal::InternalState& getPreExecMetalState() const {
+        return preMetalState;
+    }
 
-    const MetalInternalState& getMetalState(void) const override {
+    void setPreExecMetalState(const metal::InternalState& state) {
+        preMetalState.set(state);
+    }
+
+    const metal::InternalState& getMetalState(void) const override {
         return metalState;
     }
 
-    void setMetalState(const MetalInternalState& state) override {
+    void setMetalState(const metal::InternalState& state) override {
         metalState.set(state);
     }
 

@@ -1,91 +1,79 @@
 #include "arch/arm/insts/metal/menter.hh"
 #include "arch/arm/regs/metal.hh"
-#include "arch/arm/regs/metal_misc.hh"
 #include "arch/arm/utility.hh"
 #include "enums/StaticInstFlags.hh"
 
-namespace gem5 {
-    namespace ArmISA {
-        Menter64::Menter64(ExtMachInst _machInst, uint _imm) : MetalImmOp("menter", _machInst, IntAluOp, _imm)
+namespace gem5 { namespace ArmISA {
+namespace metal { namespace inst {
+        Menter64::Menter64( const char * mnem,ExtMachInst _machInst, uint _imm) : MetalImmOp(mnem, _machInst, IntAluOp, _imm)
         {
             this->flags[IsControl] = true;
             this->flags[IsIndirectControl] = true;
             this->flags[IsUncondControl] = true;
             this->flags[IsCall] = true;
-            this->flags[IsPreExecOperandUpdate] = true;
+
+            setDestRegIdx(_numDestRegs++, metalRegClass[metal::reg::MLR]);
+            _numTypedDestRegs[metalRegClass.type()] += 1;
         }
 
-        void Menter64::doMenter(ExecContext *xc,
-            const StaticInst * inst,
-            Addr npc,
-            Addr lpc,
-            int mlr_idx)
+        Menter64::Menter64(ExtMachInst _machInst, uint _imm) : Menter64("menter", _machInst, _imm)
         {
-            PCState pcState;
-            set(pcState, xc->tcBase()->pcState());
-            // set new PC
-            pcState.instNPC(npc);
-            xc->pcState(pcState);
-
-            // save link address
-            xc->setRegOperand(inst, mlr_idx, lpc);
-
-            // // write MSPSR
-            // const CPSR spsr = ArmFault::dumpPState64(tc, inAArch64(tc), false);
-            // tc->setMetalReg(RegId(metalRegClass, metal_reg::MSPSR), spsr);
-
-            // // write MSFLAGS
-            // const metal_reg::MFLAGS_t mflags = tc->readMetalMiscReg(metal_reg::MFLAGS);
-            // tc->setMetalReg(RegId(metalRegClass, metal_reg::MSFLAGS), mflags);
         }
+        
 
         // we know we will increase the metal level by 1 if successfully executed
         Fault Menter64::preExec(ExecContext *xc, trace::InstRecord *traceData)
         {
-            MetalInternalState state = xc->getMetalState();
-            metal_reg::MSR_t msr = state.getMSR();
+            auto state = xc->getMetalState();
 
-            if (msr.lv >= metal_reg::MaxMetalLevel || imm >= ISA::MroutineTableMaxEntryNum) {
+            if (state.getLevel() >= reg::MaxMetalLevel || imm >= MroutineTableMaxEntryNum) {
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            msr.lv = msr.lv + 1;
-            state.setMSR(msr);
+            state.setLevel(state.getLevel() + 1);
             xc->setMetalState(state);
-
-            // manually flatten
-            setDestRegIdx(_numDestRegs++, metalRegClass[metal_reg::MLR].flatten(xc));
-            _numTypedDestRegs[metalRegClass.type()] += 1;
 
             return NoFault;
         }
 
-        Fault Menter64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        Fault Menter64::execute(ExecContext *xc, trace::InstRecord *traceData, Addr mlr) const
         {
             ThreadContext * tc = xc->tcBase();
-            metal_reg::MSR_t msr = xc->getMetalState().getMSR();
+            gem5::metal::InternalState state = xc->getMetalState();
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
             MRLB & mrlb = isa->getMrlbPtr();
 
             // lookup MRLB
             const MRLBEntry &mrlbEnt = mrlb.get(this->imm);
 
-            assert(&mrlbEnt != &MRLB::NullEntry && msr.lv <= metal_reg::MaxMetalLevel);
-
-            METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx, valid = %d.\n", this->imm, mrlbEnt.getAddr(), mrlbEnt.isValid());
-
-            if (!mrlbEnt.isValid()) {
+            if (&mrlbEnt == &MRLB::NullEntry || !mrlbEnt.isValid()) {
+                METAL_DBGPRINT(INSTS, MENTER, "MRLB *miss* or *invalid* for mroutine %d. \n", this->imm);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            const Addr lpc = xc->pcState().instAddr() + this->instSize();
+            assert(state.getLevel() <= reg::MaxMetalLevel);
+
+            METAL_DBGPRINT(INSTS, MENTER, "MRLB *hit* for mroutine %d. Addr = 0x%lx.\n", this->imm, mrlbEnt.getAddr());
+
+            const Addr lpc = mlr;
             const Addr npc = purifyTaggedAddr(mrlbEnt.getAddr(), tc, currEL(tc), true);
 
-            doMenter(xc, this, npc,  lpc, 0);
+            PCState pc;
+            set(pc, xc->pcState());
+            pc.instNPC(npc);
+            xc->pcState(pc);
 
-            METAL_DBGPRINT(INSTS, MENTER, "Entering Metal mode (Lv. %d): NextPC = 0x%lx, LinkPC (MLR %d) = 0x%lx.\n", msr.lv, npc, lpc);
+            // save link address
+            xc->setRegOperand(this, 0, lpc);
+
+            METAL_DBGPRINT(INSTS, MENTER, "Entering Metal mode (Lv. %d): NextPC = 0x%lx, LinkPC (MLR) = 0x%lx.\n", state.getLevel(), npc, lpc);
 
             return NoFault;
         }
-    }
-}
+
+        Fault Menter64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+        {
+            return execute(xc, traceData, xc->pcState().instAddr() + this->instSize());
+        }
+}}
+}}

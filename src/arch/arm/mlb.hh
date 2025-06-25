@@ -69,7 +69,6 @@ private:
     const StaticInstPtr inst;
     const ArmStaticInst * armInst;
     const MachInst opMask;
-    const bool post;
     const unsigned int mroutine;
     const MachInst mask0;
     const MachInst mask1;
@@ -77,10 +76,9 @@ private:
 public:
     IILBEntry(void) = delete;
     IILBEntry(const IILBEntry & other) = default;
-    IILBEntry(const StaticInstPtr _inst, MachInst _opMask, bool _post, unsigned int _mroutine, MachInst _mask0, MachInst _mask1, MachInst _mask2);
-    IILBEntry(const StaticInstPtr _inst, bool _post);
+    IILBEntry(const StaticInstPtr _inst, MachInst _opMask, unsigned int _mroutine, MachInst _mask0, MachInst _mask1, MachInst _mask2);
+    IILBEntry(const StaticInstPtr _inst);
 
-    bool isPost(void) const;
     unsigned int getMroutine(void) const;
     MachInst getOpMask(void) const;
     MachInst getMask0(void) const;

@@ -1,8 +1,9 @@
 #include "arch/arm/insts/metal/mexit.hh"
 #include "arch/arm/regs/metal.hh"
+#include "cpu/metal_int_state.hh"
 
-namespace gem5 {
-    namespace ArmISA {
+namespace gem5 { namespace ArmISA {
+namespace metal{ namespace inst {
         Mexit64::Mexit64(ExtMachInst _machInst, uint _imm) : MetalImmOp("mexit", _machInst, IntAluOp, _imm)
         {
             this->flags[IsControl] = true;
@@ -10,31 +11,25 @@ namespace gem5 {
             this->flags[IsUncondControl] = true;
             this->flags[IsCall] = true;
             this->flags[IsPreExecOperandUpdate] = true;
-
-            const MexitFlags flags = static_cast<MexitFlags>(imm);
-            if (flags.rfi) {
-                this->flags[IsInteger] = true;
-            }
         }
 
         Fault Mexit64::preExec(ExecContext *xc, trace::InstRecord *traceData)
         {
-            MetalInternalState state = xc->getMetalState();
-            metal_reg::MSR_t msr = state.getMSR();
+            auto state = xc->getMetalState();
 
-            if (!metal_reg::isInMetalMode(msr)) {
+            if (state.getLevel() == 0) {
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
             // manually flatten registers to pre metal state change
-            setSrcRegIdx(_numSrcRegs++, metalRegClass[metal_reg::MLR].flatten(xc));
+            setSrcRegIdx(_numSrcRegs++, metalRegClass[reg::MLR].flatten(xc));
 
             const MexitFlags flags = static_cast<MexitFlags>(imm);
             if (flags.rfi) {
                 //
                 // "lightweight" exception: only restore COND flags
                 //
-                setSrcRegIdx(_numSrcRegs++, metalRegClass[metal_reg::MSPSR].flatten(xc));
+                setSrcRegIdx(_numSrcRegs++, metalRegClass[reg::MSPSR].flatten(xc));
                 // setSrcRegIdx(_numSrcRegs++, metalRegClass[metal_reg::MSFLAGS].flatten(xc));
 
                 setDestRegIdx(_numDestRegs++, ccRegClass[cc_reg::Nz].flatten(xc));
@@ -44,19 +39,18 @@ namespace gem5 {
             }
 
             if (flags.id) {
-                msr.id = 1;
+                state.setFlags(gem5::metal::FLAG_INTERRUPT_MASK);
             }
 
             if (flags.eim) {
-                msr.em = 1;
+                state.setFlags(gem5::metal::FLAG_EXC_INTERCEPT_MASK);
             }
 
             if (flags.iim) {
-                msr.im = 1;
+                state.setFlags(gem5::metal::FLAG_INST_INTERCEPT_MASK);
             }
 
-            msr.lv = msr.lv - 1;
-            state.setMSR(msr);
+            state.setLevel(state.getLevel() - 1);
             xc->setMetalState(state);
 
             return NoFault;
@@ -64,8 +58,8 @@ namespace gem5 {
 
         Fault Mexit64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const metal_reg::MSR_t msr = xc->getMetalState().getMSR();
-            assert(metal_reg::isInMetalMode(msr.lv + 1));
+            const gem5::metal::InternalState state = xc->getMetalState();
+            assert(state.getLevel() >= 0);
 
             const RegVal ret = xc->getRegOperand(this, 0);
             const MexitFlags flags = static_cast<MexitFlags>(imm);
@@ -92,9 +86,9 @@ namespace gem5 {
             }
 
             METAL_DBGPRINT(INSTS, MEXIT, "Exiting Metal mode (Lv.%d): MLR = 0x%lx, flags = [id = %d, rfi = %d (MSPSR = 0x%lx), iim = %d, eim = %d]\n",
-                                                msr.lv, ret, flags.id, flags.rfi, mspsr, flags.iim, flags.eim);
+                                                state.getLevel(), ret, flags.id, flags.rfi, mspsr, flags.iim, flags.eim);
 
             return NoFault;
         }
-    }
-}
+}}
+}}

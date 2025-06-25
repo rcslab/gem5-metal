@@ -459,11 +459,11 @@ class SimpleExecContext : public ExecContext
         return cpu->getCpuAddrMonitor(thread->threadId());
     }
 
-    const MetalInternalState& getMetalState(void) const override {
+    const metal::InternalState& getMetalState(void) const override {
         return tcBase()->getIsaPtr()->getMetalState();
     }
 
-    void setMetalState(const MetalInternalState& state) override {
+    void setMetalState(const metal::InternalState& state) override {
         tcBase()->getIsaPtr()->setMetalState(state);
     }
 };

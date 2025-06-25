@@ -146,11 +146,6 @@ class Interrupts : public BaseInterrupts
     checkInterrupts() const override
     {
         HCR  hcr  = tc->readMiscReg(MISCREG_HCR_EL2);
-        bool metal_mode = metal_reg::isInMetalMode(tc->readMetalMiscRegNoEffect(metal_reg::MSR));
-
-        if (metal_mode) {
-            return false;
-        }
 
         if (!(intStatus || hcr.va || hcr.vi || hcr.vf))
             return false;

@@ -51,8 +51,11 @@
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/exetrace.hh"
+#include "cpu/metal_int_state.hh"
+#include "cpu/null_static_inst.hh"
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
+#include "cpu/o3/dyn_inst_ptr.hh"
 #include "cpu/o3/limits.hh"
 #include "cpu/o3/thread_state.hh"
 #include "cpu/o3/thread_context.hh"
@@ -673,6 +676,7 @@ Commit::handleInterrupt()
         return;
     }
 
+    auto * isa = thread[0]->getTC()->getIsaPtr();
     // Wait until all in flight instructions are finished before enterring
     // the interrupt.
     if (canHandleInterrupts && cpu->instList.empty()) {
@@ -694,6 +698,12 @@ Commit::handleInterrupt()
         // interrupt. This is because the local copy may no longer be the
         // interrupt that the interrupt controller thinks is being handled.
         cpu->processInterrupts(cpu->getInterrupts());
+
+        if (isa->interceptExc(interrupt, nullStaticInstPtr)) {
+            DPRINTF(Commit, "Intercepting Interrupt %s.", interrupt->name());
+        } else {
+            cpu->trap(interrupt, 0, nullptr);
+        }
 
         thread[0]->noSquashFromTC = false;
 
@@ -815,7 +825,8 @@ Commit::commit()
             // All younger instructions will be squashed. Set the sequence
             // number as the youngest instruction in the ROB.
             youngestSeqNum[tid] = squashed_inst;
-            const MetalInternalState& state = rob->findInst(tid, squashed_inst)->getMetalState();
+            DynInstPtr squashInst = rob->findInst(tid, squashed_inst);
+            const auto& state = squashInst->getMetalState();
             rob->squash(squashed_inst, tid);
             changedROBNumEntries[tid] = true;
 
@@ -833,8 +844,7 @@ Commit::commit()
                 fromIEW->mispredictInst[tid];
             toIEW->commitInfo[tid].branchTaken =
                 fromIEW->branchTaken[tid];
-            toIEW->commitInfo[tid].squashInst =
-                                    rob->findInst(tid, squashed_inst);
+            toIEW->commitInfo[tid].squashInst = squashInst;
             if (toIEW->commitInfo[tid].mispredictInst) {
                 if (toIEW->commitInfo[tid].mispredictInst->isUncondCtrl()) {
                      toIEW->commitInfo[tid].branchTaken = true;
@@ -1006,8 +1016,12 @@ Commit::commitInsts()
                 // Set the doneSeqNum to the youngest committed instruction.
                 toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNum;
 
-                if (tid == 0)
-                    canHandleInterrupts = !head_inst->isDelayedCommit();
+                if (tid == 0) {
+                    auto const * isa = thread[0]->getTC()->getIsaPtr();
+                    auto const & mist = isa->getMetalState();
+                    canHandleInterrupts = !head_inst->isDelayedCommit()
+                                && mist.getLevel() == 0 && !mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK);
+                }
 
                 // at this point store conditionals should either have
                 // been completed or predicated false
@@ -1107,6 +1121,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     assert(head_inst);
 
     ThreadID tid = head_inst->threadNumber;
+    BaseISA * isa = thread[tid]->getTC()->getIsaPtr();
 
     // If the instruction is not executed yet, then it will need extra
     // handling.  Signal backwards that it should be executed.
@@ -1203,24 +1218,39 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         // execution doesn't generate extra squashes.
         thread[tid]->noSquashFromTC = true;
 
-        // Execute the trap.  Although it's slightly unrealistic in
-        // terms of timing (as it doesn't wait for the full timing of
-        // the trap event to complete before updating state), it's
-        // needed to update the state as soon as possible.  This
-        // prevents external agents from changing any specific state
-        // that the trap need.
-        cpu->trap(inst_fault, tid,
-                  head_inst->notAnInst() ? nullStaticInstPtr :
-                      head_inst->staticInst);
+        //
+        // pre execute state here because the Exec state is updated before it's PreExec'd and stored
+        //
+        const auto & mist = head_inst->getPreExecMetalState();
+        const auto miflags = mist.getFlags();
+
+        if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK) && 
+            isa->interceptExc(inst_fault, head_inst->staticInst)) {
+
+            DPRINTF(Commit,
+            "[tid:%i] [sn:%llu] Intercepting instruction with fault \"%s\"\n",
+                    tid, head_inst->seqNum, inst_fault->name());
+        } else {
+            // Execute the trap.  Although it's slightly unrealistic in
+            // terms of timing (as it doesn't wait for the full timing of
+            // the trap event to complete before updating state), it's
+            // needed to update the state as soon as possible.  This
+            // prevents external agents from changing any specific state
+            // that the trap need.
+            cpu->trap(inst_fault, tid,
+                    head_inst->notAnInst() ? nullStaticInstPtr :
+                        head_inst->staticInst);
+
+            DPRINTF(Commit,
+            "[tid:%i] [sn:%llu] Committing instruction with fault \"%s\"\n",
+                    tid, head_inst->seqNum, inst_fault->name());
+        }
 
         // Exit state update mode to avoid accidental updating.
         thread[tid]->noSquashFromTC = false;
 
         commitStatus[tid] = TrapPending;
 
-        DPRINTF(Commit,
-            "[tid:%i] [sn:%llu] Committing instruction with fault\n",
-            tid, head_inst->seqNum);
         if (head_inst->traceData) {
             // We ignore ReExecution "faults" here as they are not real
             // (architectural) faults but signal flush/replays.
@@ -1266,7 +1296,6 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     }
 
     // update the tc states
-    BaseISA * isa = thread[tid]->getTC()->getIsaPtr();
     isa->setMetalState(head_inst->getMetalState());
 
     // hardware transactional memory

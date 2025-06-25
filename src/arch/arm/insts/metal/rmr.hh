@@ -3,6 +3,7 @@
 
 namespace gem5 {
     namespace ArmISA {
+    namespace metal { namespace inst {
         class Rmr64 : public MetalMRegRegOp
         {
         public:
@@ -10,5 +11,6 @@ namespace gem5 {
 
             Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
         };
+    }}
     }
 }

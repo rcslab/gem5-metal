@@ -4,6 +4,7 @@
 
 namespace gem5 {
     namespace ArmISA {
+    namespace metal { namespace inst {
         BitUnion64(TlbExtAttr)
             Bitfield<0> itlb; // 1 = inst tlb, 0 = data tlb
             Bitfield<2, 1> el; // el = 0-3
@@ -57,16 +58,15 @@ namespace gem5 {
         Fault Wtlb64::execute(ExecContext *xc, trace::InstRecord *traceData)
             const
         {
-            const MetalInternalState &mist = xc->getMetalState();
-            const metal_reg::MSR_t msr = mist.getMSR();
+            const auto &mist = xc->getMetalState();
 
             RegVal desc = xc->getRegOperand(this, 0);
             RegVal info = xc->getRegOperand(this, 1);
             RegVal vaddr = xc->getRegOperand(this, 2);
 
-            if (!metal_reg::isInMetalMode(msr))
+            if (mist.getLevel() == 0)
             {
-                METAL_DBGPRINT(INSTS, WTLB, "Permission denied: MSR = 0x%lx.\n", msr);
+                METAL_DBGPRINT(INSTS, WTLB, "Permission denied: MetalState = [%s].\n", mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
@@ -148,5 +148,6 @@ namespace gem5 {
 
             return NoFault;
         }
+    }}
     }
 }

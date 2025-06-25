@@ -40,10 +40,8 @@
 
 #include "arch/arm/regs/int.hh"
 
-#include "arch/arm/isa.hh"
-#include "arch/arm/insts/static_inst.hh"
 #include "arch/arm/regs/metal.hh"
-#include "arch/arm/utility.hh"
+#include "cpu/metal_int_state.hh"
 #include "debug/Metal.hh"
 #include "base/logging.hh"
 #include "cpu/exec_context.hh"
@@ -55,25 +53,25 @@ namespace ArmISA
 {
     RegId MetalRegClassOps::flatten(const BaseISA &isa, const RegId &id) const
     {
-        return flattenWithStates(isa.getMetalState().getMSR(), id);
+        return flattenWithStates(isa.getMetalState(), id);
     }
 
     RegId MetalRegClassOps::flatten(ExecContext *xc, const RegId &id) const
     {
-        return flattenWithStates(xc->getMetalState().getMSR(), id);
+        return flattenWithStates(xc->getMetalState(), id);
     }
 
-    RegId MetalRegClassOps::flattenWithStates(metal_reg::MSR_t msr, const RegId &id)
+    RegId MetalRegClassOps::flattenWithStates(const gem5::metal::InternalState & state, const RegId &id)
     {
         const RegIndex idx = id.index();
-        assert(idx < metal_reg::WindowSize);
+        assert(idx < metal::reg::WindowSize);
 
-        unsigned int level = msr.lv;
-        if (level > metal_reg::MaxMetalLevel) {
+        unsigned int level = state.getLevel();
+        if (level > metal::reg::MaxMetalLevel) {
             panic("Metal level overflow.");
         }
 
-        const size_t window = (metal_reg::NumGRegs - metal_reg::WindowSize) - level * metal_reg::WindowShift;
+        const size_t window = (metal::reg::NumRegs - metal::reg::WindowSize) - level * metal::reg::WindowShift;
         const RegIndex fidx = window + idx;
         // METAL_DBGPRINT(REGS, GEN, "Flattening %s to %d at level %d, window %d.\n", ArmStaticInst::printMetalReg(idx), fidx, level, window);
 

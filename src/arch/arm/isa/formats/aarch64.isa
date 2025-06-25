@@ -220,10 +220,10 @@ namespace Aarch64
                 const uint32_t imm = bits(machInst, 20, 0);
                 switch(inst) {
                     case 0b0000: {
-                        return new Menter64(machInst, imm);
+                        return new gem5::ArmISA::metal::inst::Menter64(machInst, imm);
                     }
                     case 0b0001: {
-                        return new Mexit64(machInst, imm);
+                        return new gem5::ArmISA::metal::inst::Mexit64(machInst, imm);
                     }
                     default: {
                         return new Unknown64(machInst);
@@ -241,16 +241,16 @@ namespace Aarch64
                 }
                 switch (inst) {
                     case 0b0000: {
-                        return new Rmr64(machInst, r1, r2);
+                        return new gem5::ArmISA::metal::inst::Rmr64(machInst, r1, r2);
                     }
                     case 0b0001: {
-                        return new Wmr64(machInst, r1, r2);
+                        return new gem5::ArmISA::metal::inst::Wmr64(machInst, r1, r2);
                     }
                     case 0b0010: {
-                        return new Rmcr64(machInst, r1, r2);
+                        return new gem5::ArmISA::metal::inst::Rmcr64(machInst, r1, r2);
                     }
                     case 0b0011: {
-                        return new Wmcr64(machInst, r1, r2);
+                        return new gem5::ArmISA::metal::inst::Wmcr64(machInst, r1, r2);
                     }
                     default: {
                         return new Unknown64(machInst);
@@ -269,10 +269,10 @@ namespace Aarch64
                 }
                 switch (inst) {
                     case 0b0000: {
-                        return new Rtlb64(machInst, r1, r2, r3);
+                        return new gem5::ArmISA::metal::inst::Rtlb64(machInst, r1, r2, r3);
                     }
                     case 0b0001: {
-                        return new Wtlb64(machInst, r1, r2, r3);
+                        return new gem5::ArmISA::metal::inst::Wtlb64(machInst, r1, r2, r3);
                     }
                     default: {
                         return new Unknown64(machInst);
@@ -287,10 +287,10 @@ namespace Aarch64
                 const uint8_t imm2 = bits(machInst, 20, 13);
                 switch (inst) {
                     case 0b0000: {
-                        return new Rar64(machInst, reg, imm1, imm2);
+                        return new gem5::ArmISA::metal::inst::Rar64(machInst, reg, imm1, imm2);
                     }
                     case 0b0001: {
-                        return new War64(machInst, reg, imm1, imm2);
+                        return new gem5::ArmISA::metal::inst::War64(machInst, reg, imm1, imm2);
                     }
                     default: {
                         return new Unknown64(machInst);
@@ -305,31 +305,31 @@ namespace Aarch64
                 const RegIndex reg1 = (RegIndex)(uint8_t)bits(machInst, 4, 0);
                 const RegIndex reg2 = (RegIndex)(uint8_t)bits(machInst, 9, 5);
                 if (is_imm) {
-                    const MetalPMemRegImmOp::Mode mode = static_cast<MetalPMemRegImmOp::Mode>((uint8_t)bits(machInst, 20, 19));
+                    const auto mode = static_cast<gem5::ArmISA::metal::inst::MetalPMemRegImmOp::Mode>((uint8_t)bits(machInst, 20, 19));
                     const int32_t imm = sext<9>(bits(machInst, 18, 10));
                     if (read) {
                         switch (size) {
                             case 0b00:
-                                return new Pldri<uint8_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pldri<uint8_t>(machInst, reg1, reg2, imm, mode);
                             case 0b01:
-                                return new Pldri<uint16_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pldri<uint16_t>(machInst, reg1, reg2, imm, mode);
                             case 0b10:
-                                return new Pldri<uint32_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pldri<uint32_t>(machInst, reg1, reg2, imm, mode);
                             case 0b11:
-                                return new Pldri<uint64_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pldri<uint64_t>(machInst, reg1, reg2, imm, mode);
                             default:
                                 return new Unknown64(machInst);
                         }
                     } else {
                         switch (size) {
                             case 0b00:
-                                return new Pstri<uint8_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pstri<uint8_t>(machInst, reg1, reg2, imm, mode);
                             case 0b01:
-                                return new Pstri<uint16_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pstri<uint16_t>(machInst, reg1, reg2, imm, mode);
                             case 0b10:
-                                return new Pstri<uint32_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pstri<uint32_t>(machInst, reg1, reg2, imm, mode);
                             case 0b11:
-                                return new Pstri<uint64_t>(machInst, reg1, reg2, imm, mode);
+                                return new gem5::ArmISA::metal::inst::Pstri<uint64_t>(machInst, reg1, reg2, imm, mode);
                             default:
                                 return new Unknown64(machInst);
                         }
@@ -343,26 +343,26 @@ namespace Aarch64
                     if (read) {
                         switch (size) {
                             case 0b00:
-                                return new Pldrr<uint8_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pldrr<uint8_t>(machInst, reg1, reg2, reg3);
                             case 0b01:
-                                return new Pldrr<uint16_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pldrr<uint16_t>(machInst, reg1, reg2, reg3);
                             case 0b10:
-                                return new Pldrr<uint32_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pldrr<uint32_t>(machInst, reg1, reg2, reg3);
                             case 0b11:
-                                return new Pldrr<uint64_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pldrr<uint64_t>(machInst, reg1, reg2, reg3);
                             default:
                                 return new Unknown64(machInst);
                         }
                     } else {
                         switch (size) {
                             case 0b00:
-                                return new Pstrr<uint8_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pstrr<uint8_t>(machInst, reg1, reg2, reg3);
                             case 0b01:
-                                return new Pstrr<uint16_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pstrr<uint16_t>(machInst, reg1, reg2, reg3);
                             case 0b10:
-                                return new Pstrr<uint32_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pstrr<uint32_t>(machInst, reg1, reg2, reg3);
                             case 0b11:
-                                return new Pstrr<uint64_t>(machInst, reg1, reg2, reg3);
+                                return new gem5::ArmISA::metal::inst::Pstrr<uint64_t>(machInst, reg1, reg2, reg3);
                             default:
                                 return new Unknown64(machInst);
                         }

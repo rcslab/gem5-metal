@@ -686,20 +686,20 @@ TimingSimpleCPU::fetch()
     DPRINTF(SimpleCPU, "Fetch\n");
 
     // set proper flags for the new fetch cycle
-    thread->setInterruptDisabledFlag(thread->checkInterruptDisabled());
-    if (thread->getInterruptDisabledFlag()) {
-        METAL_DBGPRINT(EXEC, EXCINTR, "Temporarily masking exception intercept...\n");
-    }
+    // thread->setInterruptDisabledFlag(thread->checkInterruptDisabled());
+    // if (thread->getInterruptDisabledFlag()) {
+    //     METAL_DBGPRINT(EXEC, EXCINTR, "Temporarily masking exception intercept...\n");
+    // }
 
-    thread->setExcInterceptMaskFlag(thread->checkExcInterceptMasked());
-    if (thread->getExcInterceptMaskFlag()){
-        METAL_DBGPRINT(EXEC, INSTINTR, "Temporarily masking interrupts...\n");
-    }
+    // thread->setExcInterceptMaskFlag(thread->checkExcInterceptMasked());
+    // if (thread->getExcInterceptMaskFlag()){
+    //     METAL_DBGPRINT(EXEC, INSTINTR, "Temporarily masking interrupts...\n");
+    // }
 
     if (!curStaticInst || !curStaticInst->isDelayedCommit()) {
-        if (!thread->getInterruptDisabledFlag()) {
+        // if (!thread->getInterruptDisabledFlag()) {
             checkForInterrupts();
-        }
+        // }
         checkPcEventQueue();
     }
 
@@ -777,27 +777,27 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
 
     // use separate mask flags to make sure we don't clear the MSR flags for the current cycle
     // the next fetch cycle sets the separate mask flags
-    if (thread->getExcInterceptMaskFlag()) {
-        if (!curMacroStaticInst || curStaticInst->isLastMicroop()) {
-            // mask exc intercept for all microops of the current macroop
-            thread->doneExcInterceptMasked();
-        }
-    }
+    // if (thread->getExcInterceptMaskFlag()) {
+    //     if (!curMacroStaticInst || curStaticInst->isLastMicroop()) {
+    //         // mask exc intercept for all microops of the current macroop
+    //         thread->doneExcInterceptMasked();
+    //     }
+    // }
 
-    if (thread->getInterruptDisabledFlag()) {
-        if (fault != NoFault || !curMacroStaticInst || curStaticInst->isLastMicroop()) {
-            thread->doneInterruptDisabled();
-        }
-    }
+    // if (thread->getInterruptDisabledFlag()) {
+    //     if (fault != NoFault || !curMacroStaticInst || curStaticInst->isLastMicroop()) {
+    //         thread->doneInterruptDisabled();
+    //     }
+    // }
 
     if (fault != NoFault) {
-        if (!thread->getExcInterceptMaskFlag() && thread->checkExcIntercept(fault, curStaticInst)) {
-            thread->doExcIntercept(fault, curStaticInst);
-            // force control change (in case in the middle of a macroop)
-            overrideFault = NoFault;
-            skipCurMacroOp = true;
-            goto end;
-        }
+        // if (!thread->getExcInterceptMaskFlag() && thread->checkExcIntercept(fault, curStaticInst)) {
+        //     thread->doExcIntercept(fault, curStaticInst);
+        //     // force control change (in case in the middle of a macroop)
+        //     overrideFault = NoFault;
+        //     skipCurMacroOp = true;
+        //     goto end;
+        // }
 
         // hardware transactional memory
         // If a fault occurred within a transaction
@@ -839,15 +839,15 @@ TimingSimpleCPU::advanceInst(const Fault &fault)
         return;
     } else {
         // check intercept when we don't have a sync exception
-        bool checkIntercept = true;
-        if (curMacroStaticInst) {
-            // skip microops
-            checkIntercept = curStaticInst->isLastMicroop();
-        }
+        // bool checkIntercept = true;
+        // if (curMacroStaticInst) {
+        //     // skip microops
+        //     checkIntercept = curStaticInst->isLastMicroop();
+        // }
 
-        if (checkIntercept && thread->checkInstIntercept(curStaticInst, true)) {
-            thread->doInstIntercept(curStaticInst, true);
-        }
+        // if (checkIntercept && thread->checkInstIntercept(curStaticInst, true)) {
+        //     thread->doInstIntercept(curStaticInst, true);
+        // }
     }
 
 end:
@@ -894,26 +894,26 @@ TimingSimpleCPU::completeIfetch(PacketPtr pkt)
     preExecute();
 
     if (curStaticInst) {
-        if (thread->checkInstInterceptMasked()) {
-            thread->doneInstInterceptMasked();
-            METAL_DBGPRINT(Exec, INSTINTR, "Temporarily masking instruction intercept...\n");
-        } else {
-            bool checkInstIntercept = true;
-            const StaticInstPtr * ptr = &curStaticInst;
+        // if (thread->checkInstInterceptMasked()) {
+        //     thread->doneInstInterceptMasked();
+        //     METAL_DBGPRINT(Exec, INSTINTR, "Temporarily masking instruction intercept...\n");
+        // } else {
+            //bool checkInstIntercept = true;
+            //const StaticInstPtr * ptr = &curStaticInst;
             if (curMacroStaticInst) {
                 // for macro instructions
                 // skip intercepting microops except when the first microop is loaded
                 assert(curStaticInst->isMicroop());
-                checkInstIntercept = curStaticInst->isFirstMicroop();
-                ptr = &curMacroStaticInst;
+                //checkInstIntercept = curStaticInst->isFirstMicroop();
+                //ptr = &curMacroStaticInst;
             }
 
-            if (checkInstIntercept && thread->checkInstIntercept(*ptr, false)) {
-                thread->doInstIntercept(*ptr, false);
-                advanceInst(NoFault);
-                goto cleanup;
-            }
-        }
+        //     if (checkInstIntercept && thread->checkInstIntercept(*ptr, false)) {
+        //         thread->doInstIntercept(*ptr, false);
+        //         advanceInst(NoFault);
+        //         goto cleanup;
+        //     }
+        // }
     }
 
     // hardware transactional memory

@@ -1,9 +1,9 @@
 #ifndef __ARCH_ARM_REGS_METAL_HH__
 #define __ARCH_ARM_REGS_METAL_HH__
 
+#include "cpu/metal_int_state.hh"
 #include "debug/MetalRegs.hh"
 #include "cpu/reg_class.hh"
-#include "metal_misc.hh"
 
 namespace gem5
 {
@@ -11,7 +11,10 @@ namespace gem5
 namespace ArmISA
 {
 
-namespace metal_reg
+namespace metal 
+{
+
+namespace reg 
 {
     enum : RegIndex
     {
@@ -87,7 +90,7 @@ namespace metal_reg
     static_assert(WindowSize == 32);
     static_assert(WindowSize <= (1 << 5));
     static_assert(MaxMetalLevel > 0);
-    static constexpr size_t NumGRegs = WindowSize + MaxMetalLevel * (WindowShift);
+    static constexpr size_t NumRegs = WindowSize + MaxMetalLevel * (WindowShift);
 
     const char * const regNames[] = {
         "mo0",
@@ -126,22 +129,23 @@ namespace metal_reg
         "mi9",
     };
     static_assert((sizeof(regNames) / sizeof(regNames[0])) == WindowSize);
-} // namespace metal_reg
+} // namespace reg
+} // namespace metal
 
 inline constexpr RegClass flatMetalRegClass =
-    RegClass(MetalRegClass, MetalRegClassName, metal_reg::NumGRegs, debug::MetalRegs);
+    RegClass(MetalRegClass, MetalRegClassName, metal::reg::NumRegs, debug::MetalRegs);
 
 class MetalRegClassOps : public RegClassOps
 {
     RegId flatten(const BaseISA &isa, const RegId &id) const override;
     RegId flatten(ExecContext * xc, const RegId &id) const override;
-    static RegId flattenWithStates(metal_reg::MSR_t msr, const RegId &id);
+    static RegId flattenWithStates(const gem5::metal::InternalState & state, const RegId &id);
 };
 
 inline constexpr MetalRegClassOps metalRegClassOps;
 
 inline constexpr RegClass metalRegClass =
-    RegClass(MetalRegClass, MetalRegClassName, metal_reg::NumGRegs, debug::MetalRegs).
+    RegClass(MetalRegClass, MetalRegClassName, metal::reg::NumRegs, debug::MetalRegs).
     ops(metalRegClassOps).needsFlattening();
 
 } // namespace ARMISA

@@ -117,7 +117,7 @@ struct TimeStruct
         std::unique_ptr<PCStateBase> nextPC;
         DynInstPtr mispredictInst;
         DynInstPtr squashInst;
-        MetalInternalState squashMist;
+        metal::InternalState squashMist;
         InstSeqNum doneSeqNum;
         Addr mispredPC;
         uint64_t branchAddr;
@@ -180,7 +180,7 @@ struct TimeStruct
         DynInstPtr squashInst; // *F
 
         /// the metal internal state after the squash
-        MetalInternalState squashMist; // *F
+        metal::InternalState squashMist; // *F
 
         /// Hack for now to send back a strictly ordered access to the
         /// IEW stage.

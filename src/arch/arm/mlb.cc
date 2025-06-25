@@ -100,13 +100,13 @@ MRLB::get(unsigned int idx) const
     const MRLBEntry & ent = entries.at(idx);
 
     if (!ent.isLoaded()) {
-        METAL_DBGPRINT(MRLB, GET, "*miss* for mroutine %d.\n", idx);
+        //METAL_DBGPRINT(MRLB, GET, "*miss* for mroutine %d.\n", idx);
         return NullEntry;
     }
     
     assert(ent.getIdx() == idx);
 
-    METAL_DBGPRINT(MRLB, GET, "*hit* for mroutine %d, addr = 0x%lx, valid = %d.\n", ent.getIdx(), ent.getAddr(), ent.isValid());
+    //METAL_DBGPRINT(MRLB, GET, "*hit* for mroutine %d, addr = 0x%lx, valid = %d.\n", ent.getIdx(), ent.getAddr(), ent.isValid());
     return ent;
 }
 
@@ -136,21 +136,15 @@ MRLB::flush(unsigned int idx)
 
 
 // IILB
-IILBEntry::IILBEntry(const StaticInstPtr _inst, MachInst _opMask, bool _post, unsigned int _mroutine, MachInst _mask0, MachInst _mask1, MachInst _mask2) :
-    inst(_inst), armInst(reinterpret_cast<const ArmStaticInst *>(_inst.get())), opMask(_opMask),
-    post(_post), mroutine(_mroutine), mask0(_mask0), mask1(_mask1), mask2(_mask2) 
+IILBEntry::IILBEntry(const StaticInstPtr _inst, MachInst _opMask, unsigned int _mroutine, MachInst _mask0, MachInst _mask1, MachInst _mask2) :
+    inst(_inst), armInst(reinterpret_cast<const ArmStaticInst *>(_inst.get())), opMask(_opMask), mroutine(_mroutine), mask0(_mask0), mask1(_mask1), mask2(_mask2) 
 { 
 }
 
-IILBEntry::IILBEntry(const StaticInstPtr _inst, bool _post) : IILBEntry(_inst, 0, _post, 0, 0, 0, 0)
+IILBEntry::IILBEntry(const StaticInstPtr _inst) : IILBEntry(_inst, 0, 0, 0, 0, 0)
 {
 }
 
-bool 
-IILBEntry::isPost(void) const 
-{
-    return post;
-}
 
 unsigned int 
 IILBEntry::getMroutine(void) const 
@@ -205,10 +199,10 @@ bool IILBEntry::operator==(const IILBEntry &other) const
 
 bool IILBEntry::match(const IILBEntry &other) const
 {
-    return isSameInstClass(this->armInst->encoding(), other.armInst->encoding(), this->opMask) && this->post == other.post;
+    return isSameInstClass(this->armInst->encoding(), other.armInst->encoding(), this->opMask);
 }
 
-const IILBEntry IILB::NullEntry(nullStaticInstPtr, false);
+const IILBEntry IILB::NullEntry(nullStaticInstPtr);
 
 void IILB::flush()
 {
@@ -248,10 +242,10 @@ void IILB::add(const IILBEntry & _ent)
         }
     }
     
-    METAL_DBGPRINT(IILB, ADD, "*added* IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n", 
+    METAL_DBGPRINT(IILB, ADD, "*added* IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n", 
                                                                                     ent->getArmStaticInst()->encoding(),
                                                                                     ent->getInst()->getName(),
-                                                                                    ent->getOpMask(), ent->isPost(), 
+                                                                                    ent->getOpMask(), 
                                                                                     ent->getMroutine(), ent->getMask0(), 
                                                                                     ent->getMask1(), ent->getMask2());
     vec->push_back(std::move(ent));
@@ -269,15 +263,14 @@ const IILBEntry & IILB::get(const IILBEntry & ent) const
     while (vit != vec->end()) {
         const auto each = vit->get();
         if (each->match(ent)) {
-            METAL_DBGPRINT(IILB, GET, "*matched* [inst = 0x%x, mnemonic = \"%s\", post = %d] -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n",
-                                                                                    ent.getArmStaticInst()->encoding(),
-                                                                                    ent.getInst()->getName().c_str(),
-                                                                                    ent.isPost(), 
-                                                                                    each->getArmStaticInst()->encoding(),
-                                                                                    each->getInst()->getName().c_str(), 
-                                                                                    each->getOpMask(), each->isPost(), 
-                                                                                    each->getMroutine(), each->getMask0(), 
-                                                                                    each->getMask1(), each->getMask2());
+            // METAL_DBGPRINT(IILB, GET, "*matched* [inst = 0x%x, mnemonic = \"%s\"] -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, post = %d, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n",
+            //                                                                         ent.getArmStaticInst()->encoding(),
+            //                                                                         ent.getInst()->getName().c_str(),
+            //                                                                         each->getArmStaticInst()->encoding(),
+            //                                                                         each->getInst()->getName().c_str(), 
+            //                                                                         each->getOpMask(),
+            //                                                                         each->getMroutine(), each->getMask0(), 
+            //                                                                         each->getMask1(), each->getMask2());
             return *each;
         }
         ++vit;
@@ -384,11 +377,11 @@ const EILBEntry & EILB::get(const EILBEntry & ent) const
     while (it != vec.end()) {
         const auto each = it->get();
         if (each->match(ent)) {
-            METAL_DBGPRINT(EILB, GET, "*matched* EILB entry [excBits = 0x%lx, excMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
-                                                        each->getExcBits(),
-                                                        each->getExcMask(),
-                                                        static_cast<int>(each->getMode()),
-                                                        each->getMroutine());
+            // METAL_DBGPRINT(EILB, GET, "*matched* EILB entry [excBits = 0x%lx, excMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
+            //                                             each->getExcBits(),
+            //                                             each->getExcMask(),
+            //                                             static_cast<int>(each->getMode()),
+            //                                             each->getMroutine());
             return *each;
         } else {
             ++it;

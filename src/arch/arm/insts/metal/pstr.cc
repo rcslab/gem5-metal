@@ -1,19 +1,18 @@
 #include "arch/arm/insts/metal/pstr.hh"
 #include "arch/generic/memhelpers.hh"
+#include "cpu/metal_int_state.hh"
 #include "enums/StaticInstFlags.hh"
 
 namespace gem5 {
     namespace ArmISA {
-        static constexpr size_t log2(size_t n)
-        {
-            return ( (n<2) ? 0 : 1 + log2(n/2));
-        }
+    namespace metal { namespace inst {
+
         static constexpr const char * MNEM_LOOKUP_TABLE[] = {"pstrb", "pstrh", "pstrw", "pstr"};
 
         // pstr, imm offset
         template <typename T>
         Pstri<T>::Pstri(ExtMachInst _machInst, RegIndex _sReg, RegIndex _aReg, int32_t _imm, Mode _mode) :
-            MetalPMemRegImmOp(MNEM_LOOKUP_TABLE[log2(sizeof(T))], _machInst, MemWriteOp, _sReg, _aReg, _imm, _mode)
+            MetalPMemRegImmOp(MNEM_LOOKUP_TABLE[log2i(sizeof(T))], _machInst, MemWriteOp, _sReg, _aReg, _imm, _mode)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[_sReg]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[_aReg]);
@@ -26,11 +25,10 @@ namespace gem5 {
         template <typename T>
         Fault Pstri<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState & mist = xc->getMetalState();
-            metal_reg::MSR_t msr = mist.getMSR();
+            const gem5::metal::InternalState & mist = xc->getMetalState();
 
-            if (!metal_reg::isInMetalMode(msr)) {
-                METAL_DBGPRINT(INSTS, PSTR, "Permission denied: MSR = 0x%lx.\n", msr);
+            if (mist.getLevel() == 0) {
+                METAL_DBGPRINT(INSTS, PSTR, "Permission denied: MetalState = [%s].\n", mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
@@ -86,7 +84,7 @@ namespace gem5 {
         // pstr, reg offset
         template <typename T>
         Pstrr<T>::Pstrr(ExtMachInst _machInst, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
-            MetalPMemRegOp(MNEM_LOOKUP_TABLE[log2(sizeof(T))], _machInst, MemWriteOp, _dReg, _bReg, _oReg)
+            MetalPMemRegOp(MNEM_LOOKUP_TABLE[log2i(sizeof(T))], _machInst, MemWriteOp, _dReg, _bReg, _oReg)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[_dReg]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[_bReg]);
@@ -98,16 +96,15 @@ namespace gem5 {
         template <typename T>
         Fault Pstrr<T>::initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState & mist = xc->getMetalState();
-            metal_reg::MSR_t msr = mist.getMSR();
+            const gem5::metal::InternalState & mist = xc->getMetalState();
             const Addr addr = xc->getRegOperand(this, 1) + xc->getRegOperand(this, 2);
 
             METAL_DBGPRINT(INSTS, PSTRR, "sReg = %u, bReg = %u, oReg = %u, addr = %#lx, size = %u.\n",
                     r1, r2, r3, addr,
                     sizeof(T));
 
-            if (!metal_reg::isInMetalMode(msr)) {
-                METAL_DBGPRINT(INSTS, PSTR, "Permission denied: MSR = 0x%lx.\n", msr);
+            if (mist.getLevel() <= 0) {
+                METAL_DBGPRINT(INSTS, PSTR, "Permission denied: MetalState = [%s].\n", mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
@@ -140,5 +137,6 @@ namespace gem5 {
         {
             panic("unimplemented.");
         }
+    }}
     }
 }

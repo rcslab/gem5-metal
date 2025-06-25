@@ -54,6 +54,8 @@ class Process;
 namespace o3
 {
 
+class ThreadContext;
+
 class CPU;
 
 /**

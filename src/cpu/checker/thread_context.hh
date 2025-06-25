@@ -115,10 +115,6 @@ class CheckerThreadContext : public ThreadContext
         return actualTC->getCurrentInstCount();
     }
 
-    const MetalInternalState & getTransientMetalState() const override { panic("unimplemented"); };
-
-    void setTransientMetalState(const MetalInternalState &) override { panic("unimplemented"); };
-
     BaseCPU *getCpuPtr() override { return actualTC->getCpuPtr(); }
 
     uint32_t socketId() const override { return actualTC->socketId(); }
@@ -353,62 +349,6 @@ class CheckerThreadContext : public ThreadContext
     setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override
     {
         panic("function not implemented");
-    }
-
-    bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override {
-        panic("unimplemented!");
-    }
-
-    void doInstIntercept(const StaticInstPtr &inst, bool post) override {
-        panic("unimplemented!");
-    }
-
-    bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const override {
-        panic("unimplemented!");
-    }
-
-    void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) override{
-        panic("unimplemented!");
-    }
-
-    bool checkInstInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-
-    void doneInstInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-
-    bool checkExcInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-
-    void doneExcInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-
-    bool checkInterruptDisabled(void) const override {
-        panic("unimplemented!");
-    }
-
-    void doneInterruptDisabled(void) override {
-        panic("unimplemented!");
-    }
-
-    bool getExcInterceptMaskFlag(void) const override {
-        panic("unimplemented!");
-    }
-
-    void setExcInterceptMaskFlag(bool) override {
-        panic("unimplemented!");
-    }
-
-    bool getInterruptDisabledFlag(void) const override {
-        panic("unimplemented!");
-    }
-
-    void setInterruptDisabledFlag(bool) override {
-        panic("unimplemented!");
     }
 };
 

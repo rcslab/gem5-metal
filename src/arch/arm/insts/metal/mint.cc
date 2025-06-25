@@ -1,57 +1,61 @@
 #include "arch/arm/insts/metal/mint.hh"
 #include "arch/arm/insts/metal/menter.hh"
+#include "arch/arm/regs/cc.hh"
 #include "arch/arm/regs/metal.hh"
-#include "arch/arm/regs/metal_misc.hh"
 #include "base/types.hh"
+#include "cpu/static_inst.hh"
 
-namespace gem5 {
-    namespace ArmISA {
-        Mint64::Mint64(ExtMachInst _machInst, uint _imm) : Menter64(_machInst, _imm), saved_mflags(0)
-        {
-            this->flags[IsPreExecOperandUpdate] = true;
-        }
+namespace gem5 { namespace ArmISA {
+namespace metal { namespace inst {
+    Mint64::Mint64(ExtMachInst _machInst, uint _imm, RegVal mir0, RegVal mir1, RegVal mir2) : 
+    Menter64("mint", _machInst, _imm), mir0(mir0), mir1(mir1), mir2(mir2)
+    {
+        setDestRegIdx(_numDestRegs++, metalRegClass[reg::MSPSR]); // idx = 1
+        setDestRegIdx(_numDestRegs++, metalRegClass[reg::MIR0]); // idx = 2
+        setDestRegIdx(_numDestRegs++, metalRegClass[reg::MIR1]); // idx = 3
+        setDestRegIdx(_numDestRegs++, metalRegClass[reg::MIR2]); // idx = 4
+        _numTypedDestRegs[metalRegClass.type()] += 4;
 
-        Fault Mint64::preExec(ExecContext *xc, trace::InstRecord *traceData)
-        {
-            Fault fault;
+        // setDestRegIdx(_numDestRegs++, metalRegClass[metal_reg::MSFLAGS].flatten(xc));
+        // _numTypedDestRegs[metalRegClass.type()]++;
 
-            if ((fault = Menter64::preExec(xc, traceData)) != NoFault) {
-                return fault;
-            }
-
-            setDestRegIdx(_numDestRegs++, metalRegClass[metal_reg::MSPSR].flatten(xc));
-            _numTypedDestRegs[metalRegClass.type()]++;
-            // setDestRegIdx(_numDestRegs++, metalRegClass[metal_reg::MSFLAGS].flatten(xc));
-            // _numTypedDestRegs[metalRegClass.type()]++;
-
-            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz].flatten(xc));
-            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C].flatten(xc));
-            setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V].flatten(xc));
-
-            return NoFault;
-        }
-
-        Fault Mint64::execute(ExecContext *xc, trace::InstRecord *traceData) const
-        {
-            // save NzCV
-            const RegVal nz = xc->getRegOperand(this, 0);
-            const RegVal c = xc->getRegOperand(this, 1);
-            const RegVal v = xc->getRegOperand(this, 2);
-
-            CPSR mspsr = 0;
-            mspsr.nz = nz;
-            mspsr.c = c;
-            mspsr.v = v;
-
-            // set mspsr
-            xc->setRegOperand(this, 1, mspsr);
-
-            // set msflags
-            // xc->setRegOperand(this, 2, saved_mflags);
-
-            METAL_DBGPRINT(INSTS, MINT, "Intercepting to mroutine %d, MSPSR = 0x%lx.", imm, mspsr);
-
-            return Menter64::execute(xc, traceData);
-        }
+        setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::Nz]); // idx = 0
+        setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::C]); // idx = 1
+        setSrcRegIdx(_numSrcRegs++, ccRegClass[cc_reg::V]); // idx = 2
     }
-}
+
+    Fault Mint64::preExec(ExecContext *xc, trace::InstRecord *traceData)
+    {
+        return Menter64::preExec(xc, traceData);
+    }
+
+    Fault Mint64::execute(ExecContext *xc, trace::InstRecord *traceData) const
+    {
+        // save NzCV
+        const RegVal nz = xc->getRegOperand(this, 0);
+        const RegVal c = xc->getRegOperand(this, 1);
+        const RegVal v = xc->getRegOperand(this, 2);
+
+        CPSR mspsr = 0;
+        mspsr.nz = nz;
+        mspsr.c = c;
+        mspsr.v = v;
+
+        // set mspsr
+        xc->setRegOperand(this, 1, mspsr);
+
+        // set msflags
+        // xc->setRegOperand(this, 2, saved_mflags);
+        
+        // set the three masks
+        xc->setRegOperand(this, 2, mir0);
+        xc->setRegOperand(this, 3, mir1);
+        xc->setRegOperand(this, 4, mir2);
+
+        METAL_DBGPRINT(INSTS, MINT, "Intercepting to mroutine %d, MSPSR = 0x%lx, MIRs = [0x%lx, 0x%lx, 0x%lx].\n", imm, mspsr, mir0, mir1, mir2);
+
+        return Menter64::execute(xc, traceData, xc->pcState().instAddr());
+    }
+
+}}
+}}

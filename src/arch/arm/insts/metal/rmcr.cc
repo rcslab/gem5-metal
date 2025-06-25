@@ -3,6 +3,7 @@
 
 namespace gem5 {
     namespace ArmISA {
+        namespace metal { namespace inst {
         Rmcr64::Rmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) : MetalMRegRegOp("rmcr", _machInst, IntAluOp, _mreg, _greg)
         {
             setDestRegIdx(_numDestRegs++, intRegClass[gReg]);
@@ -13,14 +14,13 @@ namespace gem5 {
 
         Fault Rmcr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
-            const MetalInternalState &mist = xc->getMetalState();
-            const metal_reg::MSR_t msr = mist.getMSR();
+            const auto &mist = xc->getMetalState();
 
             ThreadContext * tc = xc->tcBase();
-            const RegVal mar = tc->readMetalMiscRegNoEffect(metal_reg::MAR);
+            const RegVal mar = tc->readMetalMiscRegNoEffect(reg::MAR);
 
-            if (!metal_reg::canAccessMiscReg(mReg, msr, mar, false)) {
-                METAL_DBGPRINT(INSTS, RMCR, "Permission denied: reading %s (MAR = 0x%lx, MSR = 0x%lx).\n", printMetalMiscReg(mReg), mar, msr);
+            if (!reg::canAccessMiscReg(mReg, mist, mar, false)) {
+                METAL_DBGPRINT(INSTS, RMCR, "Permission denied: reading %s (MAR = 0x%lx, MetalState = [%s]).\n", printMetalMiscReg(mReg), mar, mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
@@ -45,5 +45,6 @@ namespace gem5 {
             printIntReg(ss, gReg);
             return ss.str();
         }
+    }}
     }
 }

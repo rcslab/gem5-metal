@@ -38,6 +38,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "cpu/metal_int_state.hh"
 #include <cassert>
 
 #ifndef __ARCH_ARM_REGS_INT_HH__
@@ -128,7 +129,7 @@ enum : RegIndex
 
     // constants
     NumArchRegs = 32,
-    NumRegs = NumRegsOneWindow + NumArchRegs * metal_reg::MaxMetalLevel,
+    NumRegs = NumRegsOneWindow + NumArchRegs * metal::reg::MaxMetalLevel,
     _SpxIdx = NumRegs,
 
     _X0Idx = 0,
@@ -174,7 +175,7 @@ class IntRegClassOps : public RegClassOps
     RegId flatten(ExecContext *xc, const RegId &id) const override;
 
 public:
-    static RegId flattenWithStates(RegVal cpsr, metal_reg::MSR_t msr, const RegId &id);
+    static RegId flattenWithStates(RegVal cpsr, const gem5::metal::InternalState & state, const RegId &id);
 };
 
 inline constexpr IntRegClassOps intRegClassOps;
@@ -451,10 +452,10 @@ const RegMap Reg64Map = {
     R8Fiq,  R9Fiq,  R10Fiq, R11Fiq, R12Fiq, R13Fiq, R14Fiq, Zero
 };
 
-inline constexpr std::array<RegId[NumArchRegs], metal_reg::MaxMetalLevel> 
+inline constexpr std::array<RegId[NumArchRegs], metal::reg::MaxMetalLevel> 
 constructReg64MetalMap()
 {
-    std::array<RegId[NumArchRegs], metal_reg::MaxMetalLevel> arr;
+    std::array<RegId[NumArchRegs], metal::reg::MaxMetalLevel> arr;
     for (unsigned int lvl = 0; lvl < arr.size(); lvl++) {
         RegId * ids = arr.at(lvl);
         for (unsigned int i = 0; i < NumArchRegs - 1; i++) {
@@ -465,7 +466,7 @@ constructReg64MetalMap()
     return arr;
 }
 
-inline constexpr std::array<RegId[NumArchRegs], metal_reg::MaxMetalLevel> Reg64MetalMap = constructReg64MetalMap();
+inline constexpr std::array<RegId[NumArchRegs], metal::reg::MaxMetalLevel> Reg64MetalMap = constructReg64MetalMap();
 
 static inline RegId
 x(unsigned index)

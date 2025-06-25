@@ -44,6 +44,7 @@
 #include "arch/generic/decoder.hh"
 #include "arch/generic/mmu.hh"
 #include "base/statistics.hh"
+#include "cpu/metal_int_state.hh"
 #include "cpu/o3/comm.hh"
 #include "cpu/o3/dyn_inst_ptr.hh"
 #include "cpu/o3/limits.hh"
@@ -196,6 +197,8 @@ class Fetch
     /** List that has the threads organized by priority. */
     std::list<ThreadID> priorityList;
 
+    metal::InternalState transientMetalState;
+
     /** Probe points. */
     ProbePointArg<DynInstPtr> *ppFetch;
     /** To probe when a fetch request is successfully sent. */
@@ -311,7 +314,7 @@ class Fetch
     bool checkInterrupt(Addr pc) { return interruptPending; }
 
     /** Squashes a specific thread and resets the PC. */
-    void doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst, const MetalInternalState& squashState, ThreadID tid);
+    void doSquash(const PCStateBase &new_pc, const DynInstPtr squashInst, const metal::InternalState& squashState, ThreadID tid);
 
     /** Squashes a specific thread and resets the PC. Also tells the CPU to
      * remove any instructions between fetch and decode
@@ -320,7 +323,7 @@ class Fetch
     void squashFromDecode(const PCStateBase &new_pc,
                           const DynInstPtr squashInst,
                           const InstSeqNum seq_num, 
-                          const MetalInternalState& squashState,
+                          const metal::InternalState& squashState,
                           ThreadID tid);
 
     /** Checks if a thread is stalled. */
@@ -336,7 +339,7 @@ class Fetch
      * squash should be the commit stage.
      */
     void squash(const PCStateBase &new_pc, const InstSeqNum seq_num,
-                DynInstPtr squashInst, const MetalInternalState& squashState, ThreadID tid);
+                DynInstPtr squashInst, const metal::InternalState& squashState, ThreadID tid);
 
     /** Ticks the fetch stage, processing all inputs signals and fetching
      * as many instructions as possible.

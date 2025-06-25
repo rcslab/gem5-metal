@@ -6,6 +6,7 @@
 
 namespace gem5 {
     namespace ArmISA {
+    namespace metal { namespace inst {
         // wmr
         Wmcr64::Wmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg) :
             MetalMacroInst("wmcr", _machInst, IntAluOp), mReg(_mreg), gReg(_greg)
@@ -16,35 +17,35 @@ namespace gem5 {
 
             this->numMicroops = 1;
 
-            if (mReg == metal_reg::MIB) {
+            if (mReg == reg::MIB) {
                 this->flags[IsLoad] = true;
-                this->numMicroops += ISA::InstInterceptTableTotalSize / ISA::InstInterceptTableLoadSize;
-            } else if (mReg == metal_reg::MEB) {
+                this->numMicroops += InstInterceptTableTotalSize / InstInterceptTableLoadSize;
+            } else if (mReg == reg::MEB) {
                 this->flags[IsLoad] = true;
-                this->numMicroops += ISA::ExcInterceptTableTotalSize / ISA::ExcInterceptTableLoadSize;
-            } else if (mReg == metal_reg::MBR) {
+                this->numMicroops += ExcInterceptTableTotalSize / ExcInterceptTableLoadSize;
+            } else if (mReg == reg::MBR) {
                 this->flags[IsLoad] = true;
-                this->numMicroops += ISA::MroutineTableTotalSize / ISA::MroutineTableLoadSize;
+                this->numMicroops += MroutineTableTotalSize / MroutineTableLoadSize;
             }
 
             this->microOps = new StaticInstPtr[this->numMicroops];
             StaticInst * inst = new Wmcr64_u(_machInst, mReg, gReg);
             this->microOps[0] = inst;
 
-            if (mReg == metal_reg::MIB) {
-                for (int i = 0; i < ISA::InstInterceptTableTotalSize / ISA::InstInterceptTableLoadSize; i++) {
-                    StaticInstPtr uop = new Mliit64_u(_machInst, i * ISA::InstInterceptTableLoadSize, ISA::InstInterceptTableLoadSize);
+            if (mReg == reg::MIB) {
+                for (int i = 0; i < InstInterceptTableTotalSize / InstInterceptTableLoadSize; i++) {
+                    StaticInstPtr uop = new Mliit64_u(_machInst, i * InstInterceptTableLoadSize, InstInterceptTableLoadSize);
                     this->microOps[i+1] = uop;
                 }
-            } else if (mReg == metal_reg::MEB) {
-                for (int i = 0; i < ISA::ExcInterceptTableTotalSize / ISA::ExcInterceptTableLoadSize; i++) {
-                    StaticInstPtr uop = new Mleit64_u(_machInst, i * ISA::ExcInterceptTableLoadSize, ISA::ExcInterceptTableLoadSize);
+            } else if (mReg == reg::MEB) {
+                for (int i = 0; i < ExcInterceptTableTotalSize / ExcInterceptTableLoadSize; i++) {
+                    StaticInstPtr uop = new Mleit64_u(_machInst, i * ExcInterceptTableLoadSize, ExcInterceptTableLoadSize);
                     this->microOps[i+1] = uop;
                 }
-            } else if (mReg == metal_reg::MBR) {
-                for (int i = 0; i < ISA::MroutineTableTotalSize / ISA::MroutineTableLoadSize; i++) {
-                    StaticInstPtr uop = new Mlmrt64_u(_machInst, i * ISA::MroutineTableLoadSize, ISA::MroutineTableLoadSize,
-                            i * (ISA::MroutineTableLoadSize / sizeof(ISA::MroutineTableEntry)));
+            } else if (mReg == reg::MBR) {
+                for (int i = 0; i < MroutineTableTotalSize / MroutineTableLoadSize; i++) {
+                    StaticInstPtr uop = new Mlmrt64_u(_machInst, i * MroutineTableLoadSize, MroutineTableLoadSize,
+                            i * (MroutineTableLoadSize / sizeof(MroutineTableEntry)));
                     this->microOps[i+1] = uop;
                 }
             }
@@ -69,5 +70,6 @@ namespace gem5 {
             printIntReg(ss, gReg);
             return ss.str();
         }
+    }}
     }
 }

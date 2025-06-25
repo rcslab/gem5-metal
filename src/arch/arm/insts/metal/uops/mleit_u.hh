@@ -1,11 +1,11 @@
 #pragma once
 
 #include "arch/arm/insts/metal/common.hh"
-#include "cpu/metal_int_state.hh"
 #include "arch/generic/memhelpers.hh"
 
 namespace gem5 {
 namespace ArmISA {
+namespace metal { namespace inst {
     class Mleit64_u : public MetalMicroInst
     {
     protected:
@@ -22,7 +22,7 @@ namespace ArmISA {
         Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override
         {
             ThreadContext *tc = xc->tcBase();
-            const RegVal meb = tc->readMetalMiscRegNoEffect(metal_reg::MEB);
+            const RegVal meb = tc->readMetalMiscRegNoEffect(reg::MEB);
             const Addr base = purifyTaggedAddr(this->offset + meb, tc, currEL(tc), true);
 
             // no permission check here because wmcr_u already checks it
@@ -46,8 +46,8 @@ namespace ArmISA {
                 panic("Data fetch failed.");
             }
 
-            static char buf[ISA::ExcInterceptTableLoadSize];
-            assert(this->size <= ISA::ExcInterceptTableLoadSize);
+            static char buf[ExcInterceptTableLoadSize];
+            assert(this->size <= ExcInterceptTableLoadSize);
             getMemRawPtr(pkt, buf, this->size, traceData);
             isa->loadExcInterceptTable(buf, this->size);
             return NoFault;
@@ -68,5 +68,6 @@ namespace ArmISA {
             return ss.str();
         }
     };
+}}
 }
 }

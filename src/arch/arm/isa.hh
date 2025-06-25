@@ -41,6 +41,7 @@
 #ifndef __ARCH_ARM_ISA_HH__
 #define __ARCH_ARM_ISA_HH__
 
+#include "arch/arm/metal.hh"
 #include "arch/arm/isa_device.hh"
 #include "arch/arm/mmu.hh"
 #include "arch/arm/pcstate.hh"
@@ -131,75 +132,22 @@ namespace ArmISA
         int armFaultToIntID(const ArmFault & fault) const;
 
         RegVal miscRegs[NUM_MISCREGS];
-        std::array<RegVal, metal_reg::NumMiscRegs> metalMiscRegs;
-        MetalInternalState metalInternalState;
+        std::array<RegVal, metal::reg::NumMiscRegs> metalMiscRegs;
+        gem5::metal::InternalState metalInternalState;
 
         MRLB mrlb;
         IILB iilb;
         EILB eilb;
 public:
-        // mroutine stuff
-        static constexpr size_t MroutineTableMaxEntryNum = 1 << 8;
-        static constexpr uint64_t MroutineTableEntryAddrShift = 4;
-        BitUnion64(MroutineTableEntry)
-            Bitfield<63, MroutineTableEntryAddrShift> unshiftedAddr;
-            Bitfield<MroutineTableEntryAddrShift - 1, 1> _unused;
-            Bitfield<0> valid;
-        EndBitUnion(MroutineTableEntry)
-        static_assert(sizeof(MroutineTableEntry) == sizeof(uint64_t) && isPowerOf2(sizeof(MroutineTableEntry)));
-        static constexpr size_t MroutineTableLoadSize = 8 * sizeof(MroutineTableEntry);
-        static constexpr size_t MroutineTableTotalSize = MroutineTableMaxEntryNum * sizeof(MroutineTableEntry);
-
-        // Instruction intercept
-        BitUnion32(InstInterceptCtrl)
-            Bitfield<7, 0> mroutine;
-            Bitfield<30> post;
-            Bitfield<31> valid;
-        EndBitUnion(InstInterceptCtrl)
-        struct InstInterceptTableEntry {
-            MachInst inst;
-            MachInst opMask;
-            InstInterceptCtrl ctrl;
-            MachInst mask0;
-            MachInst mask1;
-            MachInst mask2;
-        };
-        static_assert(sizeof(InstInterceptTableEntry) == sizeof(uint32_t) * 6);
-
-        static constexpr size_t InstInterceptTableMaxEntryNum = 64;
-        static constexpr size_t InstInterceptTableLoadSize = 2 * sizeof(InstInterceptTableEntry);
-        static constexpr size_t InstInterceptTableTotalSize = InstInterceptTableMaxEntryNum * sizeof(InstInterceptTableEntry);
-        static_assert((InstInterceptTableTotalSize % InstInterceptTableLoadSize) == 0 && (InstInterceptTableLoadSize % sizeof(InstInterceptTableEntry)) == 0);
-
-        // Exception intercept
-        BitUnion32(ExcInterceptCtrl)
-            Bitfield<7, 0> mroutine;
-            Bitfield<9, 8> mode;
-            Bitfield<10> im;
-            Bitfield<31> valid;
-        EndBitUnion(ExcInterceptCtrl)
-
-        struct ExcInterceptTableEntry {
-            uint32_t excBits;
-            uint32_t excMask;
-            ExcInterceptCtrl ctrl;
-        };
-        static_assert(sizeof(ExcInterceptTableEntry) == sizeof(uint32_t) * 3);
-        static constexpr size_t ExcInterceptTableMaxEntryNum = 64;
-        static constexpr size_t ExcInterceptTableLoadSize = 4 * sizeof(ExcInterceptTableEntry);
-        static constexpr size_t ExcInterceptTableTotalSize = ExcInterceptTableMaxEntryNum * sizeof(ExcInterceptTableEntry);
-        static_assert((ExcInterceptTableTotalSize % ExcInterceptTableLoadSize) == 0 && (ExcInterceptTableLoadSize % sizeof(ExcInterceptTableEntry)) == 0);
-
-public:
         static const RegId *
-        getIntRegMap(CPSR cpsr, metal_reg::MSR_t msr)
+        getIntRegMap(CPSR cpsr, const gem5::metal::InternalState state)
         {
             const RegId * intRegMap;
             if (cpsr.width == 0) {
-                if (!metal_reg::isInMetalMode(msr)) {
+                if (state.getLevel() <= 0) {
                     intRegMap = int_reg::Reg64Map;
                 } else {
-                    intRegMap = int_reg::Reg64MetalMap.at(metal_reg::getMetalLevel(msr) - 1);
+                    intRegMap = int_reg::Reg64MetalMap.at(state.getLevel() - 1);
                 }
             } else {
                 switch (cpsr.mode) {
@@ -270,15 +218,15 @@ public:
         void setMetalMiscReg(RegIndex idx, RegVal val) override;
         RegVal readMetalMiscRegNoEffect(RegIndex idx) const override;
         void setMetalMiscRegNoEffect(RegIndex idx, RegVal val) override;
-        const MetalInternalState & getMetalState(void) const override {
+        const gem5::metal::InternalState & getMetalState(void) const override {
             return this->metalInternalState;
         }
-        void setMetalState(const MetalInternalState & st) override {
+        void setMetalState(const gem5::metal::InternalState & st) override {
             this->metalInternalState.set(st);
         }
 private:
         void resetMetalRegs(void);
-        void registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent);
+        void registerInstIntercept(StaticInstPtr inst, const metal::InstInterceptTableEntry & _ent);
         static MachInst shiftInstMask(MachInst encoding, MachInst mask)
         {
               if (!mask)
@@ -295,20 +243,8 @@ public:
         void loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size);
         void loadExcInterceptTable(void * rawMem, size_t size);
 
-        bool checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const override;
-        void doExcIntercept(const Fault &fault, const StaticInstPtr &nst) override;
-        bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override;
-        void doInstIntercept(const StaticInstPtr &inst, bool post) override;
-        bool checkInstInterceptMasked(void) const override;
-        void doneInstInterceptMasked(void) override;
-        bool checkExcInterceptMasked(void) const override;
-        void doneExcInterceptMasked(void) override;
-        bool checkInterruptDisabled(void) const override;
-        void doneInterruptDisabled(void) override;
-        void setExcInterceptMaskFlag(bool) override;
-        bool getExcInterceptMaskFlag(void) const override;
-        void setInterruptDisabledFlag(bool) override;
-        bool getInterruptDisabledFlag(void) const override;
+        StaticInstPtr interceptInst(const StaticInstPtr &inst) const override;
+        bool interceptExc(const Fault &fault, const StaticInstPtr &inst) override;
 
         int
         flattenMiscIndex(int reg) const

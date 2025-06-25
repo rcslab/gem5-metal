@@ -70,7 +70,6 @@ class ThreadContext : public gem5::ThreadContext
   public:
    /** Pointer to the CPU. */
     CPU *cpu;
-    MetalInternalState transientMetalState;
 
     bool
     schedule(PCEvent *e) override
@@ -211,14 +210,6 @@ class ThreadContext : public gem5::ThreadContext
      * write might have as defined by the architecture. */
     void setMiscReg(RegIndex misc_reg, RegVal val) override;
 
-    const MetalInternalState & getTransientMetalState() const override {
-        return transientMetalState;
-    }
-
-    void setTransientMetalState(const MetalInternalState & other) override {
-        transientMetalState.set(other);
-    }
-
     void setMetalMiscReg(RegIndex metal_reg, RegVal val) override {
         getIsaPtr()->setMetalMiscReg(metal_reg, val);
     }
@@ -277,51 +268,6 @@ class ThreadContext : public gem5::ThreadContext
                              HtmFailureFaultCause cause) override;
     BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
-
-    bool checkInstIntercept(const StaticInstPtr &inst, bool post) const override {
-        return this->getIsaPtr()->checkInstIntercept(inst, post);
-    }
-    void doInstIntercept(const StaticInstPtr &inst, bool post) override {
-        this->getIsaPtr()->doInstIntercept(inst, post);
-    }
-    bool checkExcIntercept(const Fault & fault, const StaticInstPtr &inst) const override {
-        return this->getIsaPtr()->checkExcIntercept(fault, inst);
-    }
-    void doExcIntercept(const Fault & fault, const StaticInstPtr &inst) override{
-        this->getIsaPtr()->doExcIntercept(fault, inst);
-    }
-
-    bool checkInstInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-    void doneInstInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-    bool checkExcInterceptMasked(void) const override {
-        panic("unimplemented!");
-    }
-    void doneExcInterceptMasked(void) override {
-        panic("unimplemented!");
-    }
-    bool checkInterruptDisabled(void) const override {
-        panic("unimplemented!");
-    }
-    void doneInterruptDisabled(void) override {
-        panic("unimplemented!");
-    }
-    bool getExcInterceptMaskFlag(void) const override {
-        panic("unimplemented!");
-    }
-    void setExcInterceptMaskFlag(bool) override {
-        panic("unimplemented!");
-    }
-    bool getInterruptDisabledFlag(void) const override {
-        panic("unimplemented!");
-    }
-    void setInterruptDisabledFlag(bool) override {
-        panic("unimplemented!");
-    }
-
 };
 
 } // namespace o3

@@ -687,7 +687,6 @@ CPU::processInterrupts(const Fault &interrupt)
     interrupts[0]->updateIntrInfo();
 
     DPRINTF(O3CPU, "Interrupt %s being handled\n", interrupt->name());
-    trap(interrupt, 0, nullptr);
 }
 
 void

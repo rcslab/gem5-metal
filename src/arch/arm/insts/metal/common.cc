@@ -1,10 +1,9 @@
 #include "arch/arm/insts/metal/common.hh"
 #include "base/cprintf.hh"
 
-namespace gem5
-{
-    namespace ArmISA
-    {
+namespace gem5 { namespace ArmISA {
+namespace metal { namespace inst {
+
         std::string
         MetalImmOp::generateDisassembly(
             Addr pc, const loader::SymbolTable *symtab) const
@@ -132,6 +131,7 @@ namespace gem5
                     panic("Unknown Metal PMem mode: %d", static_cast<int>(this->mode));
             }
             return ss.str();
-        }
-    } // namespace ArmISA
+        } 
+    }}
+} // namespace ArmISA
 } // namespace gem5

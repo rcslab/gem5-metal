@@ -4,15 +4,17 @@
 
 namespace gem5 {
     namespace ArmISA {
-        class Rmcr64 : public MetalMRegRegOp
-        {
-        public:
-            Rmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
+        namespace metal { namespace inst {
+            class Rmcr64 : public MetalMRegRegOp
+            {
+            public:
+                Rmcr64(ExtMachInst _machInst, RegIndex _mreg, RegIndex _greg);
 
-            Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
+                Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
 
-            std::string generateDisassembly(
-                Addr pc, const loader::SymbolTable *symtab) const override;
-        };
+                std::string generateDisassembly(
+                    Addr pc, const loader::SymbolTable *symtab) const override;
+            };
+        }}
     }
 }

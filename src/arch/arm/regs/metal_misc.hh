@@ -2,19 +2,18 @@
 #define __ARCH_ARM_REGS_METAL_MISC_HH__
 
 
-#include "arch/arm/types.hh"
-#include "base/logging.hh"
+#include "arch/arm/metal.hh"
+#include "cpu/metal_int_state.hh"
 #include "debug/MetalRegs.hh"
 #include "cpu/reg_class.hh"
-#include "sim/core.hh"
 
 namespace gem5
 {
-
 namespace ArmISA
 {
-
-namespace metal_reg
+namespace metal
+{
+namespace reg
 {
     BitUnion64(MSR_t)
         Bitfield<63> init; // whether metal is initialized
@@ -27,7 +26,7 @@ namespace metal_reg
     BitUnion64(MFLAGS_t)
         Bitfield<0> ii; // instruction intercept enable
         Bitfield<1> ei; // exc intercept enable
-        Bitfield<2> pd; // privileged instruction disable
+        // Bitfield<2> pd; // privileged instruction disable
     EndBitUnion(MFLAGS_t)
 
     BitUnion8(MTPField)
@@ -121,16 +120,6 @@ namespace metal_reg
     };
     static_assert((sizeof(miscRegNames) / sizeof(miscRegNames[0])) == NumMiscRegs);
 
-    static inline unsigned long getMetalLevel(MSR_t msr)
-    {
-        return msr.lv;
-    }
-
-    static inline bool isInMetalMode(MSR_t msr)
-    {
-        return getMetalLevel(msr) > 0;
-    }
-
     static inline bool isInitReg(RegIndex idx)
     {
         return idx == MBR || idx == MSTK || idx == MAR;
@@ -165,57 +154,28 @@ namespace metal_reg
         return !((mar >> (2 * idx + 1)) & 0x1);
     }
 
-    static inline bool canAccessMiscReg(RegIndex idx, MSR_t msr, RegVal mar, bool write)
+    static inline bool canAccessMiscReg(RegIndex idx, const gem5::metal::InternalState & state, RegVal mar, bool write)
     {
         bool allowAccess = false;
-        if (!msr.init && isInitReg(idx)) {
+        gem5::metal::InternalFlags flags = state.getFlags();
+        if (!(flags & METAL_FLAG_INIT) && isInitReg(idx)) {
             // allow Metal initialization
             allowAccess = true;
-        } else if (isInMetalMode(msr)) {
+        } else if (state.getLevel() > 0) {
             allowAccess = write ? getWritePerm(mar, idx) : getReadPerm(mar, idx);
         }
 
         return allowAccess;
     }
-
-    static inline bool isPrivInstsEnabled(MFLAGS_t mflags)
-    {
-        return !static_cast<bool>(mflags.pd);
-    }
-
-    static inline bool isInstInterceptEnabled(MFLAGS_t mflags)
-    {
-        return static_cast<bool>(mflags.ii);
-    }
-
-    static inline bool isExcInterceptEnabled(MFLAGS_t mflags)
-    {
-        return static_cast<bool>(mflags.ei);
-    }
-
-    static inline bool isInstInterceptMasked(MSR_t msr)
-    {
-        return static_cast<bool>(msr.im);
-    }
-
-    static inline bool isExcInterceptMasked(MSR_t msr)
-    {
-        return static_cast<bool>(msr.em);
-    }
-
-    static inline bool isInterruptDisabled(MSR_t msr)
-    {
-        return static_cast<bool>(msr.id);
-    }
-
-} // namespace metal_reg
+} // namespace reg
+} // namespace metal
 
 class MetalMiscRegClassOps : public RegClassOps {};
 
 inline constexpr MetalMiscRegClassOps metalMiscRegClassOps;
 
 inline constexpr RegClass metalMiscRegClass =
-    RegClass(MetalMiscRegClass, MetalMiscRegClassName, metal_reg::NumMiscRegs, debug::MetalRegs).
+    RegClass(MetalMiscRegClass, MetalMiscRegClassName, metal::reg::NumMiscRegs, debug::MetalRegs).
     ops(metalMiscRegClassOps);
 
 } // namespace ARMISA

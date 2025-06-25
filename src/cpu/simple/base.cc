@@ -53,6 +53,7 @@
 #include "cpu/checker/cpu.hh"
 #include "cpu/checker/thread_context.hh"
 #include "cpu/exetrace.hh"
+#include "cpu/metal_int_state.hh"
 #include "cpu/null_static_inst.hh"
 #include "cpu/pred/bpred_unit.hh"
 #include "cpu/simple/exec_context.hh"
@@ -293,8 +294,10 @@ BaseSimpleCPU::checkForInterrupts()
 
             // check for interrupt intercept
             t_info.fetchOffset = 0;
-            if (tc->checkExcIntercept(interrupt, nullStaticInstPtr)) {
-                tc->doExcIntercept(interrupt, nullStaticInstPtr);
+            const auto & mist = tc->getIsaPtr()->getMetalState();
+            const auto miflags = mist.getFlags();
+            if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK)) {
+                tc->getIsaPtr()->interceptExc(interrupt, nullStaticInstPtr);
                 // force control change (in case in the middle of a macroop)
                 advancePC(NoFault, true);
             } else {

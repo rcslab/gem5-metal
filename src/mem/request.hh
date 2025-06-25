@@ -472,7 +472,7 @@ class Request : public Extensible<Request>
     HtmFailureFaultCause _htmAbortCause = HtmFailureFaultCause::INVALID;
 
     struct PersistentState {
-        MetalInternalState mist;    
+        metal::InternalState mist;    
     };
     /** Persistent CPU states for this request */
     PersistentState pstate;

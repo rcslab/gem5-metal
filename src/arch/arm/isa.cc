@@ -40,9 +40,12 @@
 #include "arch/arm/decoder.hh"
 #include "arch/arm/faults.hh"
 #include "arch/arm/htm.hh"
+#include "arch/arm/insts/metal/common.hh"
+#include "arch/arm/insts/metal/mint.hh"
 #include "arch/arm/interrupts.hh"
 #include "arch/arm/mmu.hh"
 #include "arch/arm/pmu.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "arch/arm/regs/misc.hh"
 #include "arch/arm/regs/metal.hh"
 #include "arch/arm/self_debug.hh"
@@ -55,7 +58,10 @@
 #include "base/random.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
+#include "cpu/metal_int_state.hh"
+#include "cpu/null_static_inst.hh"
 #include "cpu/reg_class.hh"
+#include "cpu/static_inst_fwd.hh"
 #include "debug/Arm.hh"
 #include "debug/LLSC.hh"
 #include "debug/MatRegs.hh"
@@ -84,7 +90,7 @@ RegClass floatRegClass(FloatRegClass, FloatRegClassName, 0, debug::FloatRegs);
 } // anonymous namespace
 
 ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
-    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), mrlb(MroutineTableMaxEntryNum)
+    _decoderFlavor(p.decoderFlavor), pmu(p.pmu), impdefAsNop(p.impdef_nop), mrlb(metal::MroutineTableMaxEntryNum)
 {
     _regClasses.push_back(&flatIntRegClass);
     _regClasses.push_back(&metalRegClass);
@@ -207,11 +213,11 @@ ISA::copyRegsFrom(ThreadContext *src)
         tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
 
     // copy window
-    for (int i = 0; i < metal_reg::NumGRegs; i++)
+    for (int i = 0; i < metal::reg::NumRegs; i++)
         // need to copy full window
         panic("unimplemented");
 
-    for (int i = 0; i < metal_reg::NumMiscRegs; i++)
+    for (int i = 0; i < metal::reg::NumMiscRegs; i++)
         tc->setMetalMiscRegNoEffect(i, src->readMetalMiscRegNoEffect(i));
 
     ArmISA::VecRegContainer vc;
@@ -1366,21 +1372,21 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
 }
 
 void
-ISA::registerInstIntercept(StaticInstPtr inst, const InstInterceptTableEntry & _ent)
+ISA::registerInstIntercept(StaticInstPtr inst, const metal::InstInterceptTableEntry & _ent)
 {
-    const IILBEntry ent(inst, _ent.opMask, _ent.ctrl.post, _ent.ctrl.mroutine, _ent.mask0, _ent.mask1, _ent.mask2);
+    const IILBEntry ent(inst, _ent.opMask, _ent.ctrl.mroutine, _ent.mask0, _ent.mask1, _ent.mask2);
     this->iilb.add(ent);
-    METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for \"%s\".\n", inst->getName());
+    METAL_DBGPRINT(ISA, INSTINTR, "Registered inst intercept for \"%s\" to mroutine %d.\n", inst->getName(), _ent.ctrl.mroutine);
 }
 
 void
 ISA::loadExcInterceptTable(void * rawMem, size_t size)
 {
-    assert((size % sizeof(ExcInterceptTableEntry)) == 0);
+    assert((size % sizeof(metal::ExcInterceptTableEntry)) == 0);
 
-    auto ents = static_cast<ExcInterceptTableEntry *>(rawMem);
+    auto ents = static_cast<metal::ExcInterceptTableEntry *>(rawMem);
 
-    for (int i = 0; i < size / sizeof(ExcInterceptTableEntry); i++) {
+    for (int i = 0; i < size / sizeof(metal::ExcInterceptTableEntry); i++) {
         auto ent = ents[i];
         ent.ctrl = gtoh(ent.ctrl, byteOrder(this->tc));
         if (!ent.ctrl.valid) {
@@ -1407,15 +1413,15 @@ ISA::loadExcInterceptTable(void * rawMem, size_t size)
 void
 ISA::loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size)
 {
-    assert((size % sizeof(InstInterceptTableEntry)) == 0);
+    assert((size % sizeof(metal::InstInterceptTableEntry)) == 0);
 
-    auto ents = static_cast<InstInterceptTableEntry *>(rawMem);
+    auto ents = static_cast<metal::InstInterceptTableEntry *>(rawMem);
 
     // we need to decode from the emulated PC but obtain flags from the read memory
     InstDecoder * decoder = this->tc->getDecoderPtr();
     decoder->reset();
 
-    for (int i = 0; i < size / sizeof(InstInterceptTableEntry); i++) {
+    for (int i = 0; i < size / sizeof(metal::InstInterceptTableEntry); i++) {
         auto ent = ents[i];
         MachInst instEncoding = ent.inst;
 
@@ -1430,7 +1436,7 @@ ISA::loadInstInterceptTable(void * rawMem, Addr memAddr, size_t size)
             continue;
         }
 
-        auto memEnt = reinterpret_cast<InstInterceptTableEntry *>(memAddr + i * sizeof(InstInterceptTableEntry));
+        auto memEnt = reinterpret_cast<metal::InstInterceptTableEntry *>(memAddr + i * sizeof(metal::InstInterceptTableEntry));
         Addr inst_addr = reinterpret_cast<Addr>(&memEnt->inst);
 
         // copy current thread's PCState info
@@ -1478,149 +1484,49 @@ ISA::getEilbPtr(void)
 void
 ISA::loadMroutineTable(void * raw, size_t count, unsigned int startIdx)
 {
-    MroutineTableEntry * ents = reinterpret_cast<MroutineTableEntry *> (raw);
+    metal::MroutineTableEntry * ents = reinterpret_cast<metal::MroutineTableEntry *> (raw);
     for (int i = 0; i < count; i++) {
-        MroutineTableEntry ent = ents[i];
+        metal::MroutineTableEntry ent = ents[i];
         // table format is little endian
         ent = gtoh(ent, byteOrder(this->tc));
-        const MRLBEntry entry(startIdx + i, ent.unshiftedAddr << ISA::MroutineTableEntryAddrShift, ent.valid);
+        const MRLBEntry entry(startIdx + i, ent.unshiftedAddr << metal::MroutineTableEntryAddrShift, ent.valid);
         mrlb.add(entry);
     }
 }
 
-bool
-ISA::checkInstInterceptMasked(void) const
+StaticInstPtr
+ISA::interceptInst(const StaticInstPtr &inst) const
 {
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
-    return metal_reg::isInstInterceptMasked(msr);
-}
+    metal::reg::MFLAGS_t mflags = tc->readMetalMiscRegNoEffect(metal::reg::MFLAGS);
 
-void
-ISA::doneInstInterceptMasked(void)
-{
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
-    msr.im = 0;
-    this->setMetalMiscReg(metal_reg::MSR, msr);
-}
-
-void ISA::setExcInterceptMaskFlag(bool val)
-{
-    this->excInterceptMask = val;
-}
-
-bool ISA::getExcInterceptMaskFlag(void) const
-{
-    return this->excInterceptMask;
-}
-
-bool
-ISA::checkExcInterceptMasked(void) const
-{
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
-    return metal_reg::isExcInterceptMasked(msr);
-}
-
-void
-ISA::doneExcInterceptMasked(void)
-{
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
-    msr.em = 0;
-    this->setMetalMiscReg(metal_reg::MSR, msr);
-}
-
-bool
-ISA::checkInterruptDisabled(void) const
-{
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
-    return metal_reg::isInterruptDisabled(msr);
-}
-
-void
-ISA::doneInterruptDisabled(void)
-{
-    metal_reg::MSR_t msr = this->readMetalMiscRegNoEffect(metal_reg::MSR);
-    msr.id = 0;
-    this->setMetalMiscReg(metal_reg::MSR, msr);
-}
-
-void ISA::setInterruptDisabledFlag(bool val)
-{
-    this->interruptMask = val;
-}
-
-bool ISA::getInterruptDisabledFlag(void) const
-{
-    return this->interruptMask;
-}
-
-bool
-ISA::checkInstIntercept(const StaticInstPtr &inst, bool post) const
-{
-    metal_reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(metal_reg::MFLAGS);
-
-    if (!metal_reg::isInstInterceptEnabled(mflags)) {
-        // ic flag is currently disabled or metal mode is disabled
-        return false;
+    if (!mflags.ii) {
+        return nullStaticInstPtr;
     }
 
-    const IILBEntry ent(inst, post);
+    const IILBEntry ent(inst);
     const IILBEntry & resultEnt = iilb.get(ent);
     if (&resultEnt == &IILB::NullEntry) {
-        return false;
+        return nullStaticInstPtr;
     }
-    ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+
+    const ArmStaticInst * armInst = dynamic_cast<const ArmStaticInst *>(inst.get());
     assert(armInst);
-    return true;
-}
+    const MachInst enc = armInst->encoding();
+    const RegVal mir0 = enc & resultEnt.getMask0();
+    const RegVal mir1 = enc & resultEnt.getMask1();
+    const RegVal mir2 = enc & resultEnt.getMask2();
 
-void
-ISA::doInstIntercept(const StaticInstPtr &inst, bool post)
-{
-    // METAL_XXX: probably somehow should only look it up once
-    // const IILBEntry findEnt(inst, post);
-    // const IILBEntry & ent = iilb.get(findEnt);
-    // assert (&ent != &IILB::NullEntry);
+    METAL_DBGPRINT(ISA, InterceptInst, "intercepting [inst = 0x%x, mnemonic = \"%s\"] -> IILB entry [inst = 0x%x, mnemonic = \"%s\", opMask = 0x%x, mroutine = %u, mask0 = 0x%x, mask1 = 0x%x, mask2 = 0x%x].\n",
+                                                                             ent.getArmStaticInst()->encoding(),
+                                                                             ent.getInst()->getName().c_str(),
+                                                                             resultEnt.getArmStaticInst()->encoding(),
+                                                                             resultEnt.getInst()->getName().c_str(), 
+                                                                             resultEnt.getOpMask(),
+                                                                             resultEnt.getMroutine(), resultEnt.getMask0(), 
+                                                                             resultEnt.getMask1(), resultEnt.getMask2());
 
-    // // lookup mroutine
-    // unsigned int mroutine = ent.getMroutine();
-    // const MRLBEntry & mrEnt = this->mrlb.get(mroutine);
-    // if (&mrEnt == &MRLB::NullEntry) {
-    //     panic("MRLB miss during inst intercept.\n");
-    // }
-
-    // ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
-    // assert(armInst);
-    // // reset upc in case we intercept a macro inst
-    // PCState pc = tc->pcState().as<PCState>();
-    // pc.uReset();
-    // tc->pcState(pc);
-
-    // Menter64::doMenter(this->tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true),
-    //             post ? pc.npc() : pc.pc());
-
-    // // set MIRs in the new reg window
-    // MachInst instBits = armInst->encoding();
-
-    // this->setMetalReg(metal_reg::MIR0, shiftInstMask(instBits, ent.getMask0()));
-    // this->setMetalReg(metal_reg::MIR1, shiftInstMask(instBits, ent.getMask1()));
-    // this->setMetalReg(metal_reg::MIR2, shiftInstMask(instBits, ent.getMask2()));
-
-    // // set CPSR
-    // CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
-    // cpsr.il = 0; // illegal execution
-    // cpsr.ss = 0; // single step
-    // tc->setMiscReg(MISCREG_CPSR, cpsr);
-
-    // // set MFLAGS to mask instruction intercept
-    // metal_reg::MFLAGS_t mflags = this->readMetalMiscReg(metal_reg::MFLAGS);
-    // mflags.ii = 0;
-    // this->setMetalMiscReg(metal_reg::MFLAGS, mflags);
-
-    // METAL_DBGPRINT(ISA, INSTINTR, "intercepting instruction 0x%x(\"%s\") at pc = 0x%lx, post = %d.\n",
-    //                                     armInst->encoding(),
-    //                                     inst->getName().c_str(),
-    //                                     pc.instAddr(),
-    //                                     post);
+    StaticInstPtr mint = new metal::inst::Mint64(0, resultEnt.getMroutine(), mir0, mir1, mir2);
+    return mint;
 }
 
 int
@@ -1648,12 +1554,17 @@ ISA::getEILBEntryFromFault(const ArmFault & armFault) const
     return result;
 }
 
+// Below is how PSTATE is stored in gem5 for aarch64:
+//
+// SPSEL (SS 21), CURRENTEL, PAN, UAO, Execution mode (M 0-3), Register Width (M 4), D/A/I/F still in CPSR
+// [NZ], [C], [V] each in a separate register
+// see https://developer.arm.com/documentation/100076/0100/Instruction-Set-Overview/Overview-of-AArch64-stateSaved-Program-Status-Registers-in-AArch64-state
 bool
-ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
+ISA::interceptExc(const Fault &fault, const StaticInstPtr &inst)
 {
-    metal_reg::MFLAGS_t mflags = this->readMetalMiscRegNoEffect(metal_reg::MFLAGS);
+    metal::reg::MFLAGS_t mflags = tc->readMetalMiscRegNoEffect(metal::reg::MFLAGS);
 
-    if (!metal_reg::isExcInterceptEnabled(mflags)) {
+    if (!mflags.ei) {
         return false;
     }
 
@@ -1671,75 +1582,66 @@ ISA::checkExcIntercept(const Fault &fault, const StaticInstPtr &inst) const
         return false;
     }
 
-    if (inst) {
-        auto armInst = dynamic_cast<ArmStaticInst *>(inst.get());
-        assert(armInst);
+    if (inst != nullStaticInstPtr) {
+        ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+        assert(armInst != nullptr);
         // annotate the fault for correct ESR
         armInst->annotateFault(armFault);
     }
 
-    const EILBEntry & result = getEILBEntryFromFault(*armFault);
-    if (&result != &EILB::NullEntry) {
-        return true;
+    const EILBEntry & eilbEnt = getEILBEntryFromFault(*armFault);
+    if (&eilbEnt == &EILB::NullEntry) {
+        return false;
     }
 
-    return false;
-}
+    METAL_DBGPRINT(ISA, InterceptExc, "*matched* EILB entry [excBits = 0x%lx, excMask = 0x%lx, mode = 0x%x, mroutine = %u]\n", 
+                                                 eilbEnt.getExcBits(),
+                                                 eilbEnt.getExcMask(),
+                                                 static_cast<int>(eilbEnt.getMode()),
+                                                 eilbEnt.getMroutine());
+  
+    // lookup MRLB
+    const MRLBEntry &mrlbEnt = mrlb.get(eilbEnt.getMroutine());
 
-// Below is how PSTATE is stored in gem5 for aarch64:
-//
-// SPSEL (SS 21), CURRENTEL, PAN, UAO, Execution mode (M 0-3), Register Width (M 4), D/A/I/F still in CPSR
-// [NZ], [C], [V] each in a separate register
-// see https://developer.arm.com/documentation/100076/0100/Instruction-Set-Overview/Overview-of-AArch64-stateSaved-Program-Status-Registers-in-AArch64-state
-void
-ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
-{
-    // auto armFault = dynamic_cast<ArmFault *>(fault.get());
-    // assert(armFault && armFault->isUpdated() && armFault->isFrom64() && armFault->isTo64());
+    if (&mrlbEnt == &MRLB::NullEntry || !mrlbEnt.isValid()) {
+        METAL_DBGPRINT(ISA, InterceptExc, "failed to locate mroutine %d.\n", eilbEnt.getMroutine());
+        return false;
+    }
 
-    // if (inst) {
-    //     auto armInst = dynamic_cast<ArmStaticInst *>(inst.get());
-    //     assert(armInst);
-    //     // annotate the fault for correct ESR
-    //     armInst->annotateFault(armFault);
-    // }
+    const Addr curr_pc = tc->pcState().instAddr();
+    const Addr npc = purifyTaggedAddr(mrlbEnt.getAddr(), tc, ::gem5::ArmISA::currEL(tc), true);
 
-    // const EILBEntry & result = getEILBEntryFromFault(*armFault);
-    // assert(&result != &EILB::NullEntry);
+    PCState pc;
+    set(pc, tc->pcState());
+    pc.uReset();
+    pc.pc(npc);
+    tc->pcState(pc);
+    
+    // increase metal level
+    if (metalInternalState.getLevel() >= metal::reg::MaxMetalLevel) {
+        panic("metal level overflow!");
+    }
+    metalInternalState.setLevel(metalInternalState.getLevel() + 1);
 
-    // const unsigned int mroutine = result.getMroutine();
-    // const MRLBEntry & mrEnt = this->mrlb.get(mroutine);
-    // if (&mrEnt == &MRLB::NullEntry) {
-    //     panic("MRLB miss during exc intercept.\n");
-    // }
+    // save link address
+    tc->setReg(metalRegClass[metal::reg::MLR], curr_pc);
 
-    // // METAL_XXX: this assumes the exception is taken from aarch64 mode so we don't care about thumb mode etc.
-    // const Addr curr_pc = tc->pcState().instAddr();
-    // const Addr ret_addr = curr_pc + armFault->armPcElrOffset();
+    // save spsr
+    const CPSR spsr = ArmFault::dumpPState64(tc, armFault->isFrom64(), armFault->isResetSPSR());
+    tc->setReg(metalRegClass[metal::reg::MSPSR], spsr);
 
-    // // reset upc in case we intercept a macro inst
-    // PCState pc = tc->pcState().as<PCState>();
-    // pc.uReset();
-    // tc->pcState(pc);
+    // set registers in the current window
+    // MER0 = ESR or intid
+    tc->setReg(metalRegClass[metal::reg::MER0], eilbEnt.getMode() == EILBMode::MODE_SYNC ?
+        static_cast<unsigned long>(armFault->getSyndrome(tc)) : this->armFaultToIntID(*armFault));
 
-    // Menter64::doMenter(tc, purifyTaggedAddr(mrEnt.getAddr(), tc, currEL(), true), ret_addr);
+    // MER1 = Fault VADDR (if available)
+    Addr fvaddr;
+    if (armFault->getFaultVAddr(fvaddr)) {
+        tc->setReg(metalRegClass[metal::reg::MER1], fvaddr);
+    }
 
-    // // set registers in the current window
-    // // MER0 = ESR or intid
-    // this->setMetalReg(metal_reg::MER0, result.getMode() == EILBMode::MODE_SYNC ?
-    //     static_cast<int>(armFault->getSyndrome(tc)) : this->armFaultToIntID(*armFault));
-
-    // // MER1 = Fault VADDR (if available)
-    // Addr fvaddr;
-    // if (armFault->getFaultVAddr(fvaddr)) {
-    //     this->setMetalReg(metal_reg::MER1, fvaddr);
-    // }
-
-    // // rewrite MSPSR using fault
-    // CPSR spsr = ArmFault::dumpPState64(tc, armFault->isFrom64(), armFault->isResetSPSR());
-    // this->setMetalReg(metal_reg::MSPSR, spsr);
-
-    // // set CPSR for exceptions
+    // update CPSR for exceptions
     // CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);
     // cpsr.daif = 0b1111; // mask interrupts and exceptions
     // cpsr.il = 0; // illegal execution
@@ -1748,11 +1650,13 @@ ISA::doExcIntercept(const Fault &fault, const StaticInstPtr &inst)
     // cpsr.uao = 0; // user access override
     // tc->setMiscReg(MISCREG_CPSR, cpsr);
 
-    // METAL_DBGPRINT(ISA, EXCINTR, "intercepting exception: mode = 0x%x, MRT = %d, MER0 = 0x%lx, MER1 = 0x%lx.\n",
-    //                                     result.getMroutine(),
-    //                                     static_cast<int>(result.getMode()),
-    //                                     tc->readMetalReg(RegId(MetalRegClass, metal_reg::MER0)),
-    //                                     tc->readMetalReg(RegId(MetalRegClass metal_reg::MER1)));
+    METAL_DBGPRINT(ISA, InterceptExc, "intercepting exception: mroutine = 0x%x, mode = %d, MER0 = 0x%lx, MER1 = 0x%lx.\n",
+                                        eilbEnt.getMroutine(),
+                                        static_cast<int>(eilbEnt.getMode()),
+                                        tc->getReg(metalRegClass[metal::reg::MER0]),
+                                        tc->getReg(metalRegClass[metal::reg::MER1]));
+    
+    return true;
 }
 
 RegVal
@@ -1782,22 +1686,31 @@ ISA::resetMetalRegs(void)
 RegVal
 ISA::readMetalMiscReg(RegIndex idx) const
 {
-    assert(idx < metal_reg::NumMiscRegs);
+    assert(idx < metal::reg::NumMiscRegs);
     return readMetalMiscRegNoEffect(idx);
 }
 
 RegVal
 ISA::readMetalMiscRegNoEffect(RegIndex idx) const
 {
-    assert(idx < metal_reg::NumMiscRegs);
+    assert(idx < metal::reg::NumMiscRegs);
     RegVal ret;
+    metal::reg::MSR_t msr;
+    gem5::metal::InternalFlags flags;
     switch (idx)
     {
-        case metal_reg::MSTK:
+        case metal::reg::MSTK:
           ret = this->tc->getReg({flatIntRegClass, int_reg::Spm});
           break;
-        case metal_reg::MSR:
-          ret = metalInternalState.getMSR();
+        case metal::reg::MSR:
+          msr = 0;
+          flags = metalInternalState.getFlags();
+          msr.lv = metalInternalState.getLevel();
+          msr.id = flags.isSet(gem5::metal::FLAG_INST_INTERCEPT_MASK);
+          msr.im = flags.isSet(gem5::metal::FLAG_INTERRUPT_MASK);
+          msr.em = flags.isSet(gem5::metal::FLAG_EXC_INTERCEPT_MASK);
+          msr.init = flags.isSet(metal::METAL_FLAG_INIT);
+          ret = msr;
           break;
         default:
           ret = this->metalMiscRegs.at(idx);
@@ -1808,15 +1721,15 @@ ISA::readMetalMiscRegNoEffect(RegIndex idx) const
 void
 ISA::setMetalMiscRegNoEffect(RegIndex idx, RegVal val)
 {
-    assert(idx < metal_reg::NumMiscRegs);
+    assert(idx < metal::reg::NumMiscRegs);
     METAL_DBGPRINT(ISA, REGS, "Setting Metal Misc Reg %s to 0x%lx.\n", ArmStaticInst::printMetalMiscReg(idx), val);
 
     switch (idx)
     {
-        case metal_reg::MSTK:
+        case metal::reg::MSTK:
             this->tc->setReg({flatIntRegClass, int_reg::Spm}, val);
             break;
-        case metal_reg::MSR : {
+        case metal::reg::MSR : {
             METAL_DBGPRINT(ISA, REGS, "WARNING: Ignoring MSR write (0x%lx).\n", val);
             break;
         }
@@ -1828,28 +1741,28 @@ ISA::setMetalMiscRegNoEffect(RegIndex idx, RegVal val)
 void
 ISA::setMetalMiscReg(RegIndex idx, RegVal val)
 {
-    assert(idx < metal_reg::NumMiscRegs);
+    assert(idx < metal::reg::NumMiscRegs);
 
     switch (idx) {
-        case metal_reg::MIB : {
+        case metal::reg::MIB : {
             this->iilb.flush();
             break;
         }
-        case metal_reg::MBR : {
-            if ((val & (sizeof(MroutineTableEntry) - 1)) != 0) {
-                METAL_DBGPRINT(ISA, REGS, "MBR is not %d byte aligned: 0x%lx.\n", sizeof(MroutineTableEntry), val);
-                val = val & (~((sizeof(MroutineTableEntry) - 1)));
+        case metal::reg::MBR : {
+            if ((val & (sizeof(metal::MroutineTableEntry) - 1)) != 0) {
+                METAL_DBGPRINT(ISA, REGS, "MBR is not %d byte aligned: 0x%lx.\n", sizeof(metal::MroutineTableEntry), val);
+                val = val & (~((sizeof(metal::MroutineTableEntry) - 1)));
             }
 
             this->mrlb.flushAll();
             break;
         }
-        case metal_reg::MFLAGS : {
-            metal_reg::MFLAGS_t new_val = val;
-            metal_reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(idx);
-            if (mflags.pd != new_val.pd) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[pd]: %d -> %d.\n", mflags.pd, new_val.pd);
-            }
+        case metal::reg::MFLAGS : {
+            metal::reg::MFLAGS_t new_val = val;
+            metal::reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(idx);
+            // if (mflags.pd != new_val.pd) {
+            //     METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[pd]: %d -> %d.\n", mflags.pd, new_val.pd);
+            // }
             if (mflags.ii != new_val.ii) {
                 METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[ii]:  %d -> %d.\n", mflags.ii, new_val.ii);
             }
@@ -1858,11 +1771,11 @@ ISA::setMetalMiscReg(RegIndex idx, RegVal val)
             }
             break;
         }
-        case metal_reg::MSR : {
+        case metal::reg::MSR : {
             METAL_DBGPRINT(ISA, REGS, "WARNING: Ignoring MSR write (0x%lx).\n", val);
             break;
         }
-        case metal_reg::MTP: {
+        case metal::reg::MTP: {
             static_cast<MMU *>(tc->getMMUPtr())->invalidateMiscReg();
             break;
         }

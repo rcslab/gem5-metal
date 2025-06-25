@@ -2,11 +2,11 @@
 
 
 #include "arch/arm/insts/metal/common.hh"
-#include "cpu/metal_int_state.hh"
 #include "arch/generic/memhelpers.hh"
 
 namespace gem5 {
 namespace ArmISA {
+namespace metal { namespace inst {
     class Mliit64_u : public MetalMicroInst
     {
     protected:
@@ -22,7 +22,7 @@ namespace ArmISA {
         Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override
         {
             ThreadContext *tc = xc->tcBase();
-            const RegVal mib = tc->readMetalMiscRegNoEffect(metal_reg::MIB);
+            const RegVal mib = tc->readMetalMiscRegNoEffect(reg::MIB);
             const Addr base = purifyTaggedAddr(this->offset + mib, tc, currEL(tc), true);
 
             // no permission check here because wmcr_u already checks it
@@ -38,14 +38,14 @@ namespace ArmISA {
         {
             ThreadContext *tc = xc->tcBase();
             ISA * isa = static_cast<ISA *>(tc->getIsaPtr());
-            RegVal mib = tc->readMetalMiscRegNoEffect(metal_reg::MIB);
+            RegVal mib = tc->readMetalMiscRegNoEffect(reg::MIB);
 
             if (pkt->isError()) {
                 panic("Data fetch failed.");
             }
 
-            static char buf[ISA::InstInterceptTableLoadSize];
-            assert(this->size <= ISA::InstInterceptTableLoadSize);
+            static char buf[InstInterceptTableLoadSize];
+            assert(this->size <= InstInterceptTableLoadSize);
             getMemRawPtr(pkt, buf, this->size, traceData);
             isa->loadInstInterceptTable(buf, purifyTaggedAddr(this->offset + mib, tc, currEL(tc), true), this->size);
             return NoFault;
@@ -66,5 +66,6 @@ namespace ArmISA {
             return ss.str();
         }
     };
+}}
 }
 }

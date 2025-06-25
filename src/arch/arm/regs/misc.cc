@@ -41,6 +41,7 @@
 
 #include "arch/arm/insts/misc64.hh"
 #include "arch/arm/isa.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "base/logging.hh"
 #include "cpu/thread_context.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
@@ -729,15 +730,18 @@ Fault
 checkFaultAccessAArch64SysReg(MiscRegIndex reg, CPSR cpsr,
                               ThreadContext *tc, const MiscRegOp64 &inst)
 {
-    if (metal_reg::isInMetalMode(tc->readMetalMiscRegNoEffect(metal_reg::MSR))) {
+    // we can use the threadcontext here because aarch64 sys reg accesses are serializing
+    if (tc->getIsaPtr()->getMetalState().getLevel() > 0) {
       // allow access to privileged system regs in Metal mode
       return NoFault;
     }
+
+    // const metal_reg::MFLAGS_t mflags = tc->readMetalMiscRegNoEffect(metal_reg::MFLAGS);
     
-    if (!metal_reg::isPrivInstsEnabled(tc->readMetalMiscRegNoEffect(metal_reg::MFLAGS))) {
-      // if we disabled access to privileged system registers, simulate the read/write from el0 (user mode)
-      return lookUpMiscReg[reg].checkFault(tc, inst, EL0);
-    }
+    // if (mflags.pd) {
+    //   // if we disabled access to privileged system registers, simulate the read/write from el0 (user mode)
+    //   return lookUpMiscReg[reg].checkFault(tc, inst, EL0);
+    // }
 
     return lookUpMiscReg[reg].checkFault(tc, inst, currEL(cpsr));
 }
