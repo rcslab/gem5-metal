@@ -70,6 +70,7 @@
 #include "dev/arm/generic_timer.hh"
 #include "dev/arm/gic_v3.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
+#include "enums/OpClass.hh"
 #include "params/ArmISA.hh"
 #include "sim/faults.hh"
 #include "sim/stat_control.hh"
@@ -1582,12 +1583,10 @@ ISA::interceptExc(const Fault &fault, const StaticInstPtr &inst)
         return false;
     }
 
-    if (inst != nullStaticInstPtr) {
-        ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
-        assert(armInst != nullptr);
-        // annotate the fault for correct ESR
-        armInst->annotateFault(armFault);
-    }
+    // annotate the fault for correct ESR
+    ArmStaticInst * armInst = dynamic_cast<ArmStaticInst *>(inst.get());
+    if (armInst != nullptr)
+          armInst->annotateFault(armFault);
 
     const EILBEntry & eilbEnt = getEILBEntryFromFault(*armFault);
     if (&eilbEnt == &EILB::NullEntry) {

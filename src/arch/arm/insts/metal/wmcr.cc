@@ -3,6 +3,7 @@
 #include "arch/arm/insts/metal/uops/mlmrt_u.hh"
 #include "arch/arm/insts/metal/uops/wmcr_u.hh"
 #include "arch/arm/insts/metal/uops/mliit_u.hh"
+#include "enums/StaticInstFlags.hh"
 
 namespace gem5 {
     namespace ArmISA {
@@ -31,6 +32,8 @@ namespace gem5 {
             this->microOps = new StaticInstPtr[this->numMicroops];
             StaticInst * inst = new Wmcr64_u(_machInst, mReg, gReg);
             this->microOps[0] = inst;
+            this->microOps[0]->setFlag(IsSerializeAfter);
+            this->microOps[0]->setFlag(IsNonSpeculative);
 
             if (mReg == reg::MIB) {
                 for (int i = 0; i < InstInterceptTableTotalSize / InstInterceptTableLoadSize; i++) {

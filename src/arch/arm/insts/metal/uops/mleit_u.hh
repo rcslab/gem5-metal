@@ -34,7 +34,7 @@ namespace metal { namespace inst {
                 traceData->setMem(base, this->size, ArmISA::MMU::AllowUnaligned);
             }
 
-            return NoFault;
+            return fault;
         }
 
         Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override

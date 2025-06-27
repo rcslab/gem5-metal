@@ -677,6 +677,7 @@ Commit::handleInterrupt()
     }
 
     auto * isa = thread[0]->getTC()->getIsaPtr();
+    const auto & mist = isa->getMetalState();
     // Wait until all in flight instructions are finished before enterring
     // the interrupt.
     if (canHandleInterrupts && cpu->instList.empty()) {
@@ -699,7 +700,8 @@ Commit::handleInterrupt()
         // interrupt that the interrupt controller thinks is being handled.
         cpu->processInterrupts(cpu->getInterrupts());
 
-        if (isa->interceptExc(interrupt, nullStaticInstPtr)) {
+        if (!mist.getFlags().isSet(metal::FLAG_EXC_INTERCEPT_MASK) && 
+                isa->interceptExc(interrupt, nullStaticInstPtr)) {
             DPRINTF(Commit, "Intercepting Interrupt %s.", interrupt->name());
         } else {
             cpu->trap(interrupt, 0, nullptr);
@@ -825,8 +827,6 @@ Commit::commit()
             // All younger instructions will be squashed. Set the sequence
             // number as the youngest instruction in the ROB.
             youngestSeqNum[tid] = squashed_inst;
-            DynInstPtr squashInst = rob->findInst(tid, squashed_inst);
-            const auto& state = squashInst->getMetalState();
             rob->squash(squashed_inst, tid);
             changedROBNumEntries[tid] = true;
 
@@ -834,7 +834,7 @@ Commit::commit()
 
             toIEW->commitInfo[tid].squash = true;
 
-            toIEW->commitInfo[tid].squashMist.set(state);
+            toIEW->commitInfo[tid].squashMist.set(fromIEW->squashedMist[tid]);
 
             // Send back the rob squashing signal so other stages know that
             // the ROB is in the process of squashing.
@@ -844,7 +844,7 @@ Commit::commit()
                 fromIEW->mispredictInst[tid];
             toIEW->commitInfo[tid].branchTaken =
                 fromIEW->branchTaken[tid];
-            toIEW->commitInfo[tid].squashInst = squashInst;
+            toIEW->commitInfo[tid].squashInst = rob->findInst(tid, squashed_inst);;
             if (toIEW->commitInfo[tid].mispredictInst) {
                 if (toIEW->commitInfo[tid].mispredictInst->isUncondCtrl()) {
                      toIEW->commitInfo[tid].branchTaken = true;
@@ -1224,7 +1224,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         const auto & mist = head_inst->getPreExecMetalState();
         const auto miflags = mist.getFlags();
 
-        if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK) && 
+        if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK) &&
             isa->interceptExc(inst_fault, head_inst->staticInst)) {
 
             DPRINTF(Commit,

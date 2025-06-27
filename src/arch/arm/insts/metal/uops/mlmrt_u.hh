@@ -31,7 +31,7 @@ namespace metal { namespace inst {
             Fault fault = initiateMemRead(xc, base, this->size, ArmISA::MMU::AllowUnaligned);
             if(traceData)
                 traceData->setMem(base, this->size, ArmISA::MMU::AllowUnaligned | ArmISA::MMU::BypassMMU);
-            return NoFault;
+            return fault;
         }
 
         Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override

@@ -1122,6 +1122,11 @@ CPU::addInst(const DynInstPtr &inst)
     return --(instList.end());
 }
 
+DynInstPtr getInst(ThreadID tid, const InstSeqNum &seq_num)
+{
+    
+}
+
 void
 CPU::instDone(ThreadID tid, const DynInstPtr &inst)
 {

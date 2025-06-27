@@ -51,6 +51,7 @@
 
 #include "arch/generic/pcstate.hh"
 #include "base/statistics.hh"
+#include "cpu/inst_seq.hh"
 #include "cpu/o3/comm.hh"
 #include "cpu/o3/commit.hh"
 #include "cpu/o3/decode.hh"
@@ -348,6 +349,8 @@ class CPU : public BaseCPU
 
     /** Function to tell the CPU that an instruction has completed. */
     void instDone(ThreadID tid, const DynInstPtr &inst);
+
+    DynInstPtr getInst(ThreadID tid, const InstSeqNum &seq_num);
 
     /** Remove an instruction from the front end of the list.  There's
      *  no restriction on location of the instruction.

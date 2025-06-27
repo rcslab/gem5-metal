@@ -1244,7 +1244,7 @@ Fetch::fetch(bool &status_change)
                     
                     const metal::InternalFlags miflags = transientMetalState.getFlags();
 
-                    if (!miflags.isSet(metal::FLAG_INST_INTERCEPT_MASK)) {
+                    if (!miflags.isSet(metal::FLAG_INST_INTERCEPT_MASK) && transientMetalState.getLevel() == 0) {
                         StaticInstPtr interceptInst = isa->interceptInst(staticInst);
                         if (interceptInst != nullStaticInstPtr) {
                             DPRINTF(Fetch, "intercepting instruction \"%s\" @ %s.\n",

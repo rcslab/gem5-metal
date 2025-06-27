@@ -424,6 +424,7 @@ IEW::squashDueToBranch(const DynInstPtr& inst, ThreadID tid)
             inst->seqNum < toCommit->squashedSeqNum[tid]) {
         toCommit->squash[tid] = true;
         toCommit->squashedSeqNum[tid] = inst->seqNum;
+        toCommit->squashedMist[tid].set(inst->getMetalState());
         toCommit->branchTaken[tid] = inst->pcState().branching();
 
         set(toCommit->pc[tid], inst->pcState());
@@ -453,6 +454,7 @@ IEW::squashDueToMemOrder(const DynInstPtr& inst, ThreadID tid)
         toCommit->squash[tid] = true;
 
         toCommit->squashedSeqNum[tid] = inst->seqNum;
+        toCommit->squashedMist[tid].set(inst->getMetalState());
         set(toCommit->pc[tid], inst->pcState());
         toCommit->mispredictInst[tid] = NULL;
 
