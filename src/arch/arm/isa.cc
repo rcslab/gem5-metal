@@ -54,6 +54,7 @@
 #include "arch/generic/decoder.hh"
 #include "arch/arm/insts/static_inst.hh"
 #include "arch/arm/insts/metal.hh"
+#include "base/addr_range.hh"
 #include "base/cprintf.hh"
 #include "base/random.hh"
 #include "cpu/base.hh"
@@ -95,6 +96,7 @@ ISA::ISA(const Params &p) : BaseISA(p), system(NULL),
 {
     _regClasses.push_back(&flatIntRegClass);
     _regClasses.push_back(&metalRegClass);
+    _regClasses.push_back(&metalGlobalRegClass);
     _regClasses.push_back(&floatRegClass);
     _regClasses.push_back(&vecRegClass);
     _regClasses.push_back(&vecElemClass);
@@ -213,13 +215,14 @@ ISA::copyRegsFrom(ThreadContext *src)
     for (int i = 0; i < NUM_MISCREGS; i++)
         tc->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
 
-    // copy window
     for (int i = 0; i < metal::reg::NumRegs; i++)
-        // need to copy full window
-        panic("unimplemented");
+        tc->setReg(flatMetalRegClass[i], src->getReg(flatMetalRegClass[i]));
 
     for (int i = 0; i < metal::reg::NumMiscRegs; i++)
         tc->setMetalMiscRegNoEffect(i, src->readMetalMiscRegNoEffect(i));
+
+    for (int i = 0; i < metal::reg::NumGlobalRegs; i++)
+        tc->setReg(metalGlobalRegClass[i], src->getReg(metalGlobalRegClass[i]));
 
     ArmISA::VecRegContainer vc;
     for (auto &id: vecRegClass) {
@@ -1498,7 +1501,7 @@ ISA::loadMroutineTable(void * raw, size_t count, unsigned int startIdx)
 StaticInstPtr
 ISA::interceptInst(const StaticInstPtr &inst) const
 {
-    metal::reg::MFLAGS_t mflags = tc->readMetalMiscRegNoEffect(metal::reg::MFLAGS);
+    metal::reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(metal::reg::MFLAGS);
 
     if (!mflags.ii) {
         return nullStaticInstPtr;
@@ -1563,7 +1566,7 @@ ISA::getEILBEntryFromFault(const ArmFault & armFault) const
 bool
 ISA::interceptExc(const Fault &fault, const StaticInstPtr &inst)
 {
-    metal::reg::MFLAGS_t mflags = tc->readMetalMiscRegNoEffect(metal::reg::MFLAGS);
+    metal::reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(metal::reg::MFLAGS);
 
     if (!mflags.ei) {
         return false;
@@ -1680,6 +1683,13 @@ ISA::resetMetalRegs(void)
     for(int i = 0; i < this->metalMiscRegs.size(); i++) {
         this->metalMiscRegs.at(i) = 0;
     }
+    
+    // set Metal mode registers
+    if (system->getMRAM() != nullptr) {
+        const AddrRange & range = system->getMRAM()->getAddrRange();
+        this->setMetalMiscRegNoEffect(metal::reg::MMSZ, range.size());
+        this->setMetalMiscRegNoEffect(metal::reg::MMPA,range.start());
+    }
 }
 
 RegVal
@@ -1721,67 +1731,54 @@ void
 ISA::setMetalMiscRegNoEffect(RegIndex idx, RegVal val)
 {
     assert(idx < metal::reg::NumMiscRegs);
-    METAL_DBGPRINT(ISA, REGS, "Setting Metal Misc Reg %s to 0x%lx.\n", ArmStaticInst::printMetalMiscReg(idx), val);
-
     switch (idx)
     {
         case metal::reg::MSTK:
             this->tc->setReg({flatIntRegClass, int_reg::Spm}, val);
             break;
-        case metal::reg::MSR : {
-            METAL_DBGPRINT(ISA, REGS, "WARNING: Ignoring MSR write (0x%lx).\n", val);
-            break;
-        }
-        default:
-          this->metalMiscRegs.at(idx) = val;
+        default:  
+            this->metalMiscRegs.at(idx) = val;
     }
+    METAL_DBGPRINT(ISA, REGS, "Setting %s to 0x%lx.\n", ArmStaticInst::printMetalMiscReg(idx), val);
 }
 
 void
 ISA::setMetalMiscReg(RegIndex idx, RegVal val)
 {
     assert(idx < metal::reg::NumMiscRegs);
-
+    bool skipWrite = false;
     switch (idx) {
         case metal::reg::MIB : {
             this->iilb.flush();
             break;
         }
+        case metal::reg::MEB: {
+            this->eilb.flush();
+            break;
+        }
         case metal::reg::MBR : {
             if ((val & (sizeof(metal::MroutineTableEntry) - 1)) != 0) {
-                METAL_DBGPRINT(ISA, REGS, "MBR is not %d byte aligned: 0x%lx.\n", sizeof(metal::MroutineTableEntry), val);
+                METAL_DBGPRINT(ISA, REGS, "warning: MBR is not %d byte aligned: 0x%lx.\n", sizeof(metal::MroutineTableEntry), val);
                 val = val & (~((sizeof(metal::MroutineTableEntry) - 1)));
             }
 
             this->mrlb.flushAll();
             break;
         }
-        case metal::reg::MFLAGS : {
-            metal::reg::MFLAGS_t new_val = val;
-            metal::reg::MFLAGS_t mflags = readMetalMiscRegNoEffect(idx);
-            // if (mflags.pd != new_val.pd) {
-            //     METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[pd]: %d -> %d.\n", mflags.pd, new_val.pd);
-            // }
-            if (mflags.ii != new_val.ii) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[ii]:  %d -> %d.\n", mflags.ii, new_val.ii);
-            }
-            if (mflags.ei != new_val.ei) {
-                METAL_DBGPRINT(ISA, REGS, "Setting MFLAGS.[ei]:  %d -> %d.\n", mflags.ei, new_val.ei);
-            }
+        case metal::reg::MMSZ:
+        case metal::reg::MMPA:
+        case metal::reg::MSR:
+            METAL_DBGPRINT(ISA, REGS, "warning: ignoring write to %s -> %#x.\n", ArmStaticInst::printMetalMiscReg(idx), val);
+            skipWrite = true;
             break;
-        }
-        case metal::reg::MSR : {
-            METAL_DBGPRINT(ISA, REGS, "WARNING: Ignoring MSR write (0x%lx).\n", val);
-            break;
-        }
-        case metal::reg::MTP: {
+        case metal::reg::MMVA:
+        case metal::reg::MTP:
             static_cast<MMU *>(tc->getMMUPtr())->invalidateMiscReg();
             break;
-        }
     }
 
-    setMetalMiscRegNoEffect(idx, val);
-    // updateRegMap(this->miscRegs[MISCREG_CPSR], readMetalMiscRegNoEffect(metal_reg::MSR));
+    if (!skipWrite)
+        setMetalMiscRegNoEffect(idx, val);
 }
 
 BaseISADevice &

@@ -16,7 +16,7 @@ namespace gem5 {
         {
             const auto & state = xc->getMetalState();
 
-            RegVal v = xc->getRegOperand(this, 0);
+            const RegVal v = xc->getRegOperand(this, 0);
 
             METAL_DBGPRINT(INSTS, RMR, "%s @ Lv.%d (0x%lx).\n", printMetalReg(mReg), state.getLevel(), v);
 

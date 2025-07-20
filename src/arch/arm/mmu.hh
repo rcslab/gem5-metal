@@ -42,6 +42,7 @@
 #define __ARCH_ARM_MMU_HH__
 
 #include "arch/arm/page_size.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "arch/arm/tlb.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/mmu.hh"
@@ -163,6 +164,9 @@ class MMU : public BaseMMU
             hcr = rhs.hcr;
             dacr = rhs.dacr;
             mtp = rhs.mtp;
+            mmva = rhs.mmva;
+            mmpa = rhs.mmpa;
+            mmsz = rhs.mmsz;
             miscRegValid = rhs.miscRegValid;
             curTranType = rhs.curTranType;
             stage2Req = rhs.stage2Req;
@@ -185,6 +189,9 @@ class MMU : public BaseMMU
         bool isStage2 = false;
         CPSR cpsr = 0;
         RegVal mtp = 0;
+        RegVal mmpa = 0;
+        metal::reg::MMVA_t mmva = 0;
+        RegVal mmsz = 0;
         bool aarch64 = false;
         ExceptionLevel aarch64EL = EL0;
         SCTLR sctlr = 0;
@@ -271,7 +278,12 @@ class MMU : public BaseMMU
             const RequestPtr &req, ThreadContext *tc,
             Translation *translation, Mode mode,
             ArmTranslationType tran_type, bool stage2);
-
+    
+    bool isMRAMPAddr(Addr paddr, const CachedState &state) const;
+    bool isMRAMVAddr(Addr vaddr, const CachedState &state) const;
+    Fault translateMRAM(ThreadContext *tc, const RequestPtr &req, Mode mode,
+        ArmTranslationType tran_type, Addr vaddr, bool long_desc_format,
+        CachedState &state);
     Fault translateMmuOff(ThreadContext *tc, const RequestPtr &req, Mode mode,
         ArmTranslationType tran_type, Addr vaddr, bool long_desc_format,
         CachedState &state);

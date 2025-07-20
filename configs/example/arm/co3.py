@@ -69,10 +69,10 @@ class L2(Cache):
 # l1_icache_class, l1_dcache_class, walk_cache_class, l2_Cache_class). Any of
 # the cache class may be 'None' if the particular cache is not present.
 cpu_types = {
-    "atomic": (AtomicSimpleCPU, None, None, None),
+    # "atomic": (AtomicSimpleCPU, None, None, None),
     "timing": (TimingSimpleCPU, L1I, L1D, L2),
-    "minor": (MinorCPU, devices.L1I, devices.L1D, devices.L2),
-    "hpi": (HPI.HPI, HPI.HPI_ICache, HPI.HPI_DCache, HPI.HPI_L2),
+    # "minor": (MinorCPU, devices.L1I, devices.L1D, devices.L2),
+    # "hpi": (HPI.HPI, HPI.HPI_ICache, HPI.HPI_DCache, HPI.HPI_L2),
     "o3": (
         O3_ARM_v7a.O3_ARM_v7a_3,
         O3_ARM_v7a.O3_ARM_v7a_ICache,
@@ -160,8 +160,7 @@ def create(args):
     system.connect()
 
     # Add CPU clusters to the system
-    system.cpu_cluster = [
-        devices.ArmCpuCluster(
+    armcluster = devices.ArmCpuCluster(
             system,
             args.num_cores,
             args.cpu_freq,
@@ -170,7 +169,8 @@ def create(args):
             tarmac_gen=args.tarmac_gen,
             tarmac_dest=args.tarmac_dest,
         )
-    ]
+    armcluster.connectMRAM(system.realview.mram)
+    system.cpu_cluster = armcluster
 
     # Create a cache hierarchy for the cluster. We are assuming that
     # clusters have core-private L1 caches and an L2 that's shared

@@ -57,6 +57,7 @@
 #include "mem/abstract_mem.hh"
 #include "sim/serialize.hh"
 #include "sim/sim_exit.hh"
+#include "mem/metal/mram.hh"
 
 /**
  * On Linux, MAP_NORESERVE allow us to simulate a very large memory

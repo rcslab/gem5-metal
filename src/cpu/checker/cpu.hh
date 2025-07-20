@@ -118,6 +118,15 @@ class CheckerCPU : public BaseCPU, public ExecContext
         return *icachePort;
     }
 
+    
+    Port & getMRAMInstPort() override {
+        panic("unimplemented");
+    }
+
+    Port & getMRAMDataPort() override {
+        panic("unimplemented");
+    }
+
   protected:
 
     std::vector<Process*> workload;

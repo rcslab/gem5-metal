@@ -59,6 +59,7 @@ enum RegClassType
 {
     IntRegClass,        ///< Integer register
     MetalRegClass,      ///< Metal Registers
+    MetalGlobalRegClass, ///< Metal Global register>
     FloatRegClass,      ///< Floating-point register
     /** Vector Register. */
     VecRegClass,
@@ -83,7 +84,8 @@ inline constexpr char MatRegClassName[] = "matrix";
 inline constexpr char CCRegClassName[] = "condition_code";
 inline constexpr char MiscRegClassName[] = "miscellaneous";
 inline constexpr char MetalRegClassName[] = "metal";
-inline constexpr char MetalMiscRegClassName[] = "metalmisc";
+inline constexpr char MetalMiscRegClassName[] = "metal_misc";
+inline constexpr char MetalGlobalRegClassName[] = "metal_global";
 
 class RegClass;
 class RegClassIterator;

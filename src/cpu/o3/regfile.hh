@@ -48,6 +48,7 @@
 #include "arch/generic/isa.hh"
 #include "base/trace.hh"
 #include "cpu/o3/comm.hh"
+#include "cpu/reg_class.hh"
 #include "cpu/regfile.hh"
 #include "debug/IEW.hh"
 
@@ -78,6 +79,10 @@ class PhysRegFile
     /** Metal register file **/
     RegFile metalRegFile;
     std::vector<PhysRegId> metalRegIds;
+
+    /** Metal register file **/
+    RegFile metalGlobalRegFile;
+    std::vector<PhysRegId> metalGlobalRegIds;
 
     /** Floating point register file. */
     RegFile floatRegFile;
@@ -120,6 +125,11 @@ class PhysRegFile
     unsigned numPhysicalMetalRegs;
 
     /**
+     * Number of physical Metal global registers
+     */
+    unsigned numPhysicalMetalGlobalRegs;
+
+    /**
      * Number of physical floating point registers
      */
     unsigned numPhysicalFloatRegs;
@@ -159,6 +169,7 @@ class PhysRegFile
      */
     PhysRegFile(unsigned _numPhysicalIntRegs,
                 unsigned _numPhysicalMetalRegs,
+                unsigned _numPhysicalMetalGlobalRegs,
                 unsigned _numPhysicalFloatRegs,
                 unsigned _numPhysicalVecRegs,
                 unsigned _numPhysicalVecPredRegs,
@@ -217,6 +228,11 @@ class PhysRegFile
           case MetalRegClass:
             val = metalRegFile.reg(idx);
             DPRINTF(IEW, "RegFile: Access to Metal register %i has data %#x\n",
+                    idx, val);
+            return val;
+          case MetalGlobalRegClass:
+            val = metalGlobalRegFile.reg(idx);
+            DPRINTF(IEW, "RegFile: Access to Metal global register %i has data %#x\n",
                     idx, val);
             return val;
           default:
@@ -316,6 +332,11 @@ class PhysRegFile
           case MetalRegClass:
               metalRegFile.reg(idx) = val;
               DPRINTF(IEW, "RegFile: Setting Metal register %i to %#x\n",
+                    idx, val);
+              break;
+          case MetalGlobalRegClass:
+              metalGlobalRegFile.reg(idx) = val;
+              DPRINTF(IEW, "RegFile: Setting Metal global register %i to %#x\n",
                     idx, val);
               break;
           default:

@@ -252,6 +252,12 @@ namespace Aarch64
                     case 0b0011: {
                         return new gem5::ArmISA::metal::inst::Wmcr64(machInst, r1, r2);
                     }
+                    case 0b0100: {
+                        return new gem5::ArmISA::metal::inst::Rmgr64(machInst, r1, r2);
+                    }
+                    case 0b0101: {
+                        return new gem5::ArmISA::metal::inst::Wmgr64(machInst, r1, r2);
+                    }
                     default: {
                         return new Unknown64(machInst);
                     }

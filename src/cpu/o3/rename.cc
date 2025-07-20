@@ -1044,6 +1044,7 @@ Rename::renameSrcRegs(const DynInstPtr &inst, ThreadID tid)
           case CCRegClass:
           case MiscRegClass:
           case MetalRegClass:
+          case MetalGlobalRegClass:
           case MetalMiscRegClass:
             break;
 

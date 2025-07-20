@@ -30,19 +30,18 @@ namespace metal { namespace inst {
 
         Fault preExec(ExecContext *xc, trace::InstRecord *traceData) override
         {
-            auto mist = xc->getMetalState();
-            const RegVal mar = xc->tcBase()->readMetalMiscRegNoEffect(reg::MAR);
+            const auto mist = xc->getMetalState();
 
-            if (!reg::canAccessMiscReg(mReg, mist, mar, true)) {
-                METAL_DBGPRINT(INSTS, WMCR_U, "Permission denied: %s. MAR: 0x%lx, MetalState: [%s].\n", printMetalMiscReg(mReg), mar, mist.toStr().c_str());
+            if (!reg::canAccessMiscReg(mReg, mist, true)) {
+                METAL_DBGPRINT(INSTS, WMCR_U, "Permission denied: %s. MetalState: [%s].\n", printMetalMiscReg(mReg), mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            if (!(mist.getFlags() & METAL_FLAG_INIT) && reg::isInitReg(mReg) && reg::isSetInit(mReg)) {
-                mist.setFlags(METAL_FLAG_INIT);
-            }
+            // if (!(mist.getFlags() & METAL_FLAG_INIT) && reg::isSetInit(mReg)) {
+            //     mist.setFlags(METAL_FLAG_INIT);
+            // }
 
-            xc->setMetalState(mist);
+            //xc->setMetalState(mist);
 
             return NoFault;
         }

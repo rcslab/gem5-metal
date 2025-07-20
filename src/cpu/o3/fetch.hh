@@ -91,7 +91,7 @@ class Fetch
 
       public:
         /** Default constructor. */
-        IcachePort(Fetch *_fetch, CPU *_cpu);
+        IcachePort(Fetch *_fetch, CPU *_cpu, const char * name = "icache_port");
 
       protected:
 
@@ -368,6 +368,7 @@ class Fetch
     InstDecoder *decoder[MaxThreads];
 
     RequestPort &getInstPort() { return icachePort; }
+    RequestPort &getMRAMInstPort() { return mramInstPort; }
 
   private:
     DynInstPtr buildInst(ThreadID tid, StaticInstPtr staticInst,
@@ -530,6 +531,7 @@ class Fetch
 
     /** Instruction port. Note that it has to appear after the fetch stage. */
     IcachePort icachePort;
+    IcachePort mramInstPort;
 
     /** Set to true if a pipelined I-cache request should be issued. */
     bool issuePipelinedIfetch[MaxThreads];

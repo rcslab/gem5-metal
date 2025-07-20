@@ -64,8 +64,8 @@ namespace gem5
 namespace o3
 {
 
-LSQ::DcachePort::DcachePort(LSQ *_lsq, CPU *_cpu) :
-    RequestPort(_cpu->name() + ".dcache_port"), lsq(_lsq), cpu(_cpu)
+LSQ::DcachePort::DcachePort(LSQ *_lsq, CPU *_cpu, const char * name) :
+    RequestPort(_cpu->name() + "." + name), lsq(_lsq), cpu(_cpu)
 {}
 
 LSQ::LSQ(CPU *cpu_ptr, IEW *iew_ptr, const BaseO3CPUParams &params)
@@ -83,6 +83,7 @@ LSQ::LSQ(CPU *cpu_ptr, IEW *iew_ptr, const BaseO3CPUParams &params)
       maxSQEntries(maxLSQAllocation(lsqPolicy, SQEntries, params.numThreads,
                   params.smtLSQThreshold)),
       dcachePort(this, cpu_ptr),
+      mramDataPort(this, cpu_ptr, "mramd_port"),
       numThreads(params.numThreads)
 {
     assert(numThreads > 0 && numThreads <= MaxThreads);
@@ -116,6 +117,7 @@ LSQ::LSQ(CPU *cpu_ptr, IEW *iew_ptr, const BaseO3CPUParams &params)
         thread.emplace_back(maxLQEntries, maxSQEntries);
         thread[tid].init(cpu, iew_ptr, params, this, tid);
         thread[tid].setDcachePort(&dcachePort);
+        thread[tid].setMRAMDataPort(&mramDataPort);
     }
 }
 
@@ -1516,8 +1518,8 @@ LSQ::checkStaleTranslations()
     PacketPtr pkt = Packet::createRead(req);
 
     // TODO - reserve some credit for these responses?
+    panic("Couldn't send TLBI_EXT_SYNC_COMP message");
     if (!dcachePort.sendTimingReq(pkt)) {
-        panic("Couldn't send TLBI_EXT_SYNC_COMP message");
     }
 
     waitingForStaleTranslation = false;

@@ -192,6 +192,8 @@ class Request : public Extensible<Request>
         INVALIDATE                  = 0x0000000100000000,
         /** The request cleans a memory location */
         CLEAN                       = 0x0000000200000000,
+        /** The request targets MRAM */
+        MRAM                        = 0x0000000400000000,
 
         /** The request targets the point of unification */
         DST_POU                     = 0x0000001000000000,
@@ -470,10 +472,11 @@ class Request : public Extensible<Request>
 
     /** The cause for HTM transaction abort */
     HtmFailureFaultCause _htmAbortCause = HtmFailureFaultCause::INVALID;
-
+public:
     struct PersistentState {
         metal::InternalState mist;    
     };
+private:
     /** Persistent CPU states for this request */
     PersistentState pstate;
 
@@ -1037,6 +1040,7 @@ class Request : public Extensible<Request>
     bool isPriv() const { return _flags.isSet(PRIVILEGED); }
     bool isLockedRMW() const { return _flags.isSet(LOCKED_RMW); }
     bool isSwap() const { return _flags.isSet(MEM_SWAP | MEM_SWAP_COND); }
+    bool isMRAM() const { return _flags.isSet(MRAM); }
     bool isCondSwap() const { return _flags.isSet(MEM_SWAP_COND); }
     bool
     isReadModifyWrite() const

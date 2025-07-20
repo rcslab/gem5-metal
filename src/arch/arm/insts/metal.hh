@@ -17,6 +17,8 @@
 // misc reg manip
 #include "arch/arm/insts/metal/wmcr.hh"
 #include "arch/arm/insts/metal/rmcr.hh"
+#include "arch/arm/insts/metal/wmgr.hh"
+#include "arch/arm/insts/metal/rmgr.hh"
 
 // arch extension
 #include "arch/arm/insts/metal/war.hh"

@@ -46,9 +46,11 @@
 #include <vector>
 
 #include "arch/generic/interrupts.hh"
+#include "base/addr_range.hh"
 #include "base/statistics.hh"
 #include "debug/Mwait.hh"
 #include "mem/htm.hh"
+#include "mem/port.hh"
 #include "mem/port_proxy.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
@@ -182,6 +184,34 @@ class BaseCPU : public ClockedObject
      * @return a reference to the instruction port
      */
     virtual Port &getInstPort() = 0;
+
+    /**
+     * Purely virtual method that returns a reference to the MRAM port. 
+     * All subclasses must implement this method.
+     *
+     * @return a reference to the MRAM port
+     */
+    virtual Port & getMRAMInstPort() = 0;
+
+    /**
+     * Purely virtual method that returns a reference to the MRAM port. 
+     * All subclasses must implement this method.
+     *
+     * @return a reference to the MRAM port
+     */
+    virtual Port & getMRAMDataPort() = 0;
+
+public:    
+    bool isMRAMInstAddr(const AddrRange & addr) {
+        const AddrRange r = system->getMRAM()->getAddrRange();
+        bool subset = addr.isSubset(r);
+        panic_if(!subset && addr.intersects(r), "cross MRAM and normal RAM accesses are not allowed.");
+        return subset;
+    }
+
+    bool isMRAMDataAddr(const AddrRange & addr) {
+        return isMRAMInstAddr(addr);
+    }
 
     /** Reads this CPU's ID. */
     int cpuId() const { return _cpuId; }

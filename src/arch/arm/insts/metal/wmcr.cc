@@ -1,8 +1,10 @@
 #include "arch/arm/insts/metal/wmcr.hh"
 #include "arch/arm/insts/metal/uops/mleit_u.hh"
 #include "arch/arm/insts/metal/uops/mlmrt_u.hh"
+#include "arch/arm/insts/metal/uops/msinit_u.hh"
 #include "arch/arm/insts/metal/uops/wmcr_u.hh"
 #include "arch/arm/insts/metal/uops/mliit_u.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "enums/StaticInstFlags.hh"
 
 namespace gem5 {
@@ -29,31 +31,39 @@ namespace gem5 {
                 this->numMicroops += MroutineTableTotalSize / MroutineTableLoadSize;
             }
 
+            if (reg::isSetInit(mReg)) {
+                this->numMicroops++;
+            }
+
             this->microOps = new StaticInstPtr[this->numMicroops];
-            StaticInst * inst = new Wmcr64_u(_machInst, mReg, gReg);
-            this->microOps[0] = inst;
-            this->microOps[0]->setFlag(IsSerializeAfter);
-            this->microOps[0]->setFlag(IsNonSpeculative);
+            int curMicroOp = 0;
+            this->microOps[curMicroOp++] = new Wmcr64_u(_machInst, mReg, gReg);
 
             if (mReg == reg::MIB) {
                 for (int i = 0; i < InstInterceptTableTotalSize / InstInterceptTableLoadSize; i++) {
                     StaticInstPtr uop = new Mliit64_u(_machInst, i * InstInterceptTableLoadSize, InstInterceptTableLoadSize);
-                    this->microOps[i+1] = uop;
+                    this->microOps[curMicroOp++] = uop;
                 }
             } else if (mReg == reg::MEB) {
                 for (int i = 0; i < ExcInterceptTableTotalSize / ExcInterceptTableLoadSize; i++) {
                     StaticInstPtr uop = new Mleit64_u(_machInst, i * ExcInterceptTableLoadSize, ExcInterceptTableLoadSize);
-                    this->microOps[i+1] = uop;
+                    this->microOps[curMicroOp++] = uop;
                 }
             } else if (mReg == reg::MBR) {
                 for (int i = 0; i < MroutineTableTotalSize / MroutineTableLoadSize; i++) {
                     StaticInstPtr uop = new Mlmrt64_u(_machInst, i * MroutineTableLoadSize, MroutineTableLoadSize,
                             i * (MroutineTableLoadSize / sizeof(MroutineTableEntry)));
-                    this->microOps[i+1] = uop;
+                    this->microOps[curMicroOp++] = uop;
                 }
             }
-            this->microOps[this->numMicroops - 1]->setFlag(IsSerializeAfter);
-            this->microOps[this->numMicroops - 1]->setFlag(IsNonSpeculative);
+
+            if (reg::isSetInit(mReg)) {
+                this->microOps[curMicroOp++] = new Msinit64_u(_machInst);
+            }
+
+            assert(curMicroOp == this->numMicroops);
+            this->microOps[curMicroOp - 1]->setFlag(IsSerializeAfter);
+            this->microOps[curMicroOp - 1]->setFlag(IsNonSpeculative);
             this->finalize();
         }
 

@@ -49,6 +49,7 @@
 #include "base/output.hh"
 #include "base/trace.hh"
 #include "cpu/base.hh"
+#include "cpu/reg_class.hh"
 #include "cpu/simple/base.hh"
 #include "cpu/thread_context.hh"
 #include "mem/se_translating_port_proxy.hh"
@@ -72,12 +73,13 @@ SimpleThread::SimpleThread(BaseCPU *_cpu, int _thread_num, System *_sys,
       regFiles{{
           {*_isa->regClasses().at(IntRegClass)},
           {*_isa->regClasses().at(MetalRegClass)},
+          {*_isa->regClasses().at(MetalGlobalRegClass)},
           {*_isa->regClasses().at(FloatRegClass)},
           {*_isa->regClasses().at(VecRegClass)},
           {*_isa->regClasses().at(VecElemClass)},
           {*_isa->regClasses().at(VecPredRegClass)},
           {*_isa->regClasses().at(MatRegClass)},
-          {*_isa->regClasses().at(CCRegClass)}
+          {*_isa->regClasses().at(CCRegClass)},
       }},
       isa(_isa),
       predicate(true), memAccPredicate(true),

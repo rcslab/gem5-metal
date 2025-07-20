@@ -78,8 +78,8 @@ namespace gem5
 namespace o3
 {
 
-Fetch::IcachePort::IcachePort(Fetch *_fetch, CPU *_cpu) :
-        RequestPort(_cpu->name() + ".icache_port"), fetch(_fetch)
+Fetch::IcachePort::IcachePort(Fetch *_fetch, CPU *_cpu, const char * name) :
+        RequestPort(_cpu->name() + "." + name), fetch(_fetch)
 {}
 
 
@@ -102,6 +102,7 @@ Fetch::Fetch(CPU *_cpu, const BaseO3CPUParams &params)
       numThreads(params.numThreads),
       numFetchingThreads(params.smtNumFetchingThreads),
       icachePort(this, _cpu),
+      mramInstPort(this, _cpu, "mrami_port"),
       finishTranslationEvent(this), fetchStats(_cpu, this)
 {
     if (numThreads > MaxThreads)
@@ -632,7 +633,13 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
         fetchStats.cacheLines++;
 
         // Access the cache.
-        if (!icachePort.sendTimingReq(data_pkt)) {
+        bool requestSent = true;
+        if (cpu->isMRAMInstAddr(data_pkt->getAddrRange())) {
+            DPRINTF(Fetch, "[tid:%i] Fetching from MRAM %s.\n", tid, data_pkt->getAddrRange().to_string());
+            if (!mramInstPort.sendTimingReq(data_pkt)) {
+                panic("Failed to send inst req to MRAM.");
+            }
+        } else if (!icachePort.sendTimingReq(data_pkt)) {
             assert(retryPkt == NULL);
             assert(retryTid == InvalidThreadID);
             DPRINTF(Fetch, "[tid:%i] Out of MSHRs!\n", tid);
@@ -641,7 +648,10 @@ Fetch::finishTranslation(const Fault &fault, const RequestPtr &mem_req)
             retryPkt = data_pkt;
             retryTid = tid;
             cacheBlocked = true;
-        } else {
+            requestSent = false;
+        }
+
+        if (requestSent) {
             DPRINTF(Fetch, "[tid:%i] Doing Icache access.\n", tid);
             DPRINTF(Activity, "[tid:%i] Activity: Waiting on I-cache "
                     "response.\n", tid);

@@ -49,6 +49,7 @@ from m5.objects.Platform import Platform
 from m5.objects.ResetPort import ResetResponsePort
 from m5.objects.SubSystem import SubSystem
 from m5.objects.XBar import L2XBar
+from m5.objects.MRAM import *
 from m5.params import *
 from m5.proxy import *
 from m5.SimObject import *
@@ -157,6 +158,8 @@ class BaseCPU(ClockedObject):
 
     tracer = Param.InstTracer(default_tracer, "Instruction tracer")
 
+    mrami_port = RequestPort("MRAM Instruction Port")
+    mramd_port = RequestPort("MRAM Data Port")
     icache_port = RequestPort("Instruction Port")
     dcache_port = RequestPort("Data Port")
     _cached_ports = ["icache_port", "dcache_port"]
@@ -187,6 +190,10 @@ class BaseCPU(ClockedObject):
         self.connectAllPorts(
             bus.cpu_side_ports, bus.cpu_side_ports, bus.mem_side_ports
         )
+
+    def connectMRAM(self, mram):
+        self.mrami_port = mram.port
+        self.mramd_port = mram.port
 
     def addPrivateSplitL1Caches(self, ic, dc, iwc=None, dwc=None):
         self.icache = ic

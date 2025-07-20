@@ -54,6 +54,7 @@
 #include "debug/Loader.hh"
 #include "debug/Quiesce.hh"
 #include "debug/WorkItems.hh"
+#include "debug/MRAM.hh"
 #include "mem/abstract_mem.hh"
 #include "mem/physical.hh"
 #include "params/System.hh"
@@ -186,6 +187,22 @@ System::System(const Params &p)
     panic_if(!workload, "No workload set for system %s "
             "(could use StubWorkload?).", name());
     workload->setSystem(this);
+    
+    // figure out what MRAM we have 
+    std::vector<const memory::metal::MRAM *> mrams;
+    for (auto & mem : p.memories) {
+        const memory::metal::MRAM * mram = dynamic_cast<const memory::metal::MRAM *>(mem);
+        if (mram != nullptr) {
+            mrams.push_back(mram);
+        }
+    }
+    panic_if(mrams.size() > 1, "does not support non contiguous MRAM!");
+    if (mrams.empty()) {
+        this->mram = nullptr;
+    } else {
+        this->mram = mrams.front();
+        DPRINTF(MRAM, "detected MRAM range: %s.\n", this->mram->getAddrRange().to_string().c_str());
+    }
 
     // add self to global system list
     systemList.push_back(this);

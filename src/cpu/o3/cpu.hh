@@ -571,6 +571,18 @@ class CPU : public BaseCPU
     {
         return iew.ldstQueue.getDataPort();
     }
+    
+    Port &
+    getMRAMInstPort() override
+    {
+        return fetch.getMRAMInstPort();
+    }
+
+    Port &
+    getMRAMDataPort() override
+    {
+        return iew.ldstQueue.getMRAMDataPort();
+    }
 
     struct CPUStats : public statistics::Group
     {

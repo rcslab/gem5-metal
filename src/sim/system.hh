@@ -51,8 +51,11 @@
 #include "base/loader/memory_image.hh"
 #include "base/loader/symtab.hh"
 #include "base/statistics.hh"
+#include "base/types.hh"
 #include "cpu/pc_event.hh"
 #include "enums/MemoryMode.hh"
+#include "mem/abstract_mem.hh"
+#include "mem/metal/mram.hh"
 #include "mem/mem_requestor.hh"
 #include "mem/physical.hh"
 #include "mem/port.hh"
@@ -338,6 +341,8 @@ class System : public SimObject, public PCEventScope
      */
     void setKvmVM(KvmVM *const vm) { kvmVM = vm; }
 
+    const memory::metal::MRAM* getMRAM() const { return mram; }
+
     /** Get a pointer to access the physical memory of the system */
     memory::PhysicalMemory& getPhysMem() { return physmem; }
     const memory::PhysicalMemory& getPhysMem() const { return physmem; }
@@ -400,6 +405,7 @@ class System : public SimObject, public PCEventScope
     KvmVM *kvmVM = nullptr;
 
     memory::PhysicalMemory physmem;
+    const memory::metal::MRAM * mram;
 
     AddrRangeList ShadowRomRanges;
 

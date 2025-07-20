@@ -163,6 +163,9 @@ class BaseO3CPU(BaseCPU):
     numPhysMetalRegs = Param.Unsigned(
         256, "Number of physical integer registers"
     )
+    numPhysMetalGlobalRegs = Param.Unsigned(
+        256, "Number of physical integer registers"
+    )
     numPhysFloatRegs = Param.Unsigned(
         256, "Number of physical floating point registers"
     )

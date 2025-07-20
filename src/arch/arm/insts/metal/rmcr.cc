@@ -17,10 +17,9 @@ namespace gem5 {
             const auto &mist = xc->getMetalState();
 
             ThreadContext * tc = xc->tcBase();
-            const RegVal mar = tc->readMetalMiscRegNoEffect(reg::MAR);
 
-            if (!reg::canAccessMiscReg(mReg, mist, mar, false)) {
-                METAL_DBGPRINT(INSTS, RMCR, "Permission denied: reading %s (MAR = 0x%lx, MetalState = [%s]).\n", printMetalMiscReg(mReg), mar, mist.toStr().c_str());
+            if (!reg::canAccessMiscReg(mReg, mist, false)) {
+                METAL_DBGPRINT(INSTS, RMCR, "Permission denied: %s. MetalState: [%s].\n", printMetalMiscReg(mReg), mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 

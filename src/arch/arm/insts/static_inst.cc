@@ -43,6 +43,7 @@
 
 #include "arch/arm/faults.hh"
 #include "arch/arm/isa.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "arch/arm/self_debug.hh"
 #include "arch/arm/utility.hh"
 #include "base/condcodes.hh"
@@ -401,6 +402,20 @@ ArmStaticInst::printMetalMiscReg(std::ostream &os, RegIndex reg_idx) const
 {
     assert(reg_idx < metal::reg::NumMiscRegs);
     ccprintf(os, "%s", printMetalMiscReg(reg_idx));
+}
+
+void
+ArmStaticInst::printMetalGlobalReg(std::ostream &os, RegIndex reg_idx) const
+{
+    assert(reg_idx < metal::reg::NumGlobalRegs);
+    ccprintf(os, "%s", printMetalGlobalReg(reg_idx));
+}
+
+const char *
+ArmStaticInst::printMetalGlobalReg(RegIndex reg_idx)
+{
+    assert(reg_idx < metal::reg::NumGlobalRegs);
+    return ArmISA::metal::reg::globalRegNames[reg_idx];
 }
 
 const char *

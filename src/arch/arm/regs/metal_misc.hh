@@ -3,12 +3,16 @@
 
 
 #include "arch/arm/metal.hh"
+#include "cpu/exec_context.hh"
 #include "cpu/metal_int_state.hh"
 #include "debug/MetalRegs.hh"
 #include "cpu/reg_class.hh"
 
 namespace gem5
 {
+
+class ThreadContext;
+
 namespace ArmISA
 {
 namespace metal
@@ -28,6 +32,12 @@ namespace reg
         Bitfield<1> ei; // exc intercept enable
         // Bitfield<2> pd; // privileged instruction disable
     EndBitUnion(MFLAGS_t)
+
+    constexpr static size_t MMVA_ADDRSHIFT = 10;
+    BitUnion64(MMVA_t)
+        Bitfield<0> valid; // instruction intercept enable
+        Bitfield<63, MMVA_ADDRSHIFT> addr;
+    EndBitUnion(MMVA_t)
 
     BitUnion8(MTPField)
         Bitfield<0> read;
@@ -69,19 +79,23 @@ namespace reg
         MG29,
         MG30,
         MG31,
-        NumMiscRegs,
+        NumGlobalRegs,
 
         // aliases
-        MSR = MG0, // Metal Status Register (RO)
-        MBR = MG1, // Metal Base Register
-        MIB = MG2, // Metal Instruction Base Register
-        MEB = MG3, // Metal Exception Base Register
-        MTP = MG4, // Metal TLB Permissions Register
-        MAR = MG5, // Metal Access Register
-        MSTK = MG6, // Metal Stack Register
-        MFLAGS = MG7 // Metal Flags Register
+        MSR = 0, // Metal Status Register (RO)
+        MBR, // Metal Base Register
+        MIB, // Metal Instruction Base Register
+        MEB, // Metal Exception Base Register
+        MTP, // Metal TLB Permissions Register
+        MAR, // Metal Access Register
+        MSTK, // Metal Stack Register
+        MFLAGS, // Metal Flags Register
+        MMPA, // MRAM physical memory map register (RO), 4k aligned 
+        MMSZ, // MRAM size register (RO), must be a multiple of 4K.
+        MMVA, // MRAM virtual memory map register
+        NumMiscRegs
     };
-    static_assert(NumMiscRegs == 32);
+    static_assert(NumGlobalRegs == 32);
     static_assert(NumMiscRegs <= (1 << 5));
 
     const char * const miscRegNames[] = {
@@ -93,6 +107,21 @@ namespace reg
         "mar",
         "mstk",
         "mflags",
+        "mmpa",
+        "mmsz",
+        "mmva"
+    };
+    static_assert((sizeof(miscRegNames) / sizeof(miscRegNames[0])) == NumMiscRegs);
+
+    const char * const globalRegNames[] = {
+        "mg0",
+        "mg1",
+        "mg2",
+        "mg3",
+        "mg4",
+        "mg5",
+        "mg6",
+        "mg7",
         "mg8",
         "mg9",
         "mg10",
@@ -118,11 +147,13 @@ namespace reg
         "mg30",
         "mg31"
     };
-    static_assert((sizeof(miscRegNames) / sizeof(miscRegNames[0])) == NumMiscRegs);
+    static_assert((sizeof(globalRegNames) / sizeof(globalRegNames[0])) == NumGlobalRegs);
 
+    // init regs can be accessed by WMCR/RMCR without being in metal mode when 
+    // metal mode is not initialized yet
     static inline bool isInitReg(RegIndex idx)
     {
-        return idx == MBR || idx == MSTK || idx == MAR;
+        return idx == MBR || idx == MSTK || idx == MMPA || idx == MMVA || idx == MMSZ;
     }
 
     static inline bool isSetInit(RegIndex idx)
@@ -154,15 +185,20 @@ namespace reg
         return !((mar >> (2 * idx + 1)) & 0x1);
     }
 
-    static inline bool canAccessMiscReg(RegIndex idx, const gem5::metal::InternalState & state, RegVal mar, bool write)
+    static inline bool canAccessGlobalReg(RegIndex idx, RegVal mar, bool write)
+    {
+        return write ? getWritePerm(mar, idx) : getReadPerm(mar, idx);
+    }
+
+    static inline bool canAccessMiscReg(RegIndex idx, const gem5::metal::InternalState & state, bool write)
     {
         bool allowAccess = false;
         gem5::metal::InternalFlags flags = state.getFlags();
         if (!(flags & METAL_FLAG_INIT) && isInitReg(idx)) {
             // allow Metal initialization
             allowAccess = true;
-        } else if (state.getLevel() > 0) {
-            allowAccess = write ? getWritePerm(mar, idx) : getReadPerm(mar, idx);
+        } else {
+            allowAccess = state.getLevel() > 0;
         }
 
         return allowAccess;
@@ -171,13 +207,16 @@ namespace reg
 } // namespace metal
 
 class MetalMiscRegClassOps : public RegClassOps {};
-
 inline constexpr MetalMiscRegClassOps metalMiscRegClassOps;
-
 inline constexpr RegClass metalMiscRegClass =
     RegClass(MetalMiscRegClass, MetalMiscRegClassName, metal::reg::NumMiscRegs, debug::MetalRegs).
     ops(metalMiscRegClassOps);
 
+class MetalGlobalRegClassOps : public RegClassOps {};
+inline constexpr MetalGlobalRegClassOps metalGlobalRegClassOps;
+inline constexpr RegClass metalGlobalRegClass =
+    RegClass(MetalGlobalRegClass, MetalGlobalRegClassName, metal::reg::NumGlobalRegs, debug::MetalRegs).
+    ops(metalGlobalRegClassOps);
 } // namespace ARMISA
 } // namespace gem5
 

@@ -42,6 +42,7 @@
 #include "cpu/o3/lsq_unit.hh"
 
 #include "arch/generic/debugfaults.hh"
+#include "base/addr_range.hh"
 #include "base/str.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
@@ -281,6 +282,12 @@ void
 LSQUnit::setDcachePort(RequestPort *dcache_port)
 {
     dcachePort = dcache_port;
+}
+
+void
+LSQUnit::setMRAMDataPort(RequestPort *dport)
+{
+    mramDataPort = dport;
 }
 
 void
@@ -1202,8 +1209,14 @@ LSQUnit::trySendPacket(bool isLoad, PacketPtr data_pkt)
     bool cache_got_blocked = false;
 
     LSQRequest *request = dynamic_cast<LSQRequest*>(data_pkt->senderState);
-
-    if (!lsq->cacheBlocked() &&
+    const bool isMRAM = cpu->isMRAMDataAddr(data_pkt->getAddrRange());
+    // check Metal RAM
+    if (isMRAM) {
+        DPRINTF(LSQUnit, "[sn:%llu] Memory request to MRAM %s.\n", request->instruction()->seqNum, data_pkt->getAddrRange().to_string());
+        if (!mramDataPort->sendTimingReq(data_pkt)) {
+            panic("Failed to send data packet to MRAM.");
+        }
+    } else if (!lsq->cacheBlocked() &&
         lsq->cachePortAvailable(isLoad)) {
         if (!dcachePort->sendTimingReq(data_pkt)) {
             ret = false;
@@ -1217,9 +1230,11 @@ LSQUnit::trySendPacket(bool isLoad, PacketPtr data_pkt)
         if (!isLoad) {
             isStoreBlocked = false;
         }
-        lsq->cachePortBusy(isLoad);
+        if (!isMRAM)
+            lsq->cachePortBusy(isLoad);
         request->packetSent();
     } else {
+        assert(!isMRAM);
         if (cache_got_blocked) {
             lsq->cacheBlocked(true);
             ++stats.blockedByCache;

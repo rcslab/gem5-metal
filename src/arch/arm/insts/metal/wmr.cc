@@ -16,7 +16,7 @@ namespace gem5 {
         Fault Wmr64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             const auto & state = xc->getMetalState();
-            RegVal v = xc->getRegOperand(this, 0);
+            const RegVal v = xc->getRegOperand(this, 0);
 
             METAL_DBGPRINT(INSTS, WMR, "%s @ Lv.%d => 0x%lx.\n", printMetalReg(mReg), state.getLevel(), v);
 

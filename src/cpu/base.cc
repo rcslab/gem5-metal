@@ -461,6 +461,10 @@ BaseCPU::getPort(const std::string &if_name, PortID idx)
         return getDataPort();
     else if (if_name == "icache_port")
         return getInstPort();
+    else if (if_name == "mrami_port")
+        return getMRAMInstPort();
+    else if (if_name == "mramd_port")
+        return getMRAMDataPort();
     else if (if_name == "model_reset")
         return modelResetPort;
     else

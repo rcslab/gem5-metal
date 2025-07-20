@@ -89,6 +89,10 @@ class CpuCluster(SubSystem):
         for cpu in self.cpus:
             cpu.connectBus(membus)
 
+    def connectMRAM(self, mram):
+        for cpu in self.cpus:
+            cpu.connectMRAM(mram)
+
     def memory_mode(self) -> "MemoryMode":
         return type(self.cpus[0]).memory_mode()
 

@@ -41,15 +41,22 @@
 #include "arch/arm/mmu.hh"
 
 #include "arch/arm/isa.hh"
+#include "arch/arm/metal.hh"
+#include "arch/arm/pagetable.hh"
 #include "arch/arm/reg_abi.hh"
+#include "arch/arm/regs/metal_misc.hh"
 #include "arch/arm/stage2_lookup.hh"
 #include "arch/arm/table_walker.hh"
 #include "arch/arm/tlbi_op.hh"
+#include "base/addr_range.hh"
+#include "base/types.hh"
+#include "cpu/metal_int_state.hh"
 #include "debug/TLB.hh"
 #include "debug/TLBVerbose.hh"
 #include "mem/packet_access.hh"
 #include "sim/pseudo_inst.hh"
 #include "sim/process.hh"
+#include <memory>
 
 namespace gem5
 {
@@ -169,6 +176,11 @@ bool
 MMU::translateFunctional(ThreadContext *tc, Addr va, Addr &pa)
 {
     CachedState& state = updateMiscReg(tc, NormalTran, false);
+
+    if (isMRAMVAddr(va, state)) {
+        pa = state.mmpa + (va - (state.mmva << metal::reg::MMVA_ADDRSHIFT));
+        return true;
+    }
 
     auto tlb = getTlb(BaseMMU::Read, state.directToStage2);
 
@@ -813,6 +825,67 @@ MMU::purifyTaggedAddr(Addr vaddr_tainted, ThreadContext *tc, ExceptionLevel el,
     return maskTaggedAddr(vaddr_tainted, tc, el, topbit);
 }
 
+
+bool MMU::isMRAMPAddr(Addr paddr, const CachedState &state) const
+{
+    return (state.mmsz > 0) && paddr >= state.mmpa && paddr < state.mmpa + state.mmsz;
+}
+
+bool MMU::isMRAMVAddr(Addr vaddr, const CachedState &state) const
+{
+    const Addr mmva_base = state.mmva.addr << metal::reg::MMVA_ADDRSHIFT;
+    return (state.mmsz > 0) && state.mmva.valid && 
+            (vaddr >= mmva_base) && (vaddr < mmva_base + state.mmsz);
+}
+
+Fault
+MMU::translateMRAM(ThreadContext *tc, const RequestPtr &req, Mode mode,
+        ArmTranslationType tran_type, Addr vaddr, bool long_desc_format,
+        CachedState &state)
+{
+    panic_if(!long_desc_format, "translating MRAM in non AArch64 mode.");
+    assert(isMRAMVAddr(vaddr, state));
+    const Addr paddr = state.mmpa + (vaddr - (state.mmva.addr << metal::reg::MMVA_ADDRSHIFT));
+    DPRINTF(TLB, "translating MRAM %#x -> %#x. MMVA: %#x MMPA: %#x MMSZ: %#x.\n", 
+            vaddr, paddr, state.mmva, state.mmpa, state.mmsz);
+    req->setFlags(Request::UNCACHEABLE);
+    if (state.isSecure) {
+        req->setFlags(Request::SECURE);
+    }
+    req->setPaddr(paddr);
+
+    // Set memory attributes
+    TlbEntry temp_te;
+    temp_te.ns = !state.isSecure;
+    bool dc = (HaveExt(tc, ArmExtension::FEAT_VHE) &&
+               state.hcr.e2h == 1 && state.hcr.tge == 1) ? 0: state.hcr.dc;
+    bool i_cacheability = state.sctlr.i && !state.sctlr.m;
+    if (state.isStage2 || !dc || state.isSecure ||
+       (state.isHyp && !(tran_type & S1CTran))) {
+
+        temp_te.mtype      = (mode == Execute) ? TlbEntry::MemoryType::Normal
+                                      : TlbEntry::MemoryType::StronglyOrdered;
+        temp_te.innerAttrs = i_cacheability? 0x2: 0x0;
+        temp_te.outerAttrs = i_cacheability? 0x2: 0x0;
+        temp_te.shareable  = true;
+        temp_te.outerShareable = true;
+    } else {
+        temp_te.mtype      = TlbEntry::MemoryType::Normal;
+        temp_te.innerAttrs = 0x3;
+        temp_te.outerAttrs = 0x3;
+        temp_te.shareable  = false;
+        temp_te.outerShareable = false;
+    }
+    temp_te.setAttributes(long_desc_format);
+    DPRINTF(TLBVerbose, "(No MMU + MRAM) setting memory attributes: shareable: "
+            "%d, innerAttrs: %d, outerAttrs: %d, stage2: %d\n",
+            temp_te.shareable, temp_te.innerAttrs, temp_te.outerAttrs,
+            state.isStage2);
+    setAttr(temp_te.attributes);
+
+    return NoFault;
+}
+
 Fault
 MMU::translateMmuOff(ThreadContext *tc, const RequestPtr &req, Mode mode,
         ArmTranslationType tran_type, Addr vaddr, bool long_desc_format,
@@ -977,13 +1050,7 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
     } else {
         vaddr = vaddr_tainted;
     }
-    
-    // XXX: hardcode Metal mem to be @ 0xC000000 + 1GB
-    if (vaddr >= 0xc0000000ull && vaddr < (0xc0000000ull + 0x40000000ull)) {
-        req->setFlags(BypassMMU);
-        DPRINTF(TLB, "translate Metal RAM addr %#x\n", vaddr);
-    }
-    
+
     Request::Flags flags = req->getFlags();
 
     bool is_fetch  = (mode == Execute);
@@ -1031,8 +1098,14 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
         vm = 1;
 
     Fault fault = NoFault;
+    
+    
+    // check MRAM vaddr first
+    if (isMRAMVAddr(vaddr, state)) {
+        fault = translateMRAM(tc, req, mode, tran_type, vaddr, long_desc_format, state);
+    }
     // If guest MMU is off or hcr.vm=0 go straight to stage2
-    if ((state.isStage2 && !vm) || (!state.isStage2 && !state.sctlr.m) || (flags & BypassMMU)) {
+    else if ((state.isStage2 && !vm) || (!state.isStage2 && !state.sctlr.m) || (flags.isSet(BypassMMU))) {
         fault = translateMmuOff(tc, req, mode, tran_type, vaddr,
                                 long_desc_format, state);
     } else {
@@ -1041,6 +1114,29 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
         // Translation enabled
         fault = translateMmuOn(tc, req, mode, translation, delay, timing,
                                functional, vaddr, tranMethod, state);
+    }
+    
+    // perm check for MRAM access after Metal initialization
+    if (!delay && (fault == NoFault) && isMRAMPAddr(req->getPaddr(), state) && 
+            req->getPersistentState().mist.getFlags().isSet(metal::METAL_FLAG_INIT)) {
+        const auto & mist = req->getPersistentState().mist;
+        if (mist.getFlags().isSet(metal::METAL_FLAG_INIT) && mist.getLevel() == 0) {
+            // deny non metal mode access after initialization
+            // XXX: return MRAM specific permission fault
+            stats.permsFaults++;
+            if (is_fetch) {
+                return std::make_shared<PrefetchAbort>(
+                        req->getPC(),
+                        ArmFault::PermissionLL,
+                        state.isStage2, ArmFault::LpaeTran);
+            } else {
+                return std::make_shared<DataAbort>(
+                        vaddr_tainted, TlbEntry::DomainType::NoAccess,
+                        !req->isCacheClean() && mode == Write,
+                        ArmFault::PermissionLL,
+                        state.isStage2, ArmFault::LpaeTran);
+            }
+        }
     }
 
     // Check for Debug Exceptions
@@ -1246,6 +1342,9 @@ MMU::CachedState::updateMiscReg(ThreadContext *tc,
         ELIs64(tc, aarch64EL == EL0 ? EL1 : aarch64EL);
     
     mtp = tc->readMetalMiscReg(metal::reg::MTP);
+    mmpa = tc->readMetalMiscReg(metal::reg::MMPA);
+    mmva = tc->readMetalMiscReg(metal::reg::MMVA);
+    mmsz = tc->readMetalMiscReg(metal::reg::MMSZ);
     hcr = tc->readMiscReg(MISCREG_HCR_EL2);
     if (aarch64) {  // AArch64
         // determine EL we need to translate in

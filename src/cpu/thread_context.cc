@@ -47,6 +47,7 @@
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "cpu/base.hh"
+#include "cpu/reg_class.hh"
 #include "debug/Context.hh"
 #include "debug/Quiesce.hh"
 #include "mem/port.hh"
@@ -136,6 +137,14 @@ ThreadContext::compare(ThreadContext *one, ThreadContext *two)
         RegVal t2 = two->getReg(id);
         if (t1 != t2)
             panic("Metal reg idx %d doesn't match, one: %#x, two: %#x",
+                  id.index(), t1, t2);
+    }
+
+    for (auto &id: *regClasses.at(MetalGlobalRegClass)) {
+        RegVal t1 = one->getReg(id);
+        RegVal t2 = two->getReg(id);
+        if (t1 != t2)
+            panic("Metal global reg idx %d doesn't match, one: %#x, two: %#x",
                   id.index(), t1, t2);
     }
 
