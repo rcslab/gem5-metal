@@ -721,8 +721,8 @@ ArmFault::invoke64(ThreadContext *tc, const StaticInstPtr &inst)
 
     // Set PC to start of exception handler
     Addr new_pc = purifyTaggedAddr(vec_address, tc, toEL, true);
-    DPRINTF(Faults, "Invoking Fault (AArch64 target EL):%s cpsr:%#x PC:%#x "
-            "elr:%#x newVec: %#x %s\n", name(), cpsr, curr_pc, ret_addr,
+    DPRINTF(Faults, "Invoking Fault (AArch64 target EL):%s cpsr:%#x span:%d spsr.pan:%d PC:%#x "
+            "elr:%#x newVec: %#x %s\n", name(), cpsr, span, spsr.pan, curr_pc, ret_addr,
             new_pc, arm_inst ? csprintf("inst: %#x", arm_inst->encoding()) :
             std::string());
     PCState pc(new_pc);

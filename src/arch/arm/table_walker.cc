@@ -2334,7 +2334,7 @@ TableWalker::insertPartialTableEntry(LongDescriptor &descriptor)
 
     // Debug output
     DPRINTF(TLB, descriptor.dbgHeader().c_str());
-    DPRINTF(TLB, " - N:%d pfn:%#x size:%#x global:%d valid:%d\n",
+    DPRINTF(TLB, " - N:%d pfn:%#lx size:%#lx global:%d valid:%d\n",
             te.N, te.pfn, te.size, te.global, te.valid);
     DPRINTF(TLB, " - vpn:%#x xn:%d pxn:%d ap:%d domain:%d asid:%d "
             "vmid:%d hyp:%d nc:%d ns:%d\n", te.vpn, te.xn, te.pxn,
@@ -2362,7 +2362,7 @@ TableWalker::insertTableEntry(DescriptorBase &descriptor, bool long_descriptor)
     te.vmid           = currState->vmid;
     te.N              = descriptor.offsetBits();
     te.vpn            = currState->vaddr >> te.N;
-    te.size           = (1<<te.N) - 1;
+    te.size           = (1ull << te.N) - 1;
     te.pfn            = descriptor.pfn();
     te.domain         = descriptor.domain();
     te.lookupLevel    = descriptor.lookupLevel;
@@ -2410,7 +2410,7 @@ TableWalker::insertTableEntry(DescriptorBase &descriptor, bool long_descriptor)
 
     // Debug output
     DPRINTF(TLB, descriptor.dbgHeader().c_str());
-    DPRINTF(TLB, " - N:%d pfn:%#x size:%#x global:%d valid:%d\n",
+    DPRINTF(TLB, " - N:%d pfn:%#lx size:%#lx global:%d valid:%d\n",
             te.N, te.pfn, te.size, te.global, te.valid);
     DPRINTF(TLB, " - vpn:%#x xn:%d pxn:%d ap:%d domain:%d asid:%d "
             "vmid:%d hyp:%d nc:%d ns:%d\n", te.vpn, te.xn, te.pxn,

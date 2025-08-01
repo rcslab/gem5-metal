@@ -153,9 +153,9 @@ class ArmISA(BaseISA):
         0x0000000001011010, "AArch64 Instruction Set Attribute Register 1"
     )
 
-    # 4K | 64K | !16K | !BigEndEL0 | !SNSMem | !BigEnd | 8b ASID | 40b PA
+    # 4K | 64K | !16K | !BigEndEL0 | !SNSMem | !BigEnd | 8b ASID | 52b PA
     id_aa64mmfr0_el1 = Param.UInt64(
-        0x0000000000F00002, "AArch64 Memory Model Feature Register 0"
+        0x0000000000F00006, "AArch64 Memory Model Feature Register 0"
     )
     # PAN | HPDS | !VHE | VMIDBits
     id_aa64mmfr1_el1 = Param.UInt64(

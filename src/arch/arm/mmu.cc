@@ -637,18 +637,17 @@ MMU::s1PermBits64(TlbEntry *te, const RequestPtr &req, Mode mode,
 {
     bool grant = false, grant_read = true, grant_write = true, grant_exec = true;
 
+    if (req->getPersistentState().mist.getLevel() > 0) {
+        // Metal mode has unlimited access
+        return std::make_pair(true, true);
+    }
+
     uint8_t ap, xn, pxn;
     if (te->ao) {
         metal::reg::MTPField mtp = metal::reg::getMTPField(state.mtp, te->aoid);
-        if (req->getPersistentState().mist.getLevel() > 0) {
-            grant_read = true;
-            grant_write = true;
-            grant_exec = true;
-        } else {
-            grant_read = mtp.read;
-            grant_write = mtp.write;
-            grant_exec = mtp.execute;
-        }
+        grant_read = mtp.read;
+        grant_write = mtp.write;
+        grant_exec = mtp.execute;
         DPRINTF(TLBVerbose, "Overriding S1 permissions for TLB %s (r = %d, w = %d, x = %d) -> "
                                             "MTP = %#lx, "
                                             "MetalState = [%s]\n", 

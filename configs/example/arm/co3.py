@@ -339,7 +339,7 @@ def main():
         "--mem-size",
         action="store",
         type=str,
-        default="2GB",
+        default="128MB",
         help="Specify the physical memory size",
     )
     parser.add_argument("--checkpoint", action="store_true")

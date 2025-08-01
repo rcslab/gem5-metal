@@ -300,7 +300,7 @@ class ArmSystem(System):
         "is 64 bits (ARMv8)",
     )
     phys_addr_range_64 = Param.UInt8(
-        40,
+        52,
         "Supported physical address range in bits when using AArch64 (ARMv8)",
     )
     have_large_asid_64 = Param.Bool(
