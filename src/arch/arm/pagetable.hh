@@ -266,8 +266,8 @@ struct TlbEntry : public Serializable
     bool xn;                // Execute Never
     bool pxn;               // Privileged Execute Never (LPAE only)
 
-    bool ao;
-    unsigned int aoid;
+    bool map;
+    unsigned int mapid;
 
     //Construct an entry that maps to physical address addr for SE mode
     TlbEntry(Addr _asn, Addr _vaddr, Addr _paddr,
@@ -281,8 +281,8 @@ struct TlbEntry : public Serializable
          ns(true), nstid(true), el(EL0), type(TypeTLB::unified),
          partial(false),
          nonCacheable(uncacheable),
-         shareable(false), outerShareable(false), xn(0), pxn(0), ao(false),
-         aoid(0)
+         shareable(false), outerShareable(false), xn(0), pxn(0), map(false),
+         mapid(0)
     {
         // no restrictions by default, hap = 0x3
 
@@ -299,8 +299,8 @@ struct TlbEntry : public Serializable
          longDescFormat(false), isHyp(false), global(false), valid(false),
          ns(true), nstid(true), el(EL0), type(TypeTLB::unified),
          partial(false), nonCacheable(false),
-         shareable(false), outerShareable(false), xn(0), pxn(0), ao(false),
-         aoid(0)
+         shareable(false), outerShareable(false), xn(0), pxn(0), map(false),
+         mapid(0)
     {
         // no restrictions by default, hap = 0x3
 
@@ -429,8 +429,8 @@ struct TlbEntry : public Serializable
     print() const
     {
         return csprintf("vaddr: %#x, mtype: %d, asid: %d, vmid: %d, hyp: %d, paddr: %#x, size: %#x, ap: %d, xn: %d, pxn: %d, "
-                        "ns: %d, nstid: %d, g: %d, el: %d, ao: %d, aoid: %d", vpn << N, static_cast<int>(mtype), asid, vmid,
-                        isHyp, pfn << N, size, ap, xn, pxn, ns, nstid, global, el, ao, aoid);
+                        "ns: %d, nstid: %d, g: %d, el: %d, map: %d, mapid: %d", vpn << N, static_cast<int>(mtype), asid, vmid,
+                        isHyp, pfn << N, size, ap, xn, pxn, ns, nstid, global, el, map, mapid);
     }
 
     void
@@ -461,8 +461,8 @@ struct TlbEntry : public Serializable
         SERIALIZE_SCALAR(pxn);
         SERIALIZE_SCALAR(ap);
         SERIALIZE_SCALAR(hap);
-        SERIALIZE_SCALAR(ao);
-        SERIALIZE_SCALAR(aoid);
+        SERIALIZE_SCALAR(map);
+        SERIALIZE_SCALAR(mapid);
         uint8_t domain_ = static_cast<uint8_t>(domain);
         paramOut(cp, "domain", domain_);
     }
@@ -494,8 +494,8 @@ struct TlbEntry : public Serializable
         UNSERIALIZE_SCALAR(pxn);
         UNSERIALIZE_SCALAR(ap);
         UNSERIALIZE_SCALAR(hap);
-        UNSERIALIZE_SCALAR(ao);
-        UNSERIALIZE_SCALAR(aoid);
+        UNSERIALIZE_SCALAR(map);
+        UNSERIALIZE_SCALAR(mapid);
         uint8_t domain_;
         paramIn(cp, "domain", domain_);
         domain = static_cast<DomainType>(domain_);

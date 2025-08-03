@@ -5,42 +5,49 @@
 namespace gem5 {
     namespace ArmISA {
     namespace metal { namespace inst {
-        BitUnion64(TlbExtAttr)
-            Bitfield<0> itlb; // 1 = inst tlb, 0 = data tlb
-            Bitfield<2, 1> el; // el = 0-3
-            Bitfield<4, 3> translv; // 0 - 3
-            Bitfield<6, 5> pgsz; // 0: 4k 1: 16k 2: 64k
-            Bitfield<22, 7> asid; // 8 bit asid
-            Bitfield<23> hyp; // whether this is for hypervisor
-            Bitfield<39, 24> vmid; // 16 bit vmid
-            Bitfield<40> ao; // access override
-            Bitfield<44, 41> aoid; // access override index
-            Bitfield<52, 45> mair; // mair fields for stage 1
-             // True if the entry targets the non-secure physical address space
-            Bitfield<53> ns;
-            // True if the entry was brought in from a non-secure page table
-            Bitfield<54> nstid;
-        EndBitUnion(TlbExtAttr)
+        static constexpr unsigned int WTLB_MAX_PGSHIFT = 44;
+        static constexpr unsigned int WTLB_MIN_PGSHIFT = 12;
+        enum VSpecType {
+            Data = 0,
+            Inst = 1,
+            Unified = 2,
+            Reserved = 3
+        };
+        BitUnion64(TLBVSpec)
+            Bitfield<63, WTLB_MIN_PGSHIFT> vaddr;
+            Bitfield<10, 7> mapid; // Metal access permission ID
+            Bitfield<6> map; // Metal access permissions 
+            Bitfield<5, 1> sz; // real page size bits = (12 + 2^5) - 2^5 (16TB to 4KB)
+            Bitfield<0> itlb;
+        EndBitUnion(TLBVSpec)
 
-        static inline std::string printTlbExtAttr(const TlbExtAttr attr)
+        BitUnion64(TLBPSpec)
+            Bitfield<63, WTLB_MIN_PGSHIFT> paddr;
+        EndBitUnion(TLBPSpec)
+        
+        BitUnion64(TLBExtAttr)
+            Bitfield<1, 0> el; // el = 0-3
+            Bitfield<3, 2> ap; // access permission
+            Bitfield<4> xn; // whether the page is not executable
+            Bitfield<5> pxn; // whether the page is not executable by privileged
+            Bitfield<6> hyp; // whether this tlb is stage 2
+            Bitfield<7> ns; // True if the entry targets the non-secure physical address space
+            Bitfield<8> nstid; // True if the entry was brought in from a non-secure page table
+            Bitfield<9> ng; // whether the page is not global 
+            Bitfield<11, 10> sh; // shareability
+            Bitfield<19, 12> mair; // mair bits
+            Bitfield<35, 20> asid; // 16 bit asid
+            Bitfield<51, 36> vmid; // 16 bit vmid
+        EndBitUnion(TLBExtAttr)
+
+        static inline std::string printTlbAttr(const TLBVSpec vspec, const TLBPSpec pspec, const TLBExtAttr attr)
         {
-            return csprintf("itlb: %d, el: %d, translv: %d, pgsz: %d, asid: %d, hyp: %d, vmid: %d, ao: %d, aoid: %d, mair: %#x, ns: %#x, nstid: %#x",
-                    attr.itlb, attr.el, attr.translv,
-                    attr.pgsz, attr.asid, attr.hyp,
-                    attr.vmid, attr.ao, attr.aoid,
-                    attr.mair, attr.ns, attr.nstid);
-        }
-
-        static inline GrainSize tlbExtAttrToGrainSize(const TlbExtAttr attr)
-        {
-            static std::array<GrainSize, 4> lookup {
-                Grain4KB,
-                Grain16KB,
-                Grain64KB,
-                ReservedGrain
-            };
-
-            return lookup.at(attr.pgsz);
+            return csprintf("[itlb: %u, vaddr: %#llx, paddr: %#llx, sz: %u, map: %u, mapid: %u] + "
+                    "[el: %u, ap: %u, xn: %u, pxn: %u, mair: %#x, sh: %u, ng: %u, "
+                    "hyp: %u, asid: %u, vmid: %u, ns: %u, nstid: %u]",
+                    vspec.itlb, vspec.vaddr << WTLB_MIN_PGSHIFT, pspec.paddr << WTLB_MIN_PGSHIFT, vspec.sz, vspec.map, vspec.mapid,
+                    attr.el, attr.ap, attr.xn, attr.pxn, attr.mair, attr.sh, attr.ng, 
+                    attr.hyp, attr.asid, attr.vmid, attr.ns, attr.nstid);
         }
 
         Wtlb64::Wtlb64(ExtMachInst _machInst, RegIndex _r1, RegIndex _r2,
@@ -60,39 +67,19 @@ namespace gem5 {
         {
             const auto &mist = xc->getMetalState();
 
-            RegVal desc = xc->getRegOperand(this, 0);
-            RegVal info = xc->getRegOperand(this, 1);
-            RegVal vaddr = xc->getRegOperand(this, 2);
-
             if (mist.getLevel() == 0)
             {
                 METAL_DBGPRINT(INSTS, WTLB, "Permission denied: MetalState = [%s].\n", mist.toStr().c_str());
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            METAL_DBGPRINT(INSTS, WTLB, "WTLB: desc = %#lx, attr = %#lx, vaddr = %#lx. ExtAttrs = [%s]\n",
-                                            desc,
-                                            info,
-                                            vaddr,
-                                            printTlbExtAttr(info));
+            const auto vspec = static_cast<TLBVSpec>(xc->getRegOperand(this, 0));
+            const auto pspec = static_cast<TLBPSpec>(xc->getRegOperand(this, 1));
+            const auto eattrs = static_cast<TLBExtAttr>(xc->getRegOperand(this, 2));
 
-            const auto ea = static_cast<TlbExtAttr>(info);
+            METAL_DBGPRINT(INSTS, WTLB, "WTLB: %s.\n", printTlbAttr(vspec, pspec, eattrs));
+
             TlbEntry te;
-            TableWalker::LongDescriptor ld;
-
-            ld.data = desc;
-            ld.aarch64 = true;
-            // lookup level is used with granule to collectively determine the size of the entry
-            ld.lookupLevel = static_cast<TlbEntry::LookupLevel>(static_cast<int>(ea.translv));
-            ld.grainSize = tlbExtAttrToGrainSize(ea);
-
-            if (ld.grainSize == ReservedGrain ||
-                (ld.type() != TableWalker::LongDescriptor::EntryType::Block &&
-                ld.type() != TableWalker::LongDescriptor::EntryType::Page)) {
-                // must have a supported page size and be a block/page descriptor
-                METAL_DBGPRINT(INSTS, WTLB, "Invalid TLB attribute.\n");
-                return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
-            }
 
             // fixed attributes
             te.valid = true;
@@ -104,45 +91,52 @@ namespace gem5 {
             // and extraAttr that come from the third Reg
 
             // long descriptor bits
-            te.lookupLevel = ld.lookupLevel;
-            te.N = ld.offsetBits(); // offsetBits only make sense after setting grainSize and lookupLevel
-            te.vpn = vaddr >> te.N;
-            te.size = (1 << te.N) - 1;
-            te.pfn = ld.pfn();
-            te.domain = ld.domain();
-            te.xn = ld.xn();
-            te.pxn = ld.pxn();
-            te.ap = ld.ap();
-            te.hap = ld.ap();
-            te.global = !ld.ng();
+            te.type = vspec.itlb ? TypeTLB::instruction : TypeTLB::data;
+            te.lookupLevel = enums::ArmLookupLevel::L3;
+            te.tg = ReservedGrain;
+            te.N = WTLB_MAX_PGSHIFT - vspec.sz;
+            const Addr pvaddr = purifyTaggedAddr(vspec.vaddr << WTLB_MIN_PGSHIFT, 
+                            xc->tcBase(), currEL(xc->tcBase()), 
+                        te.type == TypeTLB::unified || te.type == TypeTLB::instruction);
+            te.vpn = pvaddr >> te.N;
+            te.size = (1ull << te.N) - 1;
+            te.pfn = (pspec.paddr << WTLB_MIN_PGSHIFT) >> te.N;
+            te.map = vspec.map;
+            te.mapid = vspec.mapid;
+
+            te.domain = TlbEntry::DomainType::Client; // Domain will be deprecated so hardcore to client
+            te.xn = eattrs.xn;
+            te.pxn = eattrs.pxn;
+            te.ap = eattrs.ap;
+            te.hap = eattrs.ap;
+            te.global = !eattrs.ng;
 
             // extra attributes
-            te.el = static_cast<ExceptionLevel>(static_cast<int>(ea.el));
-            te.asid = ea.asid;
-            te.isHyp = ea.hyp;
-            te.vmid = ea.vmid;
-            te.type = ea.itlb ? TypeTLB::instruction : TypeTLB::data;
-            te.ao = ea.ao;
-            te.aoid = ea.aoid;
+            te.el = static_cast<ExceptionLevel>(static_cast<int>(eattrs.el));
+            te.asid = eattrs.asid;
+            te.isHyp = eattrs.hyp;
+            te.vmid = eattrs.vmid;
             // METAL_XXX: wtf do these fields mean?
-            te.nstid = ea.nstid;
-            te.ns = ea.ns;
+            te.nstid = eattrs.nstid;
+            te.ns = eattrs.ns;
 
             // set memory type and cacheability/shareability
-            if (ea.hyp) {
-                TableWalker::memAttrsAArch64Stage2(te, ld.memAttr());
+            if (eattrs.hyp) {
+                // TableWalker::memAttrsAArch64Stage2(te, ld.memAttr());
+                METAL_DBGPRINT(INSTS, WTLB, "Does not support stage 2 TLB entries!.\n");
+                return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             } else {
-                TableWalker::memAttrsAArch64Stage1(te, ld.sh(), ea.mair);
+                TableWalker::memAttrsAArch64Stage1(te, eattrs.sh, eattrs.mair);
             }
 
             MMU * mmu = dynamic_cast<MMU *>(xc->tcBase()->getMMUPtr());
             assert(mmu);
 
-            TLB * tlb = mmu->getTlb(ea.itlb ? BaseMMU::Execute : BaseMMU::Read, te.isHyp);
-            tlb->insert(te);
+            TLB * tlb = mmu->getTlb(vspec.itlb ? BaseMMU::Execute : BaseMMU::Read, te.isHyp);
+            tlb->multiInsert(te);
 
             if (traceData) {
-                std::array<RegVal, 3> vals{desc, info, vaddr};
+                std::array<RegVal, 3> vals{vspec, pspec, eattrs};
                 traceData->setData(vals);
             }
 

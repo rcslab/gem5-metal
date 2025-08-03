@@ -1175,6 +1175,15 @@ TableWalker::processWalkAArch64()
     currState->longDesc.aarch64 = true;
     currState->longDesc.grainSize = tg;
     currState->longDesc.physAddrRange = _physAddrRange;
+    
+    // XXX: for fast Metal exception generation
+    // trap cases where TTBRx == -1 to avoid reading memory
+    if (ttbr == (Addr)(-1)) {
+        DPRINTF(TLB, "TTBRx contains an invalid address (%#lx), causing fast fault type %d\n",
+                ttbr, ArmFault::TranslationLL + currState->longDesc.lookupLevel);
+        currState->fault = generateLongDescFault(ArmFault::TranslationLL);
+        return currState->fault;
+    }
 
     if (currState->timing) {
         fetchDescriptor(desc_addr, (uint8_t*) &currState->longDesc.data,
