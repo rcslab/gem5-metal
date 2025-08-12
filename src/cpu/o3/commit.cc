@@ -451,25 +451,31 @@ Commit::numROBFreeEntries(ThreadID tid)
     return rob->numFreeEntries(tid);
 }
 
+Cycles
+Commit::getTrapLatency(const Fault& f)
+{
+    Cycles latency = std::dynamic_pointer_cast<SyscallRetryFault>(f) ?
+                     cpu->syscallRetryLatency : trapLatency;
+
+    // hardware transactional memory
+    if (f != nullptr &&
+        std::dynamic_pointer_cast<GenericHtmFailureFault>(f)) {
+        // TODO
+        // latency = default abort/restore latency
+        // could also do some kind of exponential back off if desired
+    }
+    return latency;
+}
+
+
 void
-Commit::generateTrapEvent(ThreadID tid, Fault inst_fault)
+Commit::generateTrapEvent(ThreadID tid, Cycles latency)
 {
     DPRINTF(Commit, "Generating trap event for [tid:%i]\n", tid);
 
     EventFunctionWrapper *trap = new EventFunctionWrapper(
         [this, tid]{ processTrapEvent(tid); },
         "Trap", true, Event::CPU_Tick_Pri);
-
-    Cycles latency = std::dynamic_pointer_cast<SyscallRetryFault>(inst_fault) ?
-                     cpu->syscallRetryLatency : trapLatency;
-
-    // hardware transactional memory
-    if (inst_fault != nullptr &&
-        std::dynamic_pointer_cast<GenericHtmFailureFault>(inst_fault)) {
-        // TODO
-        // latency = default abort/restore latency
-        // could also do some kind of exponential back off if desired
-    }
 
     cpu->schedule(trap, cpu->clockEdge(latency));
     trapInFlight[tid] = true;
@@ -700,11 +706,14 @@ Commit::handleInterrupt()
         // interrupt that the interrupt controller thinks is being handled.
         cpu->processInterrupts(cpu->getInterrupts());
 
+        Cycles latency;
         if (!mist.getFlags().isSet(metal::FLAG_EXC_INTERCEPT_MASK) && 
                 isa->interceptExc(interrupt, nullStaticInstPtr)) {
             DPRINTF(Commit, "Intercepting Interrupt %s.", interrupt->name());
+            latency = Cycles(1);
         } else {
             cpu->trap(interrupt, 0, nullptr);
+            latency = getTrapLatency(interrupt);
         }
 
         thread[0]->noSquashFromTC = false;
@@ -714,7 +723,7 @@ Commit::handleInterrupt()
         interrupt = NoFault;
 
         // Generate trap squash event.
-        generateTrapEvent(0, interrupt);
+        generateTrapEvent(0, latency);
 
         avoidQuiesceLiveLock = false;
     } else {
@@ -1224,12 +1233,15 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         const auto & mist = head_inst->getPreExecMetalState();
         const auto miflags = mist.getFlags();
 
+        Cycles trapLatency;
+
         if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK) &&
             isa->interceptExc(inst_fault, head_inst->staticInst)) {
 
             DPRINTF(Commit,
             "[tid:%i] [sn:%llu] Intercepting instruction with fault \"%s\"\n",
                     tid, head_inst->seqNum, inst_fault->name());
+            trapLatency = Cycles(1);
         } else {
             // Execute the trap.  Although it's slightly unrealistic in
             // terms of timing (as it doesn't wait for the full timing of
@@ -1244,6 +1256,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
             DPRINTF(Commit,
             "[tid:%i] [sn:%llu] Committing instruction with fault \"%s\"\n",
                     tid, head_inst->seqNum, inst_fault->name());
+            trapLatency = getTrapLatency(inst_fault);
         }
 
         // Exit state update mode to avoid accidental updating.
@@ -1267,7 +1280,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         }
 
         // Generate trap squash event.
-        generateTrapEvent(tid, inst_fault);
+        generateTrapEvent(tid, trapLatency);
         return false;
     }
 

@@ -7,12 +7,6 @@ namespace gem5 {
     namespace metal { namespace inst {
         static constexpr unsigned int WTLB_MAX_PGSHIFT = 44;
         static constexpr unsigned int WTLB_MIN_PGSHIFT = 12;
-        enum VSpecType {
-            Data = 0,
-            Inst = 1,
-            Unified = 2,
-            Reserved = 3
-        };
         BitUnion64(TLBVSpec)
             Bitfield<63, WTLB_MIN_PGSHIFT> vaddr;
             Bitfield<10, 7> mapid; // Metal access permission ID
@@ -96,8 +90,7 @@ namespace gem5 {
             te.tg = ReservedGrain;
             te.N = WTLB_MAX_PGSHIFT - vspec.sz;
             const Addr pvaddr = purifyTaggedAddr(vspec.vaddr << WTLB_MIN_PGSHIFT, 
-                            xc->tcBase(), currEL(xc->tcBase()), 
-                        te.type == TypeTLB::unified || te.type == TypeTLB::instruction);
+                            xc->tcBase(), currEL(xc->tcBase()), vspec.itlb);
             te.vpn = pvaddr >> te.N;
             te.size = (1ull << te.N) - 1;
             te.pfn = (pspec.paddr << WTLB_MIN_PGSHIFT) >> te.N;

@@ -214,7 +214,10 @@ class Commit
     size_t numROBFreeEntries(ThreadID tid);
 
     /** Generates an event to schedule a squash due to a trap. */
-    void generateTrapEvent(ThreadID tid, Fault inst_fault);
+    void generateTrapEvent(ThreadID tid, Cycles latency);
+
+    /** Generates an event to schedule a squash due to a trap. */
+    Cycles getTrapLatency(const Fault& fault);
 
     /** Records that commit needs to initiate a squash due to an
      * external state update through the TC.
