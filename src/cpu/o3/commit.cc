@@ -707,7 +707,7 @@ Commit::handleInterrupt()
         cpu->processInterrupts(cpu->getInterrupts());
 
         Cycles latency;
-        if (!mist.getFlags().isSet(metal::FLAG_EXC_INTERCEPT_MASK) && 
+        if (!mist.getFlags().isSet(metal::FLAG_EXC_INTERCEPT_MASK_TEMP) && 
                 isa->interceptExc(interrupt, nullStaticInstPtr)) {
             DPRINTF(Commit, "Intercepting Interrupt %s.", interrupt->name());
             latency = Cycles(1);
@@ -1029,7 +1029,7 @@ Commit::commitInsts()
                     auto const * isa = thread[0]->getTC()->getIsaPtr();
                     auto const & mist = isa->getMetalState();
                     canHandleInterrupts = !head_inst->isDelayedCommit()
-                                && mist.getLevel() == 0 && !mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK);
+                                && mist.getLevel() == 0 && !mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK_TEMP);
                 }
 
                 // at this point store conditionals should either have
@@ -1235,7 +1235,7 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
 
         Cycles trapLatency;
 
-        if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK) &&
+        if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK_TEMP) &&
             isa->interceptExc(inst_fault, head_inst->staticInst)) {
 
             DPRINTF(Commit,

@@ -23,7 +23,15 @@ namespace gem5 {
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
 
-            RegVal v = tc->readMetalMiscReg(mReg);
+            RegVal v;
+            switch (mReg) {
+                case reg::MSR:
+                    v = reg::getMSRFromState(mist);
+                    break;
+                default:
+                    v = tc->readMetalMiscReg(mReg);
+                    break;
+            }
 
             METAL_DBGPRINT(INSTS, RMCR, "%s (0x%lx).\n", printMetalReg(mReg), v);
 

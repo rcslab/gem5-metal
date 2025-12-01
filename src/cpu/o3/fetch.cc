@@ -553,7 +553,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
         return false;
         // XXX: shouldn't we only check thread[0]?
     } else if (checkInterrupt(pc) && !delayedCommit[tid] 
-                && (mist.getLevel() == 0) && (!mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK))) {
+                && (mist.getLevel() == 0) && (!mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK_TEMP))) {
         // Hold off fetch from getting new instructions when:
         // Cache is blocked, or
         // while an interrupt is pending and we're not in PAL mode, or
@@ -1254,7 +1254,7 @@ Fetch::fetch(bool &status_change)
                     
                     const metal::InternalFlags miflags = transientMetalState.getFlags();
 
-                    if (!miflags.isSet(metal::FLAG_INST_INTERCEPT_MASK) && transientMetalState.getLevel() == 0) {
+                    if (!miflags.isSet(metal::FLAG_INST_INTERCEPT_MASK_TEMP) && transientMetalState.getLevel() == 0) {
                         StaticInstPtr interceptInst = isa->interceptInst(staticInst);
                         if (interceptInst != nullStaticInstPtr) {
                             DPRINTF(Fetch, "intercepting instruction \"%s\" @ %s.\n",
@@ -1295,9 +1295,9 @@ Fetch::fetch(bool &status_change)
             instruction->setPreExecMetalState(transientMetalState);
 
             // clear transient flags
-            transientMetalState.clearFlags(metal::FLAG_EXC_INTERCEPT_MASK | 
-                metal::FLAG_INST_INTERCEPT_MASK | 
-                metal::FLAG_INTERRUPT_MASK);
+            transientMetalState.clearFlags(metal::FLAG_EXC_INTERCEPT_MASK_TEMP | 
+                metal::FLAG_INST_INTERCEPT_MASK_TEMP | 
+                metal::FLAG_INTERRUPT_MASK_TEMP);
             instruction->setMetalState(transientMetalState);
 
             // pre-execute for metal internal state changes

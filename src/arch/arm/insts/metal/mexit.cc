@@ -39,15 +39,15 @@ namespace metal{ namespace inst {
             }
 
             if (flags.id) {
-                state.setFlags(gem5::metal::FLAG_INTERRUPT_MASK);
+                state.setFlags(gem5::metal::FLAG_INTERRUPT_MASK_TEMP);
             }
 
             if (flags.eim) {
-                state.setFlags(gem5::metal::FLAG_EXC_INTERCEPT_MASK);
+                state.setFlags(gem5::metal::FLAG_EXC_INTERCEPT_MASK_TEMP);
             }
 
             if (flags.iim) {
-                state.setFlags(gem5::metal::FLAG_INST_INTERCEPT_MASK);
+                state.setFlags(gem5::metal::FLAG_INST_INTERCEPT_MASK_TEMP);
             }
 
             state.setLevel(state.getLevel() - 1);

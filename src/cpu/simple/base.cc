@@ -296,7 +296,7 @@ BaseSimpleCPU::checkForInterrupts()
             t_info.fetchOffset = 0;
             const auto & mist = tc->getIsaPtr()->getMetalState();
             const auto miflags = mist.getFlags();
-            if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK)) {
+            if (!miflags.isSet(metal::FLAG_EXC_INTERCEPT_MASK_TEMP)) {
                 tc->getIsaPtr()->interceptExc(interrupt, nullStaticInstPtr);
                 // force control change (in case in the middle of a macroop)
                 advancePC(NoFault, true);

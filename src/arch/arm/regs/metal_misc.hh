@@ -3,7 +3,6 @@
 
 
 #include "arch/arm/metal.hh"
-#include "cpu/exec_context.hh"
 #include "cpu/metal_int_state.hh"
 #include "debug/MetalRegs.hh"
 #include "cpu/reg_class.hh"
@@ -188,6 +187,18 @@ namespace reg
     static inline bool canAccessGlobalReg(RegIndex idx, RegVal mar, bool write)
     {
         return write ? getWritePerm(mar, idx) : getReadPerm(mar, idx);
+    }
+
+    static inline MSR_t getMSRFromState(const gem5::metal::InternalState & mist)
+    {
+        MSR_t msr = 0;
+        const gem5::metal::InternalFlags flags = mist.getFlags();
+        msr.lv = mist.getLevel();
+        msr.id = flags.isSet(gem5::metal::FLAG_INST_INTERCEPT_MASK_TEMP);
+        msr.im = flags.isSet(gem5::metal::FLAG_INTERRUPT_MASK_TEMP);
+        msr.em = flags.isSet(gem5::metal::FLAG_EXC_INTERCEPT_MASK_TEMP);
+        msr.init = flags.isSet(metal::METAL_FLAG_INIT);
+        return msr;
     }
 
     static inline bool canAccessMiscReg(RegIndex idx, const gem5::metal::InternalState & state, bool write)

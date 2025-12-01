@@ -1704,22 +1704,13 @@ ISA::readMetalMiscRegNoEffect(RegIndex idx) const
 {
     assert(idx < metal::reg::NumMiscRegs);
     RegVal ret;
-    metal::reg::MSR_t msr;
-    gem5::metal::InternalFlags flags;
     switch (idx)
     {
         case metal::reg::MSTK:
           ret = this->tc->getReg({flatIntRegClass, int_reg::Spm});
           break;
         case metal::reg::MSR:
-          msr = 0;
-          flags = metalInternalState.getFlags();
-          msr.lv = metalInternalState.getLevel();
-          msr.id = flags.isSet(gem5::metal::FLAG_INST_INTERCEPT_MASK);
-          msr.im = flags.isSet(gem5::metal::FLAG_INTERRUPT_MASK);
-          msr.em = flags.isSet(gem5::metal::FLAG_EXC_INTERCEPT_MASK);
-          msr.init = flags.isSet(metal::METAL_FLAG_INIT);
-          ret = msr;
+          ret = metal::reg::getMSRFromState(metalInternalState);
           break;
         default:
           ret = this->metalMiscRegs.at(idx);

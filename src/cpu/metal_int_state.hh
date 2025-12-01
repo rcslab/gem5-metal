@@ -14,9 +14,11 @@ namespace gem5
             // low 32 bits: architecture specific flags
 
             // high 32 bits: reserved for internal use
-            FLAG_INST_INTERCEPT_MASK = 0x100000000,
-            FLAG_EXC_INTERCEPT_MASK = 0x200000000,
-            FLAG_INTERRUPT_MASK = 0x400000000
+            FLAG_INST_INTERCEPT_MASK_TEMP = 0x100000000,
+            FLAG_EXC_INTERCEPT_MASK_TEMP = 0x200000000,
+            FLAG_INTERRUPT_MASK_TEMP = 0x400000000
+            // XXX: include the permanent feature flags so that 
+            // modifying those becomes non-serializing
         };
 
         class InternalState {
