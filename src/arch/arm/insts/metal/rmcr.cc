@@ -33,7 +33,7 @@ namespace gem5 {
                     break;
             }
 
-            METAL_DBGPRINT(INSTS, RMCR, "%s (0x%lx).\n", printMetalReg(mReg), v);
+            METAL_DBGPRINT(INSTS, RMCR, "%s (0x%lx).\n", printMetalMiscReg(mReg), v);
 
             xc->setRegOperand(this, 0, v);
             if (traceData)

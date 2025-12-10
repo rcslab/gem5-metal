@@ -18,7 +18,7 @@ namespace gem5 {
         {
             const auto & mar = xc->tcBase()->readMetalMiscRegNoEffect(reg::MAR);
             if (!reg::canAccessGlobalReg(mReg, mar, true)) {
-                METAL_DBGPRINT(INSTS, WMGR, "Permission denied: %s. MAR: 0x%lx.\n", printMetalMiscReg(mReg), mar);
+                METAL_DBGPRINT(INSTS, WMGR, "Permission denied: %s. MAR: 0x%lx.\n", printMetalGlobalReg(mReg), mar);
                 return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
             }
             const RegVal v = xc->getRegOperand(this, 0);

@@ -1064,8 +1064,9 @@ MMU::translateFs(const RequestPtr &req, ThreadContext *tc, Mode mode,
             tran_type & S1S2NsTran);
 
     DPRINTF(TLB, "translateFs tainted addr %#x, untainted %#x, mode %d, st2 %d, scr %#x sctlr %#x MetalState [%s] "
-                 "flags %#lx tranType 0x%x\n", vaddr_tainted, vaddr, mode,
-                 state.isStage2, state.scr, state.sctlr, req->getPersistentState().mist.toStr().c_str(), flags, tran_type);
+                 "flags %#lx tranType 0x%x MMVA: 0x%lx MMSZ:0x%lx\n", vaddr_tainted, vaddr, mode,
+                 state.isStage2, state.scr, state.sctlr, req->getPersistentState().mist.toStr().c_str(), flags, tran_type,
+                state.mmva, state.mmsz);
 
     if (!state.isStage2) {
         if ((req->isInstFetch() && (!state.sctlr.i)) ||

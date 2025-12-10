@@ -740,7 +740,7 @@ Commit::propagateInterrupt()
     // Don't propagate intterupts if we are currently handling a trap or
     // in draining and the last observable instruction has been committed.
     if (commitStatus[0] == TrapPending || interrupt || trapSquash[0] ||
-            tcSquash[0] || drainImminent)
+            tcSquash[0] || drainImminent || thread[0]->getTC()->getIsaPtr()->getMetalState().getLevel() > 0)
         return;
 
     // Process interrupts if interrupts are enabled, not in PAL
