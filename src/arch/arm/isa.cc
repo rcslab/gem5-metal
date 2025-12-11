@@ -1639,9 +1639,10 @@ ISA::interceptExc(const Fault &fault, const StaticInstPtr &inst)
 
     // MER1 = Fault VADDR (if available)
     Addr fvaddr;
-    if (armFault->getFaultVAddr(fvaddr)) {
-        tc->setReg(metalRegClass[metal::reg::MER1], fvaddr);
-    }
+    if (!armFault->getFaultVAddr(fvaddr)) {
+        fvaddr = 0;
+    } 
+    tc->setReg(metalRegClass[metal::reg::MER1], fvaddr);
 
     // update CPSR for exceptions
     // CPSR cpsr = tc->readMiscReg(MISCREG_CPSR);

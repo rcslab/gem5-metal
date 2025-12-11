@@ -3,6 +3,7 @@
 // basic
 #include "arch/arm/insts/metal/menter.hh"
 #include "arch/arm/insts/metal/mexit.hh"
+#include "arch/arm/insts/metal/mdbgs.hh"
 
 // priv
 #include "arch/arm/insts/metal/wtlb.hh"

@@ -375,6 +375,15 @@ namespace Aarch64
                     }
                 }
             }
+            case 0b101: {
+                const uint8_t inst = bits(machInst, 7, 0);
+                switch(inst) {
+                    case 0x0:
+                        return new gem5::ArmISA::metal::inst::Mdbgs64(machInst);
+                    default:
+                        return new Unknown64(machInst);
+                }
+            }
             default: {
                 return new Unknown64(machInst);
             }

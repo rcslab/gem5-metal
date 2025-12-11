@@ -1120,6 +1120,8 @@ Gicv3Distributor::update()
     for (int i = 0; i < gic->getSystem()->threads.size(); i++) {
         gic->getRedistributor(i)->update();
     }
+    DPRINTF(GIC, "DIST update for int %d: pending %d, enabled %d, active %d, group %d, type :%d\n", 36, irqPending[36], irqEnabled[36], irqActive[36], getIntGroup(36), irqConfig[36]);
+        
 }
 
 Gicv3::IntStatus

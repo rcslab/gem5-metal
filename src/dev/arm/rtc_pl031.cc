@@ -138,6 +138,7 @@ PL031::write(PacketPtr pkt)
         if (pkt->getLE<uint32_t>()) {
             rawInt = false;
             pendingInt = false;
+            interrupt->clear();
         }
         break;
       default:
