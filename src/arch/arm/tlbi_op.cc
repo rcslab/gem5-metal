@@ -159,7 +159,7 @@ bool
 TLBIASID::match(TlbEntry* te, vmid_t vmid) const
 {
     return te->valid && te->asid == asid &&
-        secureLookup == !te->nstid &&
+        secureLookup == !te->nstid && !te->global &&
         te->checkELMatch(targetEL, inHost) &&
         (te->vmid == vmid || !el2Enabled || inHost);
 }

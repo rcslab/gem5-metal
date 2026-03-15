@@ -63,7 +63,12 @@ class TLBIOp
 
     virtual ~TLBIOp() {}
     virtual void operator()(ThreadContext* tc) {}
-
+    
+    virtual std::string print() const {
+        std::stringstream ss;
+        ss << "EL: " << targetEL << ", secure: " << secureLookup;
+        return ss.str();
+    }
     /**
      * Broadcast the TLB Invalidate operation to all
      * TLBs in the Arm system.
@@ -233,6 +238,13 @@ class TLBIASID : public TLBIOp
         el2Enabled(false)
     {}
 
+    std::string print() const override {
+        std::string parent = TLBIOp::print();
+        std::stringstream ss;
+        ss << parent << ", asid: " << asid << ", inHost: " << inHost << ", el2Enabled: " << el2Enabled;
+        return ss.str();
+    }
+
     void operator()(ThreadContext* tc) override;
 
     bool match(TlbEntry *entry, vmid_t curr_vmid) const override;
@@ -330,6 +342,13 @@ class TLBIMVA : public TLBIOp
       : TLBIOp(_targetEL, _secure), addr(_addr), asid(_asid),
         inHost(false), lastLevel(last_level)
     {}
+
+    std::string print() const override {
+        std::string parent = TLBIOp::print();
+        std::stringstream ss;
+        ss << parent << ", asid " << asid << ", addr 0x" << std::hex << addr << ", lastlv: " << lastLevel;
+        return ss.str();
+    }
 
     void operator()(ThreadContext* tc) override;
 

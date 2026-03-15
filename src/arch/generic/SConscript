@@ -50,6 +50,7 @@ SimObject('InstDecoder.py', sim_objects=['InstDecoder'])
 DebugFlag('PageTableWalker',
           "Page table walker state machine debugging")
 DebugFlag('TLB')
+DebugFlag('TLBOps')
 
 GTest('vec_reg.test', 'vec_reg.test.cc')
 GTest('vec_pred_reg.test', 'vec_pred_reg.test.cc')

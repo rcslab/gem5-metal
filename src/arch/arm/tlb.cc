@@ -52,6 +52,7 @@
 #include "cpu/thread_context.hh"
 #include "debug/TLB.hh"
 #include "debug/TLBVerbose.hh"
+#include "debug/TLBOps.hh"
 #include "params/ArmTLB.hh"
 
 namespace gem5
@@ -202,7 +203,7 @@ TLB::lookup(const Lookup &lookup_data) const
     TlbEntry *retval = match(lookup_data);
 
     DPRINTF(TLBVerbose, "Lookup %#x, asn %#x, ignore asn %d, secure %d, el %d, hyp %d -> *%s*: [%s].\n",
-            lookup_data.va, lookup_data.asn, lookup_data.ignoreAsn, 
+            lookup_data.va, lookup_data.asn, lookup_data.ignoreAsn,
             lookup_data.secure, lookup_data.targetEL, lookup_data.hyp,
             retval ? "hit" : "miss", retval ? retval->print().c_str() : "");
 
@@ -274,6 +275,7 @@ TLB::checkPromotion(TlbEntry *entry, BaseMMU::Mode mode)
 void
 TLB::insert(TlbEntry &entry)
 {
+    DPRINTF(TLBOps, "Inserting entry into TLB: - %s\n", entry.print());
     DPRINTF(TLB, "Inserting entry into TLB: %s.\n", entry.print().c_str());
 
     if (table[size - 1].valid)
@@ -320,13 +322,15 @@ TLB::printTlb() const
 void
 TLB::flushAll()
 {
-    DPRINTF(TLB, "Flushing all TLB entries\n");
+    DPRINTF(TLB, "Flushing *all* TLB entries\n");
+    DPRINTF(TLBOps, "Flushing *all* TLB entries\n");
     int x = 0;
     TlbEntry *te;
     while (x < size) {
         te = &table[x];
 
         if (te->valid) {
+            DPRINTF(TLBOps, "TLB flushing - %s\n", te->print());
             DPRINTF(TLB, " -  %s\n", te->print());
             te->valid = false;
             stats.flushedEntries++;
@@ -342,10 +346,12 @@ TLB::flush(const TLBIOp& tlbi_op)
 {
     int x = 0;
     TlbEntry *te;
+    DPRINTF(TLBOps, "Flushing matching TLB entries [%s].\n", tlbi_op.print());
     while (x < size) {
         te = &table[x];
         if (tlbi_op.match(te, vmid)) {
             DPRINTF(TLB, " -  %s\n", te->print());
+            DPRINTF(TLBOps, "TLB flushing - %s\n", te->print());
             te->valid = false;
             stats.flushedEntries++;
         }
