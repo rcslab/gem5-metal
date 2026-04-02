@@ -15,8 +15,8 @@ namespace gem5 {
             MetalMacroInst("wmcr", _machInst, IntAluOp), mReg(_mreg), gReg(_greg)
         {
             this->flags[IsInteger] = true;
-            this->flags[IsSerializeAfter] = true;
-            this->flags[IsNonSpeculative] = true;
+            // this->flags[IsSerializeAfter] = true;
+            // this->flags[IsNonSpeculative] = true;
 
             this->numMicroops = 1;
 
@@ -62,8 +62,8 @@ namespace gem5 {
             }
 
             assert(curMicroOp == this->numMicroops);
-            this->microOps[curMicroOp - 1]->setFlag(IsSerializeAfter);
-            this->microOps[curMicroOp - 1]->setFlag(IsNonSpeculative);
+            // this->microOps[curMicroOp - 1]->setFlag(IsSerializeAfter);
+            // this->microOps[curMicroOp - 1]->setFlag(IsNonSpeculative);
             this->finalize();
         }
 

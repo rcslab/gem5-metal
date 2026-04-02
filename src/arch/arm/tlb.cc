@@ -278,6 +278,31 @@ TLB::insert(TlbEntry &entry)
     DPRINTF(TLBOps, "Inserting entry into TLB: - %s\n", entry.print());
     DPRINTF(TLB, "Inserting entry into TLB: %s.\n", entry.print().c_str());
 
+    // evict matching entries first
+    Lookup lookup_data;
+    lookup_data.va = entry.vpn << entry.N;
+    lookup_data.asn = entry.asid;
+    lookup_data.ignoreAsn = entry.global;
+    lookup_data.vmid = entry.vmid;
+    lookup_data.hyp = entry.isHyp;
+    lookup_data.secure = !entry.nstid;
+    lookup_data.functional = true;
+    lookup_data.targetEL = entry.el;
+    lookup_data.inHost = false;
+    lookup_data.mode = (entry.type == TypeTLB::data ? BaseMMU::Read : BaseMMU::Execute);
+    TlbEntry * xist = lookup(lookup_data);
+    // only evict the exact same entries 
+    // i.e. same translation level (page bits), no partial entries
+    // 
+    if (xist != nullptr && 
+        xist->partial == entry.partial && 
+        xist->N == entry.N &&
+        xist->vpn == entry.vpn &&
+        (xist->type & entry.type)) {
+        xist->valid = false;
+        DPRINTF(TLBOps, "Replacing existing entry - %s.\n", xist->print());
+    }
+
     if (table[size - 1].valid)
         DPRINTF(TLB, "Replacing valid entry %s.\n", table[size-1].print().c_str());
 
@@ -330,8 +355,8 @@ TLB::flushAll()
         te = &table[x];
 
         if (te->valid) {
-            DPRINTF(TLBOps, "TLB flushing - %s\n", te->print());
             DPRINTF(TLB, " -  %s\n", te->print());
+            DPRINTF(TLBOps, " -  %s\n", te->print());
             te->valid = false;
             stats.flushedEntries++;
         }
@@ -351,7 +376,7 @@ TLB::flush(const TLBIOp& tlbi_op)
         te = &table[x];
         if (tlbi_op.match(te, vmid)) {
             DPRINTF(TLB, " -  %s\n", te->print());
-            DPRINTF(TLBOps, "TLB flushing - %s\n", te->print());
+            DPRINTF(TLBOps, " -  %s\n", te->print());
             te->valid = false;
             stats.flushedEntries++;
         }

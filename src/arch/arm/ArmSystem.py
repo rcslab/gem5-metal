@@ -304,7 +304,7 @@ class ArmSystem(System):
         "Supported physical address range in bits when using AArch64 (ARMv8)",
     )
     have_large_asid_64 = Param.Bool(
-        False, "True if ASID is 16 bits in AArch64 (ARMv8)"
+        True, "True if ASID is 16 bits in AArch64 (ARMv8)"
     )
     sve_vl = Param.SveVectorLength(
         1, "SVE vector length in quadwords (128-bit)"

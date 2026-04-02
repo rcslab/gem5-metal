@@ -1653,7 +1653,8 @@ ISA::interceptExc(const Fault &fault, const StaticInstPtr &inst)
     // cpsr.uao = 0; // user access override
     // tc->setMiscReg(MISCREG_CPSR, cpsr);
 
-    METAL_DBGPRINT(ISA, InterceptExc, "intercepting exception: mroutine = 0x%x, mode = %d, MER0 = 0x%lx, MER1 = 0x%lx.\n",
+    METAL_DBGPRINT(ISA, InterceptExc, "intercepting exception: pc = 0x%lx, mroutine = 0x%x, mode = %d, MER0 = 0x%lx, MER1 = 0x%lx.\n",
+                                        curr_pc,
                                         eilbEnt.getMroutine(),
                                         static_cast<int>(eilbEnt.getMode()),
                                         tc->getReg(metalRegClass[metal::reg::MER0]),

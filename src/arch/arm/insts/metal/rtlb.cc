@@ -1,4 +1,6 @@
 #include "arch/arm/insts/metal/rtlb.hh"
+#include "arch/arm/insts/metal/wtlb.hh"
+#include "arch/arm/pagetable.hh"
 
 namespace gem5 {
     namespace ArmISA {
@@ -8,119 +10,81 @@ namespace gem5 {
                        : MetalReg3Op("rtlb", _machInst, IntAluOp, _rl, _rm,
                                          _rn)
         {
+            setSrcRegIdx(_numSrcRegs++, intRegClass[r1]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[r3]);
+            
+            setDestRegIdx(_numDestRegs++,intRegClass[r1]);
+            setDestRegIdx(_numDestRegs++,intRegClass[r2]);
+            setDestRegIdx(_numDestRegs++,intRegClass[r3]);
+            _numTypedDestRegs[intRegClass.type()] += 3;
+
             this->flags[IsInteger] = true;
         }
 
         Fault Rtlb64::execute(ExecContext *xc, trace::InstRecord *traceData)
             const
         {
-            // this needs more thinking but we don't need this feature for now
-            panic("unimplemented");
+            const auto &mist = xc->getMetalState();
 
-            // metal_reg::MSR_t msr = xc->readMetalReg(metal_reg::MSR);
-            // RegVal vaReg = xc->readMetalReg(rn);
+            if (mist.getLevel() == 0)
+            {
+                METAL_DBGPRINT(INSTS, WTLB, "Permission denied: MetalState = [%s].\n", mist.toStr().c_str());
+                return std::make_shared<SupervisorTrap>(machInst, 0, ExceptionClass::TRAPPED_METAL_ACCESS);
+            }
 
-            // METAL_DBGPRINT(INSTS, RTLB, "RTLB: vaReg = %s, rm = %s, rn = %s (%#lx).\n",
-            //                                         printMetalReg(rl),
-            //                                         printMetalReg(rm),
-            //                                         printMetalReg(rn), vaReg);
+            const TLBVSpec vspec = xc->getRegOperand(this, 0);
+            const TLBExtAttr attrs = xc->getRegOperand(this, 1);
+            MMU * mmu = dynamic_cast<ArmISA::MMU *>(xc->tcBase()->getMMUPtr());
+            assert(mmu);
 
-            // if (!metal_reg::canWriteMetalReg(msr, rl)
-            //     || !metal_reg::canWriteMetalReg(msr, rm)
-            //     || !metal_reg::canReadMetalReg(msr, rn)
-            //     || (!metal_reg::isPrivilegeCheckDisabled(msr) && !metal_reg::isInMetalMode(msr)))
-            // {
-            //     return std::make_shared<UndefinedInstruction>(machInst, false, mnemonic);
-            // }
+            const Addr vpn = (vspec.vaddr <<  WTLB_MIN_PGSHIFT) >> (WTLB_MAX_PGSHIFT - vspec.sz);
 
-            // TableWalker::LongDescriptor ld;
-            // ld.aarch64 = true;
+            const TlbEntry * ent = mmu->lookup(vpn, attrs.asid, attrs.vmid, attrs.hyp, 
+                !attrs.ns, true, false, 
+                static_cast<ExceptionLevel>(static_cast<int>(attrs.el)), 
+                false, 
+                false,
+                vspec.itlb ? BaseMMU::Execute : BaseMMU::Read);
 
-            // TlbEntry::Lookup lookup;
-            // lookup.va = vaReg;
-            // lookup.ignoreAsn = true;
-            // lookup.targetEL = currEL(xc->tcBase());
+            TLBVSpec rvspec;
+            TLBExtAttr rattrs;
+            TLBPSpec rpspec;
+            if (ent == nullptr) {
+                rvspec = 0;
+                rattrs = 0;
+                rpspec = 0;
+                METAL_DBGPRINT(INSTS, WTLB, "RTLB: %s -> MISS.\n",
+                    printTlbAttr(vspec, 0, attrs));
+            } else {
+                rvspec.itlb = ent->type & TypeTLB::instruction;
+                rvspec.map = ent->map;
+                rvspec.mapid = ent->mapid;
+                rvspec.sz = WTLB_MAX_PGSHIFT - ent->N;
+                rvspec.vaddr = (ent->vpn << ent->N) >> WTLB_MIN_PGSHIFT ;
+                rpspec.paddr = ent->pAddr(0);
+                rpspec.valid = ent->valid;
+                rattrs.ap = ent->ap;
+                rattrs.asid = ent->asid;
+                rattrs.el = ent->el;
+                rattrs.hyp = ent->isHyp;
+                rattrs.mair = ((ent->attributes) >> 56) & 0b11111111;
+                rattrs.ng = !ent->global;
+                rattrs.ns = ent->ns;
+                rattrs.nstid = ent->nstid;
+                rattrs.pxn = ent->pxn;
+                rattrs.sh = ((ent->attributes) >> 7) & 0b11;
+                rattrs.vmid = ent->vmid;
+                rattrs.xn = ent->xn;
+                METAL_DBGPRINT(INSTS, WTLB, "RTLB: %s -> %s.\n", 
+                    printTlbAttr(vspec, 0, attrs), 
+                    printTlbAttr(rvspec, rpspec, rattrs));
+            }
 
-            // ArmISA::MMU * mmu = dynamic_cast<ArmISA::MMU *>(xc->tcBase()->getMMUPtr());
-            // assert(mmu);
+            xc->setRegOperand(this, 0, rvspec);
+            xc->setRegOperand(this, 1, rpspec);
+            xc->setRegOperand(this, 2, rattrs);
 
-            // vaReg = purifyTaggedAddr(vaReg, xc->tcBase(), currEL(xc->tcBase()), false);
-
-            // // read dtb by default
-            // // METAL_XXX: support more flags
-            // auto te = mmu->lookup(vaReg, 0, 0, false, false, false, true, currEL(xc->tcBase()), false, false, BaseMMU::Mode::Read);
-            // if (!te) {
-            //     panic("tlb entry does not exist.\n");
-            // }
-
-            // // Create and fill a new page table entry
-            // tei.set_isHyp(te->isHyp);
-            // tei.set_asid(te->asid);
-            // tei.set_vmid(te->vmid);
-            // // ld.data = insertBits(ld.data, )
-            // switch (te->N) {
-            //     // type == Page
-            //     case Grain4KB:
-            //     case Grain16KB:
-            //     case Grain64KB:
-            //         ld.data = insertBits(ld.data, 1, 0, 0x3);
-            //         ld.grainSize = (GrainSize)te->N;
-            //         break;
-
-            //     // type == Block
-            //     case 21:    // 2 MiB
-            //     case 30:    // 1 GiB
-            //         ld.data = insertBits(ld.data, 1, 0, 0x1);
-            //         ld.grainSize = Grain4KB;
-            //         break;
-            //     case 25:    // 32 MiB
-            //         ld.data = insertBits(ld.data, 1, 0, 0x1);
-            //         ld.grainSize = Grain16KB;
-            //         break;
-            //     case 29:    // 256 MiB
-            //     case 42:    // 4 TiB
-            //         ld.data = insertBits(ld.data, 1, 0, 0x1);
-            //         ld.grainSize = Grain64KB;
-            //         break;
-            //     default:
-            //         panic("Unknown page size: %d.", te->N);
-            //         break;
-            // }
-
-            // // pfn
-            // ld.data = insertBits(ld.data, 47, te->N, bits(te->pfn << te->N, 47,
-            //                      te->N));
-            // if (te->N == 16)
-            //     ld.data = insertBits(ld.data, 15, 12, bits(te->pfn << te->N,
-            //                          51, 48)); // 64k pages
-            // // domain always TlbEntry::DomainType::Client for LongDescriptor
-            // // te.domain         = ld.domain();
-            // ld.lookupLevel  = te->lookupLevel;
-            // ld.data = insertBits(ld.data, 5, te->ns);
-            // tei.set_isSecure(!te->nstid);
-            // // xn
-            // ld.data = insertBits(ld.data, 54, te->xn);
-            // tei.set_type(te->type == TypeTLB::instruction ? true : false);
-            // tei.set_el(te->el);
-            // // ld.global()
-            // ld.data = insertBits(ld.data, 11, !te->global);
-            // // ld.pxn()
-            // ld.data = insertBits(ld.data, 53, te->pxn);
-            // // ld.ap()
-            // ld.data = insertBits(ld.data, 7, 6, te->ap);
-            // tei.set_mtype(te->mtype);
-            // tei.set_nc(te->nonCacheable);
-            // // Attributes formatted according to the 64-bit PAR
-            // tei.set_attr(te->attributes >> 56);
-            // // ld.sh()
-            // ld.data = insertBits(ld.data, 9, 8, (te->attributes >> 7) & 0b11);
-
-            // tei.set_ao(te->ao);
-            // tei.set_ai(te->aoid);
-
-            // xc->setMetalReg(rl, (RegVal)ld.data);
-            // xc->setMetalReg(rm, (RegVal)tei.data);
-            //return NoFault;
+            return NoFault;
         }
     }}
     }

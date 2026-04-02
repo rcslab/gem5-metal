@@ -52,6 +52,7 @@
 #include "debug/PageTableWalker.hh"
 #include "debug/TLB.hh"
 #include "debug/TLBVerbose.hh"
+#include "debug/TLBOps.hh"
 #include "sim/system.hh"
 
 namespace gem5
@@ -1069,6 +1070,13 @@ TableWalker::processWalkAArch64()
 
     const bool is_atomic = currState->req->isAtomic();
 
+    // XXX: for fast Metal exception generation
+    // trap cases where TTBRx.addr_bits == 0 to avoid reading memory
+    if (mbits(ttbr, 47, 0) == 0) {
+        DPRINTF(TLB, "TTBRx(%#lx) contains a fast fault address, skipping translation.\n", ttbr);
+        fault = true;
+    }
+
     if (fault) {
         Fault f;
         if (currState->isFetch)
@@ -1175,15 +1183,6 @@ TableWalker::processWalkAArch64()
     currState->longDesc.aarch64 = true;
     currState->longDesc.grainSize = tg;
     currState->longDesc.physAddrRange = _physAddrRange;
-    
-    // XXX: for fast Metal exception generation
-    // trap cases where TTBRx == -1 to avoid reading memory
-    if (ttbr == (Addr)(-1)) {
-        DPRINTF(TLB, "TTBRx contains an invalid address (%#lx), causing fast fault type %d\n",
-                ttbr, ArmFault::TranslationLL + currState->longDesc.lookupLevel);
-        currState->fault = generateLongDescFault(ArmFault::TranslationLL);
-        return currState->fault;
-    }
 
     if (currState->timing) {
         fetchDescriptor(desc_addr, (uint8_t*) &currState->longDesc.data,

@@ -29,8 +29,8 @@ namespace gem5 {
             }
 
             Addr base = xc->getRegOperand(this, 0);
-            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, mode = %#x, size = %u.\n",
-                    r1, r2, imm,
+            METAL_DBGPRINT(INSTS, PLDRI, "dReg = %u, sReg = %u, imm = %d, addr = %#lx, mode = %#x, size = %u.\n",
+                    r1, r2, imm, base + imm,
                     static_cast<int>(mode) ,
                     sizeof(T));
 

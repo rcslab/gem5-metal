@@ -1307,8 +1307,8 @@ Fetch::fetch(bool &status_change)
                 transientMetalState.set(instruction->getMetalState());
                 DPRINTF(Fetch, "[tid:%i][sn:%lli] PreExec: Metal level %d -> %d, flags 0x%lx -> 0x%lx]\n", 
                         tid, instruction->seqNum,
-                        instruction->getPreExecMetalState().getLevel(), instruction->getPreExecMetalState().getFlags(),
-                        instruction->getMetalState().getLevel(), instruction->getMetalState().getFlags());
+                        instruction->getPreExecMetalState().getLevel(), instruction->getMetalState().getLevel(),
+                        instruction->getPreExecMetalState().getFlags(), instruction->getMetalState().getFlags());
             } else {
                 DPRINTF(Fetch, "[tid:%i][sn:%lli] PreExec faulted: %s.\n", tid, instruction->seqNum, preExecFault->name());
                 instruction->setSerializeAfter();

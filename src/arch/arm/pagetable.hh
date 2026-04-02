@@ -266,8 +266,8 @@ struct TlbEntry : public Serializable
     bool xn;                // Execute Never
     bool pxn;               // Privileged Execute Never (LPAE only)
 
-    bool map;
-    unsigned int mapid;
+    bool map; // Metal Access Permission Override?
+    unsigned int mapid; // Metal Access Permission ID
 
     //Construct an entry that maps to physical address addr for SE mode
     TlbEntry(Addr _asn, Addr _vaddr, Addr _paddr,
@@ -281,8 +281,8 @@ struct TlbEntry : public Serializable
          ns(true), nstid(true), el(EL0), type(TypeTLB::unified),
          partial(false),
          nonCacheable(uncacheable),
-         shareable(false), outerShareable(false), xn(0), pxn(0), map(false),
-         mapid(0)
+         shareable(false), outerShareable(false), xn(0), pxn(0), 
+         map(false), mapid(0)
     {
         // no restrictions by default, hap = 0x3
 

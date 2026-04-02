@@ -238,8 +238,8 @@ namespace gem5
             MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
                 MetalReg3Op(mnem, _machInst, __opClass, _dReg, _bReg, _oReg)
             {
-                this->flags[IsWriteBarrier] = true;
-                this->flags[IsReadBarrier] = true;
+                // this->flags[IsWriteBarrier] = true;
+                // this->flags[IsReadBarrier] = true;
             }
 
             std::string generateDisassembly(
