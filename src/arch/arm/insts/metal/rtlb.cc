@@ -37,31 +37,28 @@ namespace gem5 {
             MMU * mmu = dynamic_cast<ArmISA::MMU *>(xc->tcBase()->getMMUPtr());
             assert(mmu);
 
-            const Addr vpn = (vspec.vaddr <<  WTLB_MIN_PGSHIFT) >> (WTLB_MAX_PGSHIFT - vspec.sz);
+            const Addr vaddr = vspec.vaddr <<  WTLB_MIN_PGSHIFT;
 
-            const TlbEntry * ent = mmu->lookup(vpn, attrs.asid, attrs.vmid, attrs.hyp, 
-                !attrs.ns, true, false, 
+            const TlbEntry * ent = mmu->lookup(vaddr, attrs.asid, attrs.vmid, attrs.hyp, 
+                !attrs.nstid, true, !attrs.ng, 
                 static_cast<ExceptionLevel>(static_cast<int>(attrs.el)), 
                 false, 
                 false,
                 vspec.itlb ? BaseMMU::Execute : BaseMMU::Read);
 
-            TLBVSpec rvspec;
-            TLBExtAttr rattrs;
-            TLBPSpec rpspec;
+            TLBVSpec rvspec = 0;
+            TLBExtAttr rattrs = 0;
+            TLBPSpec rpspec = 0;
             if (ent == nullptr) {
-                rvspec = 0;
-                rattrs = 0;
-                rpspec = 0;
-                METAL_DBGPRINT(INSTS, WTLB, "RTLB: %s -> MISS.\n",
+                METAL_DBGPRINT(INSTS, RTLB, "%s -> MISS.\n",
                     printTlbAttr(vspec, 0, attrs));
             } else {
                 rvspec.itlb = ent->type & TypeTLB::instruction;
                 rvspec.map = ent->map;
                 rvspec.mapid = ent->mapid;
                 rvspec.sz = WTLB_MAX_PGSHIFT - ent->N;
-                rvspec.vaddr = (ent->vpn << ent->N) >> WTLB_MIN_PGSHIFT ;
-                rpspec.paddr = ent->pAddr(0);
+                rvspec.vaddr = (ent->vpn << ent->N) >> WTLB_MIN_PGSHIFT;
+                rpspec.paddr = ent->pAddr(0) >> WTLB_MIN_PGSHIFT;
                 rpspec.valid = ent->valid;
                 rattrs.ap = ent->ap;
                 rattrs.asid = ent->asid;
@@ -75,7 +72,7 @@ namespace gem5 {
                 rattrs.sh = ((ent->attributes) >> 7) & 0b11;
                 rattrs.vmid = ent->vmid;
                 rattrs.xn = ent->xn;
-                METAL_DBGPRINT(INSTS, WTLB, "RTLB: %s -> %s.\n", 
+                METAL_DBGPRINT(INSTS, RTLB, "%s -> %s.\n", 
                     printTlbAttr(vspec, 0, attrs), 
                     printTlbAttr(rvspec, rpspec, rattrs));
             }

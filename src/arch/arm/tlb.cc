@@ -299,18 +299,18 @@ TLB::insert(TlbEntry &entry)
         xist->N == entry.N &&
         xist->vpn == entry.vpn &&
         (xist->type & entry.type)) {
-        xist->valid = false;
-        DPRINTF(TLBOps, "Replacing existing entry - %s.\n", xist->print());
-    }
+        DPRINTF(TLBOps, "Updating existing entry - %s.\n", xist->print());
+        *xist = entry;
+    } else {
+        if (table[size - 1].valid)
+            DPRINTF(TLB, "Replacing valid entry %s.\n", table[size-1].print().c_str());
 
-    if (table[size - 1].valid)
-        DPRINTF(TLB, "Replacing valid entry %s.\n", table[size-1].print().c_str());
-
-    // inserting to MRU position and evicting the LRU one
-    for (int i = size - 1; i > 0; --i) {
-        table[i] = table[i-1];
+        // inserting to MRU position and evicting the LRU one
+        for (int i = size - 1; i > 0; --i) {
+            table[i] = table[i-1];
+        }
+        table[0] = entry;
     }
-    table[0] = entry;
 
     stats.inserts++;
     ppRefills->notify(1);
