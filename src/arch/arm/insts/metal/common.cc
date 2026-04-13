@@ -1,4 +1,5 @@
 #include "arch/arm/insts/metal/common.hh"
+#include "arch/arm/insts/metal/pmem.hh"
 #include "base/cprintf.hh"
 
 namespace gem5 { namespace ArmISA {
@@ -90,48 +91,20 @@ namespace metal { namespace inst {
             return ss.str();
         }
 
-        std::string MetalPMemRegOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
+        template<typename T>
+        std::string MetalPMemOp<T>::generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const
         {
             std::stringstream ss;
             ss << MetalDisasmPrefix;
             printMnemonic(ss, "", false);
             printIntReg(ss, r1, 64);
-            ccprintf(ss, ", [");
+            ccprintf(ss, ", ");
             printIntReg(ss, r2, 64);
             ccprintf(ss, ", ");
             printIntReg(ss, r3, 64);
-            ccprintf(ss, "]");
             return ss.str();
         }
-
-        std::string MetalPMemRegImmOp::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
-        {
-            std::stringstream ss;
-            ss << MetalDisasmPrefix;
-            printMnemonic(ss, "", false);
-            printIntReg(ss, r1, 64);
-            ccprintf(ss, ", ");
-            switch(mode) {
-                case Mode::NORMAL:
-                case Mode::PREINDEX:
-                    ccprintf(ss, "[");
-                    printIntReg(ss, r2, 64);
-                    ccprintf(ss, ", ");
-                    ccprintf(ss, "#%#x]", imm);
-                    if (mode == Mode::PREINDEX) {
-                        ccprintf(ss, "!");
-                    }
-                    break;
-                case Mode::POSTINDEX:
-                    ccprintf(ss, "[");
-                    printIntReg(ss, r2, 64);
-                    ccprintf(ss, "], #%#x", imm);
-                    break;
-                default:
-                    panic("Unknown Metal PMem mode: %d", static_cast<int>(this->mode));
-            }
-            return ss.str();
-        } 
     }}
 } // namespace ArmISA
 } // namespace gem5

@@ -231,44 +231,6 @@ namespace gem5
             std::string generateDisassembly(
                 Addr pc, const loader::SymbolTable *symtab) const override;
         };
-
-        class MetalPMemRegOp : public MetalReg3Op
-        {
-        public:
-            MetalPMemRegOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _dReg, RegIndex _bReg, RegIndex _oReg) :
-                MetalReg3Op(mnem, _machInst, __opClass, _dReg, _bReg, _oReg)
-            {
-                // this->flags[IsWriteBarrier] = true;
-                // this->flags[IsReadBarrier] = true;
-            }
-
-            std::string generateDisassembly(
-                Addr pc, const loader::SymbolTable *symtab) const override;
-        };
-
-        class MetalPMemRegImmOp : public MetalReg2Op
-        {
-        public:
-            enum class Mode {
-                NORMAL,
-                PREINDEX,
-                POSTINDEX
-            };
-        protected:
-            int imm;
-            Mode mode;
-        public:
-            MetalPMemRegImmOp(const char *mnem, ExtMachInst _machInst, OpClass __opClass, RegIndex _r1, RegIndex _r2, int32_t _imm, Mode _mode) :
-                MetalReg2Op(mnem, _machInst, __opClass, _r1, _r2), imm(_imm), mode(_mode)
-            {
-                this->flags[IsWriteBarrier] = true;
-                this->flags[IsReadBarrier] = true;
-            }
-
-            std::string generateDisassembly(
-                Addr pc, const loader::SymbolTable *symtab) const override;
-        };
-
         }}
     } // namespace ArmISA
 } // namespace gem5

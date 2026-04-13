@@ -8,8 +8,8 @@
 // priv
 #include "arch/arm/insts/metal/wtlb.hh"
 #include "arch/arm/insts/metal/rtlb.hh"
-#include "arch/arm/insts/metal/pldr.hh"
-#include "arch/arm/insts/metal/pstr.hh"
+#include "arch/arm/insts/metal/pld.hh"
+#include "arch/arm/insts/metal/pst.hh"
 
 // general reg manip
 #include "arch/arm/insts/metal/wmr.hh"

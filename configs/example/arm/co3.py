@@ -1,14 +1,13 @@
 import argparse
 import os
+import pdb
 
 import m5
+from gem5.simulate.exit_event import ExitEvent
 from m5.objects import *
+from m5.objects.Ide import *
 from m5.options import *
 from m5.util import addToPath
-import pdb;
-from m5.objects.Ide import *
-
-from gem5.simulate.exit_event import ExitEvent
 
 m5.util.addToPath("../..")
 
@@ -22,6 +21,7 @@ from common.cores.arm import (
     HPI,
     O3_ARM_v7a,
 )
+
 
 class L1I(Cache):
     tag_latency = 1
@@ -47,6 +47,7 @@ class L1D(Cache):
     write_buffers = 16
     # Consider the L2 a victim cache also for clean lines
     writeback_clean = True
+
 
 # L2 Cache
 class L2(Cache):
@@ -100,6 +101,7 @@ class CowIdeDisk(IdeDisk):
     def childImage(self, ci):
         self.image.child.image_file = ci
 
+
 def create(args):
     """Create and configure the syste   m object."""
 
@@ -137,20 +139,22 @@ def create(args):
         )
 
     system.realview.ethernet = IGbE_e1000(
-            # pci_bus=0, pci_dev=0, pci_func=0, 
-            InterruptLine=1, InterruptPin=1
+        # pci_bus=0, pci_dev=0, pci_func=0,
+        InterruptLine=1,
+        InterruptPin=1,
     )
     pci_devices.append(system.realview.ethernet)
     system.realview.ide = IdeController(
-            disks=[],
-            # pci_func=1,
-            # pci_dev=1,
-            # pci_bus=1,
-            InterruptLine=2, InterruptPin=2
+        disks=[],
+        # pci_func=1,
+        # pci_dev=1,
+        # pci_bus=1,
+        InterruptLine=2,
+        InterruptPin=2,
     )
 
     if args.disk_image:
-        disk = CowIdeDisk(driveID='device0')
+        disk = CowIdeDisk(driveID="device0")
         disk.childImage(args.disk_image)
         system.realview.ide.disks.append(disk)
 
@@ -161,14 +165,14 @@ def create(args):
 
     # Add CPU clusters to the system
     armcluster = devices.ArmCpuCluster(
-            system,
-            args.num_cores,
-            args.cpu_freq,
-            "1.0V",
-            *cpu_types[args.cpu],
-            tarmac_gen=args.tarmac_gen,
-            tarmac_dest=args.tarmac_dest,
-        )
+        system,
+        args.num_cores,
+        args.cpu_freq,
+        "1.0V",
+        *cpu_types[args.cpu],
+        tarmac_gen=args.tarmac_gen,
+        tarmac_dest=args.tarmac_dest,
+    )
     armcluster.connectMRAM(system.realview.mram)
     system.cpu_cluster = armcluster
 
@@ -192,10 +196,8 @@ def create(args):
 
     # pci devices
     for dev in pci_devices:
-        system.realview.attachPciDevice(
-            dev, system.iobus
-        )
- 
+        system.realview.attachPciDevice(dev, system.iobus)
+
     if args.gdb:
         system.workload.wait_for_remote_gdb = True
 
@@ -203,34 +205,28 @@ def create(args):
         system.workload.dtb_filename = args.dtb
     else:
         # No DTB specified: autogenerate DTB
-        system.workload.dtb_filename = os.path.join(
-            m5.options.outdir, "system.dtb"
-        )
+        system.workload.dtb_filename = os.path.join(m5.options.outdir, "system.dtb")
         system.generateDtb(system.workload.dtb_filename)
 
     if args.bootloader != "":
-        system.realview.setupBootLoader(
-            system, SysPaths.binary, args.bootloader
-        )
+        system.realview.setupBootLoader(system, SysPaths.binary, args.bootloader)
 
     if args.with_pmu:
         enabled_pmu_events = {
             *args.pmu_dump_stats_on,
             *args.pmu_reset_stats_on,
         }
-        exit_sim_on_control = bool(
-            enabled_pmu_events & set(pmu_control_events.keys())
-        )
+        exit_sim_on_control = bool(enabled_pmu_events & set(pmu_control_events.keys()))
         exit_sim_on_interrupt = bool(
             enabled_pmu_events & set(pmu_interrupt_events.keys())
         )
-        for cluster in system.cpu_cluster:
-            interrupt_numbers = [args.pmu_ppi_number] * len(cluster)
-            cluster.addPMUs(
-                interrupt_numbers,
-                exit_sim_on_control=exit_sim_on_control,
-                exit_sim_on_interrupt=exit_sim_on_interrupt,
-            )
+
+        interrupt_numbers = [args.pmu_ppi_number] * len(system.cpu_cluster)
+        system.cpu_cluster.addPMUs(
+            interrupt_numbers,
+            exit_sim_on_control=exit_sim_on_control,
+            exit_sim_on_interrupt=exit_sim_on_interrupt,
+        )
 
     if args.exit_on_uart_eot:
         for uart in system.realview.uart:
@@ -262,16 +258,10 @@ def run(args):
             print("Checkpoint done.")
         elif exit_msg in pmu_exit_msgs:
             if exit_msg in pmu_stats_dump_msgs:
-                print(
-                    f"Dumping stats at tick {m5.curTick():d}, "
-                    f"due to {exit_msg}"
-                )
+                print(f"Dumping stats at tick {m5.curTick():d}, due to {exit_msg}")
                 m5.stats.dump()
             if exit_msg in pmu_stats_reset_msgs:
-                print(
-                    f"Resetting stats at tick {m5.curTick():d}, "
-                    f"due to {exit_msg}"
-                )
+                print(f"Resetting stats at tick {m5.curTick():d}, due to {exit_msg}")
                 m5.stats.reset()
         else:
             print(f"{exit_msg} ({event.getCode()}) @ {m5.curTick()}")
@@ -290,9 +280,7 @@ def arm_ppi_arg(int_num: int) -> int:
 def main():
     parser = argparse.ArgumentParser(epilog=__doc__)
 
-    parser.add_argument(
-        "--kernel", type=str, default=None, help="Binary to run"
-    )
+    parser.add_argument("--kernel", type=str, default=None, help="Binary to run")
     parser.add_argument(
         "--disk-image", type=str, default=None, help="Disk to instantiate"
     )
@@ -310,9 +298,7 @@ def main():
         help="CPU model to use",
     )
     parser.add_argument("--cpu-freq", type=str, default="1GHz")
-    parser.add_argument(
-        "--num-cores", type=int, default=1, help="Number of CPU cores"
-    )
+    parser.add_argument("--num-cores", type=int, default=1, help="Number of CPU cores")
     parser.add_argument(
         "--machine-type",
         type=str,
