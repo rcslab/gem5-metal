@@ -11,8 +11,9 @@ namespace gem5 {
                                          _rn)
         {
             setSrcRegIdx(_numSrcRegs++, intRegClass[r1]);
+            setSrcRegIdx(_numSrcRegs++, intRegClass[r2]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[r3]);
-            
+
             setDestRegIdx(_numDestRegs++,intRegClass[r1]);
             setDestRegIdx(_numDestRegs++,intRegClass[r2]);
             setDestRegIdx(_numDestRegs++,intRegClass[r3]);
@@ -33,32 +34,36 @@ namespace gem5 {
             }
 
             const TLBVSpec vspec = xc->getRegOperand(this, 0);
-            const TLBExtAttr attrs = xc->getRegOperand(this, 1);
+            const TLBExtAttr attrs = xc->getRegOperand(this, 2);
             MMU * mmu = dynamic_cast<ArmISA::MMU *>(xc->tcBase()->getMMUPtr());
             assert(mmu);
 
-            const Addr vaddr = vspec.vaddr <<  WTLB_MIN_PGSHIFT;
+            const Addr vaddr = vspec.vpn << (WTLB_MIN_PGSHIFT + vspec.sz);
 
-            const TlbEntry * ent = mmu->lookup(vaddr, attrs.asid, attrs.vmid, attrs.hyp, 
-                !attrs.nstid, true, !attrs.ng, 
-                static_cast<ExceptionLevel>(static_cast<int>(attrs.el)), 
-                false, 
+            const TlbEntry * ent = mmu->lookup(vaddr, attrs.asid, attrs.vmid, attrs.hyp,
+                !attrs.nstid, true, !attrs.ng,
+                static_cast<ExceptionLevel>(static_cast<int>(attrs.el)),
+                false,
                 false,
                 vspec.itlb ? BaseMMU::Execute : BaseMMU::Read);
 
-            TLBVSpec rvspec = 0;
-            TLBExtAttr rattrs = 0;
-            TLBPSpec rpspec = 0;
+            TLBVSpec rvspec = xc->getRegOperand(this, 0);
+            TLBPSpec rpspec = xc->getRegOperand(this, 1);
+            TLBExtAttr rattrs = xc->getRegOperand(this, 2);
             if (ent == nullptr) {
                 METAL_DBGPRINT(INSTS, RTLB, "%s -> MISS.\n",
                     printTlbAttr(vspec, 0, attrs));
             } else {
+                rvspec = 0;
+                rattrs = 0;
+                rpspec = 0;
+
                 rvspec.itlb = ent->type & TypeTLB::instruction;
                 rvspec.map = ent->map;
                 rvspec.mapid = ent->mapid;
-                rvspec.sz = WTLB_MAX_PGSHIFT - ent->N;
-                rvspec.vaddr = (ent->vpn << ent->N) >> WTLB_MIN_PGSHIFT;
-                rpspec.paddr = ent->pAddr(0) >> WTLB_MIN_PGSHIFT;
+                rvspec.sz = ent->N - WTLB_MIN_PGSHIFT;
+                rvspec.vpn = ent->vpn;
+                rpspec.ppn = ent->pfn;
                 rpspec.valid = ent->valid;
                 rattrs.ap = ent->ap;
                 rattrs.asid = ent->asid;
@@ -72,8 +77,8 @@ namespace gem5 {
                 rattrs.sh = ((ent->attributes) >> 7) & 0b11;
                 rattrs.vmid = ent->vmid;
                 rattrs.xn = ent->xn;
-                METAL_DBGPRINT(INSTS, RTLB, "%s -> %s.\n", 
-                    printTlbAttr(vspec, 0, attrs), 
+                METAL_DBGPRINT(INSTS, RTLB, "%s -> %s.\n",
+                    printTlbAttr(vspec, 0, attrs),
                     printTlbAttr(rvspec, rpspec, rattrs));
             }
 

@@ -59,7 +59,7 @@ namespace metal{ namespace inst {
         Fault Mexit64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
             const gem5::metal::InternalState state = xc->getMetalState();
-            assert(state.getLevel() >= 0);
+            assert(state.getLevel() <= reg::MaxMetalLevel);
 
             const RegVal ret = xc->getRegOperand(this, 0);
             const MexitFlags flags = static_cast<MexitFlags>(imm);

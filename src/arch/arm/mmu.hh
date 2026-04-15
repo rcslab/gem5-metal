@@ -278,7 +278,7 @@ class MMU : public BaseMMU
             const RequestPtr &req, ThreadContext *tc,
             Translation *translation, Mode mode,
             ArmTranslationType tran_type, bool stage2);
-    
+
     bool isMRAMPAddr(Addr paddr, const CachedState &state) const;
     bool isMRAMVAddr(Addr vaddr, const CachedState &state) const;
     Fault translateMRAM(ThreadContext *tc, const RequestPtr &req, Mode mode,

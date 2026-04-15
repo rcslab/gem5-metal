@@ -281,7 +281,7 @@ struct TlbEntry : public Serializable
          ns(true), nstid(true), el(EL0), type(TypeTLB::unified),
          partial(false),
          nonCacheable(uncacheable),
-         shareable(false), outerShareable(false), xn(0), pxn(0), 
+         shareable(false), outerShareable(false), xn(0), pxn(0),
          map(false), mapid(0)
     {
         // no restrictions by default, hap = 0x3

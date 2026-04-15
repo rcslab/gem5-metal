@@ -63,7 +63,7 @@ class TLBIOp
 
     virtual ~TLBIOp() {}
     virtual void operator()(ThreadContext* tc) {}
-    
+
     virtual std::string print() const {
         std::stringstream ss;
         ss << "EL: " << targetEL << ", secure: " << secureLookup;

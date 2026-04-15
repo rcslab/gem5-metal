@@ -8,6 +8,7 @@
 // priv
 #include "arch/arm/insts/metal/wtlb.hh"
 #include "arch/arm/insts/metal/rtlb.hh"
+#include "arch/arm/insts/metal/ftlb.hh"
 #include "arch/arm/insts/metal/pld.hh"
 #include "arch/arm/insts/metal/pst.hh"
 

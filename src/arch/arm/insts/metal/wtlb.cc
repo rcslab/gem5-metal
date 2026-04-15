@@ -13,6 +13,7 @@ namespace gem5 {
             setSrcRegIdx(_numSrcRegs++, intRegClass[r2]);
             setSrcRegIdx(_numSrcRegs++, intRegClass[r3]);
 
+            this->flags[IsInteger] = true;
             // this->flags[IsNonSpeculative] = true;
             // this->flags[IsSerializeAfter] = true;
         }
@@ -49,12 +50,10 @@ namespace gem5 {
             te.type = vspec.itlb ? TypeTLB::instruction : TypeTLB::data;
             te.lookupLevel = enums::ArmLookupLevel::L3;
             te.tg = ReservedGrain;
-            te.N = WTLB_MAX_PGSHIFT - vspec.sz;
-            const Addr pvaddr = purifyTaggedAddr(vspec.vaddr << WTLB_MIN_PGSHIFT, 
-                            xc->tcBase(), currEL(xc->tcBase()), vspec.itlb);
-            te.vpn = pvaddr >> te.N;
+            te.N = WTLB_MIN_PGSHIFT + vspec.sz;
+            te.vpn = vspec.vpn;
             te.size = (1ull << te.N) - 1;
-            te.pfn = (pspec.paddr << WTLB_MIN_PGSHIFT) >> te.N;
+            te.pfn = pspec.ppn;
             te.map = vspec.map;
             te.mapid = vspec.mapid;
 
