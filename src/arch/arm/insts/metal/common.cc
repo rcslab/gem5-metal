@@ -91,20 +91,6 @@ namespace metal { namespace inst {
             return ss.str();
         }
 
-        template<typename T>
-        std::string MetalPMemOp<T>::generateDisassembly(
-                Addr pc, const loader::SymbolTable *symtab) const
-        {
-            std::stringstream ss;
-            ss << MetalDisasmPrefix;
-            printMnemonic(ss, "", false);
-            printIntReg(ss, r1, 64);
-            ccprintf(ss, ", ");
-            printIntReg(ss, r2, 64);
-            ccprintf(ss, ", ");
-            printIntReg(ss, r3, 64);
-            return ss.str();
-        }
     }}
 } // namespace ArmISA
 } // namespace gem5

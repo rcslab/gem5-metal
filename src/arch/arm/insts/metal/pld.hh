@@ -14,10 +14,10 @@ namespace gem5 {
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
         };
-        template class Pldr<uint8_t>;
-        template class Pldr<uint16_t>;
-        template class Pldr<uint32_t>;
-        template class Pldr<uint64_t>;
+        extern template class Pldr<uint8_t>;
+        extern template class Pldr<uint16_t>;
+        extern template class Pldr<uint32_t>;
+        extern template class Pldr<uint64_t>;
 
         template <typename T>
         class Pldp : public MetalPMemOp<T>
@@ -28,8 +28,8 @@ namespace gem5 {
             Fault initiateAcc(ExecContext *xc, trace::InstRecord *traceData) const override;
             Fault completeAcc(Packet *pkt, ExecContext *xc, trace::InstRecord *traceData) const override;
         };
-        template class Pldp<uint32_t>;
-        template class Pldp<uint64_t>;
+        extern template class Pldp<uint32_t>;
+        extern template class Pldp<uint64_t>;
     }}
     }
 }

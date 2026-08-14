@@ -20,10 +20,10 @@ namespace gem5 {
                     Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
                     std::string generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const override;
                 };
-                template class MetalPMemOp<uint8_t>;
-                template class MetalPMemOp<uint16_t>;
-                template class MetalPMemOp<uint32_t>;
-                template class MetalPMemOp<uint64_t>;
+                extern template class MetalPMemOp<uint8_t>;
+                extern template class MetalPMemOp<uint16_t>;
+                extern template class MetalPMemOp<uint32_t>;
+                extern template class MetalPMemOp<uint64_t>;
             }
         }
     }

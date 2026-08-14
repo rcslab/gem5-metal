@@ -441,7 +441,7 @@ main['TCMALLOC_CCFLAGS'] = []
 
 CXX_version = readCommand([main['CXX'], '--version'], exception=False)
 
-main['GCC'] = CXX_version and CXX_version.find('g++') >= 0
+main['GCC'] = CXX_version and CXX_version.find('g++') and CXX_version.find('GCC') >= 0
 main['CLANG'] = CXX_version and CXX_version.find('clang') >= 0
 if main['GCC'] + main['CLANG'] > 1:
     error('Two compilers enabled at once?')

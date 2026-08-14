@@ -82,6 +82,14 @@ namespace gem5 {
             return MetalPMemOp<T>::recvResp(pkt, xc, nullptr, 2, traceData);
         }
 
+        template class Pstr<uint8_t>;
+        template class Pstr<uint16_t>;
+        template class Pstr<uint32_t>;
+        template class Pstr<uint64_t>;
+
+        template class Pstp<uint32_t>;
+        template class Pstp<uint64_t>;
+
 
     }}
     }

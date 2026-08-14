@@ -2,6 +2,7 @@
 #include "arch/arm/insts/metal/common.hh"
 #include "arch/arm/utility.hh"
 #include "arch/generic/memhelpers.hh"
+#include "base/cprintf.hh"
 #include "base/types.hh"
 #include "enums/ByteOrder.hh"
 #include "sim/byteswap.hh"
@@ -78,6 +79,27 @@ namespace gem5 {
         {
             panic("unimplemented.");
         }
+
+        template<typename T>
+        std::string MetalPMemOp<T>::generateDisassembly(
+                Addr pc, const loader::SymbolTable *symtab) const
+        {
+            std::stringstream ss;
+            ss << MetalDisasmPrefix;
+            printMnemonic(ss, "", false);
+            printIntReg(ss, r1, 64);
+            ccprintf(ss, ", ");
+            printIntReg(ss, r2, 64);
+            ccprintf(ss, ", ");
+            printIntReg(ss, r3, 64);
+            return ss.str();
+        }
+
+        template class MetalPMemOp<uint8_t>;
+        template class MetalPMemOp<uint16_t>;
+        template class MetalPMemOp<uint32_t>;
+        template class MetalPMemOp<uint64_t>;
+
     }}
     }
 }

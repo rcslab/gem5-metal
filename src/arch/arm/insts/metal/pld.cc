@@ -96,6 +96,14 @@ namespace gem5 {
             return fault;
         }
 
+        template class Pldr<uint8_t>;
+        template class Pldr<uint16_t>;
+        template class Pldr<uint32_t>;
+        template class Pldr<uint64_t>;
+
+        template class Pldp<uint32_t>;
+        template class Pldp<uint64_t>;
+
     }}
     }
 }
