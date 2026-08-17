@@ -10,7 +10,6 @@ RUN dnf -y upgrade --refresh && \
         clang \
         llvm \
         lld \
-        gcc \
         make \
         git \
         m4 \
