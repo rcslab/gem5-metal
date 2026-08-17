@@ -1,4 +1,4 @@
-FROM fedora:43
+FROM fedora:44
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
