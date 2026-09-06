@@ -15,6 +15,7 @@ namespace gem5 {
                 Mint64(ExtMachInst _machInst, uint _imm, RegVal mir0, RegVal mir1, RegVal mir2);
                 Fault execute(ExecContext *xc, trace::InstRecord *traceData) const override;
                 Fault preExec(ExecContext *xc, trace::InstRecord *traceData) override;
+                std::unique_ptr<PCStateBase> buildRetPC(const PCStateBase &cur_pc, const PCStateBase &call_pc) const override;
             };
         }}
     }

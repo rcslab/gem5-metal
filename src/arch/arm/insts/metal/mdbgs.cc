@@ -1,10 +1,13 @@
 #include "arch/arm/insts/metal/mdbgs.hh"
 #include "arch/arm/regs/metal.hh"
+#include "base/debug.hh"
+#include "base/types.hh"
 #include "cpu/metal_int_state.hh"
+#include <sstream>
 
 namespace gem5 { namespace ArmISA {
 namespace metal{ namespace inst {
-        Mdbgs64::Mdbgs64(ExtMachInst _machInst) : MetalNakedOp("mdbgs", _machInst, IntAluOp)
+        Mdbgs64::Mdbgs64(ExtMachInst _machInst, uint _imm) : MetalImmOp("mdbgs", _machInst, IntAluOp, _imm)
         {
             this->flags[IsSerializeAfter] = true;
             this->flags[IsNonSpeculative] = true;
@@ -12,14 +15,22 @@ namespace metal{ namespace inst {
 
         Fault Mdbgs64::execute(ExecContext *xc, trace::InstRecord *traceData) const
         {
+            std::stringstream ss;
 
-            METAL_DBGPRINT(INSTS, MDBGS64, "Enabling Debug Logging (Metal, Exec)....");
+            for(unsigned int i = 0; i < std::size(FLAGS); i++) {
+                if (bits(imm, i) ) {
+                    if (i > 0) {
+                        ss << ", ";
+                    }
 
-            ObjectMatch activate("Metal");
-            ObjectMatch activate2("Exec");
+                    ss << FLAGS[i];
+                    setDebugFlag(FLAGS[i].data());
+                } else {
+                    clearDebugFlag(FLAGS[i].data());
+                }
+            }
 
-            trace::getDebugLogger()->addActivate(activate);
-            trace::getDebugLogger()->addActivate(activate2);
+            METAL_DBGPRINT(INSTS, MDBGS64, "setting debug flags to 0x%lx [%s].\n", imm, ss.str());
 
             return NoFault;
         }

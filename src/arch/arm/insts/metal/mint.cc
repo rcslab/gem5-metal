@@ -4,12 +4,18 @@
 #include "arch/arm/regs/metal.hh"
 #include "base/types.hh"
 #include "cpu/static_inst.hh"
+#include "enums/StaticInstFlags.hh"
 
 namespace gem5 { namespace ArmISA {
 namespace metal { namespace inst {
-    Mint64::Mint64(ExtMachInst _machInst, uint _imm, RegVal mir0, RegVal mir1, RegVal mir2) : 
+    Mint64::Mint64(ExtMachInst _machInst, uint _imm, RegVal mir0, RegVal mir1, RegVal mir2) :
     Menter64("mint", _machInst, _imm), mir0(mir0), mir1(mir1), mir2(mir2)
     {
+        this->flags[IsControl] = true;
+        this->flags[IsIndirectControl] = true;
+        this->flags[IsUncondControl] = true;
+        this->flags[IsCall] = true;
+
         setDestRegIdx(_numDestRegs++, metalRegClass[reg::MSPSR]); // idx = 1
         setDestRegIdx(_numDestRegs++, metalRegClass[reg::MIR0]); // idx = 2
         setDestRegIdx(_numDestRegs++, metalRegClass[reg::MIR1]); // idx = 3
@@ -29,6 +35,13 @@ namespace metal { namespace inst {
         return Menter64::preExec(xc, traceData);
     }
 
+    std::unique_ptr<PCStateBase> Mint64::buildRetPC(const PCStateBase &cur_pc, const PCStateBase &call_pc) const
+    {
+        PCStateBase *ret_pc = call_pc.clone();
+        ret_pc->as<PCState>().uReset();
+        return std::unique_ptr<PCStateBase>{ret_pc};
+    }
+
     Fault Mint64::execute(ExecContext *xc, trace::InstRecord *traceData) const
     {
         // save NzCV
@@ -46,7 +59,7 @@ namespace metal { namespace inst {
 
         // set msflags
         // xc->setRegOperand(this, 2, saved_mflags);
-        
+
         // set the three masks
         xc->setRegOperand(this, 2, mir0);
         xc->setRegOperand(this, 3, mir1);

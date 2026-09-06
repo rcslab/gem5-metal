@@ -552,7 +552,7 @@ Fetch::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
                 tid);
         return false;
         // XXX: shouldn't we only check thread[0]?
-    } else if (checkInterrupt(pc) && !delayedCommit[tid] 
+    } else if (checkInterrupt(pc) && !delayedCommit[tid]
                 && (mist.getLevel() == 0) && (!mist.getFlags().isSet(metal::FLAG_INTERRUPT_MASK_TEMP))) {
         // Hold off fetch from getting new instructions when:
         // Cache is blocked, or
@@ -1251,7 +1251,7 @@ Fetch::fetch(bool &status_change)
 
                     // Increment stat of fetched instructions.
                     cpu->fetchStats[tid]->numInsts++;
-                    
+
                     const metal::InternalFlags miflags = transientMetalState.getFlags();
 
                     if (!miflags.isSet(metal::FLAG_INST_INTERCEPT_MASK_TEMP) && transientMetalState.getLevel() == 0) {
@@ -1290,13 +1290,13 @@ Fetch::fetch(bool &status_change)
 
             DynInstPtr instruction = buildInst(
                     tid, staticInst, curMacroop, this_pc, *next_pc, true);
-            
+
             // propagate metal internal state
             instruction->setPreExecMetalState(transientMetalState);
 
             // clear transient flags
-            transientMetalState.clearFlags(metal::FLAG_EXC_INTERCEPT_MASK_TEMP | 
-                metal::FLAG_INST_INTERCEPT_MASK_TEMP | 
+            transientMetalState.clearFlags(metal::FLAG_EXC_INTERCEPT_MASK_TEMP |
+                metal::FLAG_INST_INTERCEPT_MASK_TEMP |
                 metal::FLAG_INTERRUPT_MASK_TEMP);
             instruction->setMetalState(transientMetalState);
 
@@ -1305,7 +1305,7 @@ Fetch::fetch(bool &status_change)
             if (preExecFault == NoFault) {
                 // update the latest metal internal state
                 transientMetalState.set(instruction->getMetalState());
-                DPRINTF(Fetch, "[tid:%i][sn:%lli] PreExec: Metal level %d -> %d, flags 0x%lx -> 0x%lx]\n", 
+                DPRINTF(Fetch, "[tid:%i][sn:%lli] PreExec: Metal level %d -> %d, flags 0x%lx -> 0x%lx]\n",
                         tid, instruction->seqNum,
                         instruction->getPreExecMetalState().getLevel(), instruction->getMetalState().getLevel(),
                         instruction->getPreExecMetalState().getFlags(), instruction->getMetalState().getFlags());

@@ -9,7 +9,7 @@ namespace metal{ namespace inst {
             this->flags[IsControl] = true;
             this->flags[IsIndirectControl] = true;
             this->flags[IsUncondControl] = true;
-            this->flags[IsCall] = true;
+            this->flags[IsReturn] = true;
             this->flags[IsPreExecOperandUpdate] = true;
         }
 

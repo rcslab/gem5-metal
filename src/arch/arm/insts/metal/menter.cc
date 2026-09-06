@@ -19,7 +19,7 @@ namespace metal { namespace inst {
         Menter64::Menter64(ExtMachInst _machInst, uint _imm) : Menter64("menter", _machInst, _imm)
         {
         }
-        
+
 
         // we know we will increase the metal level by 1 if successfully executed
         Fault Menter64::preExec(ExecContext *xc, trace::InstRecord *traceData)
