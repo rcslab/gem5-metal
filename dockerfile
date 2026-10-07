@@ -38,20 +38,16 @@ RUN dnf -y upgrade --refresh && \
 RUN mkdir /artifacts
 
 # clone sources
-RUN <<EOF
-set -euo pipefail
-cd /artifacts
-git clone --single-branch --depth 1 --branch master https://github.com/rcslab/copper.git
-git clone --single-branch --depth 1 --branch v23.1.0.0-metal https://github.com/rcslab/gem5-metal.git
-EOF
+COPY gem5-metal /artifacts/gem5-metal
+COPY copper /artifacts/copper
 
 # copy scripts
 COPY --chmod=0755 \
-    docker/build_copper_arm64.sh \
-    docker/build_copper_cobalt.sh \
-    docker/build_gem5.sh \
-    docker/run.sh \
-    docker/attach.sh \
+    gem5-metal/docker/build_copper_arm64.sh \
+    gem5-metal/docker/build_copper_cobalt.sh \
+    gem5-metal/docker/build_gem5.sh \
+    gem5-metal/docker/run.sh \
+    gem5-metal/docker/attach.sh \
     /artifacts/
 
 WORKDIR /artifacts
